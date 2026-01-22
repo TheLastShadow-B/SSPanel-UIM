@@ -103,7 +103,8 @@ final class UserController extends BaseController
                 (new OnlineLog())
                     ->where('user_id', $user_raw->id)
                     ->where('last_time', '>', time() - 90)
-                    ->count()
+                    ->distinct()
+                    ->count('ip')
             ) {
                 continue;
             }
