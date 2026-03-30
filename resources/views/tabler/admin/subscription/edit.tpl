@@ -77,7 +77,7 @@
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">到期日期</label>
                                 <div class="col">
-                                    <input type="text" class="form-control" value="{$subscription->end_date}" disabled>
+                                    <input id="end_date" type="date" class="form-control" value="{$subscription->end_date}">
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">
@@ -118,6 +118,7 @@
             dataType: "json",
             data: {
                 renewal_price: $('#renewal_price').val(),
+                end_date: $('#end_date').val(),
             },
             success: function (data) {
                 if (data.ret === 1) {

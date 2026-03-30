@@ -89,6 +89,7 @@ final class SubscriptionController extends BaseController
         }
 
         $newPrice = (float) $request->getParam('renewal_price');
+        $newEndDate = $request->getParam('end_date');
 
         if ($newPrice < 0) {
             return $response->withJson([
@@ -98,6 +99,28 @@ final class SubscriptionController extends BaseController
         }
 
         $subscription->renewal_price = $newPrice;
+
+        // 更新到期日期
+        if ($newEndDate !== null && $newEndDate !== '' && $newEndDate !== $subscription->end_date) {
+            $parsedDate = Carbon::parse($newEndDate);
+
+            if ($parsedDate->lt(Carbon::today())) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '到期日期不能早于今天',
+                ]);
+            }
+
+            $subscription->end_date = $parsedDate->toDateString();
+
+            // 同步更新用户的 class_expire
+            $user = (new User())->find($subscription->user_id);
+            if ($user !== null) {
+                $user->class_expire = $parsedDate->toDateString() . ' 23:59:59';
+                $user->save();
+            }
+        }
+
         $subscription->updated_at = Carbon::now()->toDateTimeString();
         $subscription->save();
 
@@ -129,7 +152,7 @@ final class SubscriptionController extends BaseController
 
         return $response->withJson([
             'ret' => 1,
-            'msg' => '续费价格更新成功',
+            'msg' => '订阅信息更新成功',
         ]);
     }
 
