@@ -43,6 +43,7 @@ final class Product extends Model
             'tabp' => '时间流量包',
             'time' => '时间包',
             'bandwidth' => '流量包',
+            'subscription' => '订阅套餐',
             default => '其他',
         };
     }

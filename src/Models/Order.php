@@ -12,8 +12,9 @@ use Illuminate\Database\Query\Builder;
  * @property int    $product_id      商品ID
  * @property string $product_type    商品类型
  * @property string $product_name    商品名称
- * @property string $product_content 商品内容
- * @property string $coupon          订单优惠码
+ * @property string  $product_content 商品内容
+ * @property int|null $subscription_id 关联订阅ID
+ * @property string  $coupon          订单优惠码
  * @property float  $price           订单金额
  * @property string $status          订单状态
  * @property int    $create_time     创建时间
@@ -51,6 +52,7 @@ final class Order extends Model
             'time' => '时间包',
             'bandwidth' => '流量包',
             'topup' => '充值',
+            'subscription' => '订阅套餐',
             default => '其他',
         };
     }
