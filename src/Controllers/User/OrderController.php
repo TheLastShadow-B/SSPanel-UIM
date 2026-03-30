@@ -15,6 +15,7 @@ use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function in_array;
 use function json_decode;
 use function json_encode;
 use function time;
@@ -68,9 +69,21 @@ final class OrderController extends BaseController
         $product->type_text = $product->type();
         $product->content = json_decode($product->content);
 
+        $isSubscription = $product->type === 'subscription';
+        $hasActiveSubscription = false;
+
+        if ($isSubscription) {
+            $hasActiveSubscription = (new \App\Models\Subscription())
+                ->where('user_id', $this->user->id)
+                ->whereIn('status', ['active', 'pending_renewal'])
+                ->exists();
+        }
+
         return $response->write(
             $this->view()
                 ->assign('product', $product)
+                ->assign('isSubscription', $isSubscription)
+                ->assign('hasActiveSubscription', $hasActiveSubscription)
                 ->fetch('user/order/create.tpl')
         );
     }
@@ -113,6 +126,7 @@ final class OrderController extends BaseController
     {
         return match ($request->getParam('type')) {
             'product' => $this->product($request, $response, $args),
+            'subscription' => $this->subscription($request, $response, $args),
             'topup' => $this->topup($request, $response, $args),
             default => $response->withJson([
                 'ret' => 0,
@@ -144,6 +158,20 @@ final class OrderController extends BaseController
                 'ret' => 0,
                 'msg' => '商品不存在或库存不足',
             ]);
+        }
+
+        if ($product->type === 'bandwidth') {
+            $hasActiveSubscription = (new \App\Models\Subscription())
+                ->where('user_id', $user->id)
+                ->where('status', 'active')
+                ->exists();
+
+            if (! $hasActiveSubscription) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '你需要先购买订阅套餐才能购买流量包',
+                ]);
+            }
         }
 
         $couponService = null;
@@ -207,6 +235,182 @@ final class OrderController extends BaseController
             'content_id' => 0,
             'name' => $product->name,
             'price' => $product->price,
+        ];
+
+        if ($couponCode !== '') {
+            $invoiceContent[] = [
+                'content_id' => 1,
+                'name' => '优惠码 ' . $couponCode,
+                'price' => '-' . $discount,
+            ];
+        }
+
+        $invoice = new Invoice();
+        $invoice->user_id = $user->id;
+        $invoice->order_id = $order->id;
+        $invoice->content = json_encode($invoiceContent);
+        $invoice->price = $buyPrice;
+        $invoice->status = $buyPrice === 0.0 ? 'paid_gateway' : 'unpaid';
+        $invoice->create_time = time();
+        $invoice->update_time = time();
+        $invoice->pay_time = 0;
+        $invoice->type = 'product';
+        $invoice->save();
+
+        if ($product->stock > 0) {
+            $product->stock -= 1;
+        }
+
+        $product->sale_count += 1;
+        $product->save();
+
+        if ($couponService !== null) {
+            $couponService->incrementUseCount();
+        }
+
+        return $response->withHeader('HX-Redirect', '/user/invoice/' . $invoice->id . '/view');
+    }
+
+    public function subscription(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        $couponCode = $this->antiXss->xss_clean($request->getParam('coupon'));
+        $productId = $this->antiXss->xss_clean($request->getParam('product_id'));
+        $billingCycle = $this->antiXss->xss_clean($request->getParam('billing_cycle'));
+
+        $product = (new Product())->find($productId);
+
+        if ($product === null || $product->stock === 0 || $product->type !== 'subscription') {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '商品不存在或库存不足',
+            ]);
+        }
+
+        $user = $this->user;
+
+        if ($user->is_shadow_banned) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '商品不存在或库存不足',
+            ]);
+        }
+
+        // 检查是否已有活跃订阅
+        $hasActiveSubscription = (new \App\Models\Subscription())
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['active', 'pending_renewal'])
+            ->exists();
+
+        if ($hasActiveSubscription) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '你已有活跃的订阅，无法购买新的订阅',
+            ]);
+        }
+
+        $content = json_decode($product->content);
+
+        // 验证账单周期
+        if (! in_array($billingCycle, ['month', 'quarter', 'year'], true)) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '无效的账单周期',
+            ]);
+        }
+
+        if (! ($content->billing_cycle->$billingCycle ?? false)) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '该套餐不支持此账单周期',
+            ]);
+        }
+
+        // 计算周期价格
+        $cyclePrice = \App\Services\SubscriptionService::calculateCyclePrice(
+            $product->price,
+            $billingCycle,
+            $content
+        );
+
+        $buyPrice = $cyclePrice;
+        $discount = 0;
+        $couponService = null;
+
+        // 优惠券验证（仅新购允许）
+        if ($couponCode !== '') {
+            $couponService = new Coupon();
+
+            if (! $couponService->validate($couponCode, $product, $user)) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => $couponService->getError(),
+                ]);
+            }
+
+            $discount = $couponService->getDiscount();
+            $buyPrice = max(0, round($cyclePrice - $discount, 2));
+        }
+
+        // 购买限制验证
+        $productLimit = json_decode($product->limit);
+
+        if ($productLimit->class_required !== '' && $user->class < (int) $productLimit->class_required) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '你的账户等级不足，无法购买此商品',
+            ]);
+        }
+
+        if ($productLimit->node_group_required !== ''
+            && $user->node_group !== (int) $productLimit->node_group_required) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '你所在的用户组无法购买此商品',
+            ]);
+        }
+
+        if ($productLimit->new_user_required !== 0) {
+            $orderCount = (new Order())->where('user_id', $user->id)->count();
+            if ($orderCount > 0) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '此商品仅限新用户购买',
+                ]);
+            }
+        }
+
+        // 在 product_content 中记录用户选择的周期和产品名
+        $orderContent = json_decode($product->content, true);
+        $orderContent['billing_cycle_selected'] = $billingCycle;
+        $orderContent['name'] = $product->name;
+
+        // 创建订单
+        $order = new Order();
+        $order->user_id = $user->id;
+        $order->product_id = $product->id;
+        $order->product_type = 'subscription';
+        $order->product_name = $product->name;
+        $order->product_content = json_encode($orderContent);
+        $order->subscription_id = null;
+        $order->coupon = $couponCode;
+        $order->price = $buyPrice;
+        $order->status = $buyPrice === 0.0 ? 'pending_activation' : 'pending_payment';
+        $order->create_time = time();
+        $order->update_time = time();
+        $order->save();
+
+        // 创建账单
+        $cycleName = match ($billingCycle) {
+            'month' => '月付',
+            'quarter' => '季付',
+            'year' => '年付',
+        };
+
+        $invoiceContent = [];
+        $invoiceContent[] = [
+            'content_id' => 0,
+            'name' => $product->name . ' (' . $cycleName . ')',
+            'price' => $cyclePrice,
         ];
 
         if ($couponCode !== '') {
