@@ -47,6 +47,11 @@ final class ProductController extends BaseController
         'ip_limit',
         'class_required',
         'node_group_required',
+        'billing_cycle_month',
+        'billing_cycle_quarter',
+        'billing_cycle_year',
+        'discount_quarter',
+        'discount_year',
     ];
 
     private static string $invalid_data_msg = '无效商品数据';
@@ -92,6 +97,8 @@ final class ProductController extends BaseController
         $content->node_group = $content->node_group ?? 0;
         $content->speed_limit = $content->speed_limit ?? 0;
         $content->ip_limit = $content->ip_limit ?? 0;
+        $content->billing_cycle = $content->billing_cycle ?? (object) ['month' => true, 'quarter' => false, 'year' => false];
+        $content->discount = $content->discount ?? (object) ['quarter' => 1.0, 'year' => 1.0];
 
         return $response->write(
             $this->view()
@@ -176,6 +183,51 @@ final class ProductController extends BaseController
 
             $content = [
                 'bandwidth' => $bandwidth,
+            ];
+        } elseif ($type === 'subscription') {
+            if ($bandwidth <= 0) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => self::$invalid_data_msg,
+                ]);
+            }
+
+            $billingCycleMonth = $request->getParam('billing_cycle_month') === 'true';
+            $billingCycleQuarter = $request->getParam('billing_cycle_quarter') === 'true';
+            $billingCycleYear = $request->getParam('billing_cycle_year') === 'true';
+
+            if (! $billingCycleMonth && ! $billingCycleQuarter && ! $billingCycleYear) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '请至少选择一个账单周期',
+                ]);
+            }
+
+            $discountQuarter = (float) ($request->getParam('discount_quarter') ?? 1.0);
+            $discountYear = (float) ($request->getParam('discount_year') ?? 1.0);
+
+            if ($discountQuarter <= 0 || $discountQuarter > 1 || $discountYear <= 0 || $discountYear > 1) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '折扣比例必须在 0 到 1 之间',
+                ]);
+            }
+
+            $content = [
+                'bandwidth' => $bandwidth,
+                'class' => $class,
+                'node_group' => $node_group,
+                'speed_limit' => $speed_limit,
+                'ip_limit' => $ip_limit,
+                'billing_cycle' => [
+                    'month' => $billingCycleMonth,
+                    'quarter' => $billingCycleQuarter,
+                    'year' => $billingCycleYear,
+                ],
+                'discount' => [
+                    'quarter' => $discountQuarter,
+                    'year' => $discountYear,
+                ],
             ];
         } else {
             return $response->withJson([
@@ -282,6 +334,51 @@ final class ProductController extends BaseController
 
             $content = [
                 'bandwidth' => $bandwidth,
+            ];
+        } elseif ($type === 'subscription') {
+            if ($bandwidth <= 0) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => self::$invalid_data_msg,
+                ]);
+            }
+
+            $billingCycleMonth = $request->getParam('billing_cycle_month') === 'true';
+            $billingCycleQuarter = $request->getParam('billing_cycle_quarter') === 'true';
+            $billingCycleYear = $request->getParam('billing_cycle_year') === 'true';
+
+            if (! $billingCycleMonth && ! $billingCycleQuarter && ! $billingCycleYear) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '请至少选择一个账单周期',
+                ]);
+            }
+
+            $discountQuarter = (float) ($request->getParam('discount_quarter') ?? 1.0);
+            $discountYear = (float) ($request->getParam('discount_year') ?? 1.0);
+
+            if ($discountQuarter <= 0 || $discountQuarter > 1 || $discountYear <= 0 || $discountYear > 1) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '折扣比例必须在 0 到 1 之间',
+                ]);
+            }
+
+            $content = [
+                'bandwidth' => $bandwidth,
+                'class' => $class,
+                'node_group' => $node_group,
+                'speed_limit' => $speed_limit,
+                'ip_limit' => $ip_limit,
+                'billing_cycle' => [
+                    'month' => $billingCycleMonth,
+                    'quarter' => $billingCycleQuarter,
+                    'year' => $billingCycleYear,
+                ],
+                'discount' => [
+                    'quarter' => $discountQuarter,
+                    'year' => $discountYear,
+                ],
             ];
         } else {
             return $response->withJson([

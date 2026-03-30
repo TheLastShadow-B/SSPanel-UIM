@@ -86,6 +86,8 @@ return static function (Slim\App $app): void {
         // 账户余额
         $group->get('/money', App\Controllers\User\MoneyController::class . ':index');
         $group->post('/giftcard', App\Controllers\User\MoneyController::class . ':applyGiftCard');
+        // 订阅管理
+        $group->get('/subscription', App\Controllers\User\SubscriptionController::class . ':index');
         // 产品页面
         $group->get('/product', App\Controllers\User\ProductController::class . ':index');
         // 订单页面
@@ -299,6 +301,12 @@ return static function (Slim\App $app): void {
         $group->post('/giftcard', App\Controllers\Admin\GiftCardController::class . ':add');
         $group->post('/giftcard/ajax', App\Controllers\Admin\GiftCardController::class . ':ajax');
         $group->delete('/giftcard/{id:[0-9]+}', App\Controllers\Admin\GiftCardController::class . ':delete');
+        // 订阅管理
+        $group->get('/subscription', App\Controllers\Admin\SubscriptionController::class . ':index');
+        $group->get('/subscription/{id:[0-9]+}/edit', App\Controllers\Admin\SubscriptionController::class . ':edit');
+        $group->put('/subscription/{id:[0-9]+}/price', App\Controllers\Admin\SubscriptionController::class . ':updatePrice');
+        $group->post('/subscription/{id:[0-9]+}/cancel', App\Controllers\Admin\SubscriptionController::class . ':cancel');
+        $group->post('/subscription/ajax', App\Controllers\Admin\SubscriptionController::class . ':ajax');
         // 商品
         $group->get('/product', App\Controllers\Admin\ProductController::class . ':index');
         $group->get('/product/create', App\Controllers\Admin\ProductController::class . ':create');

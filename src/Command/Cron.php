@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\Models\Config;
 use App\Services\Cron as CronService;
+use App\Services\SubscriptionService;
 use App\Services\Detect;
 use Exception;
 use Telegram\Bot\Exceptions\TelegramSDKException;
@@ -38,6 +39,10 @@ EOL;
         $jobs->processBandwidthOrderActivation();
         $jobs->processTimeOrderActivation();
         $jobs->processTopupOrderActivation();
+
+        // Run subscription related jobs
+        SubscriptionService::processNewSubscriptionActivation();
+        SubscriptionService::processRenewalActivation();
 
         // Run user related jobs
         $jobs->expirePaidUserAccount();
@@ -79,6 +84,12 @@ EOL;
             }
 
             $jobs->resetTodayBandwidth();
+
+            // Subscription daily jobs
+            SubscriptionService::expireSubscription();
+            SubscriptionService::generateRenewalOrder();
+            SubscriptionService::sendSecondRenewalNotification();
+            SubscriptionService::resetSubscriptionBandwidth();
 
             if (Config::obtain('im_bot_group_notify_daily_job')) {
                 $jobs->sendDailyJobNotification();
