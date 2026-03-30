@@ -335,7 +335,7 @@ final class OrderController extends BaseController
 
         // 计算周期价格
         $cyclePrice = \App\Services\SubscriptionService::calculateCyclePrice(
-            $product->price,
+            (float) $product->price,
             $billingCycle,
             $content
         );
