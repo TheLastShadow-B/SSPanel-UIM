@@ -308,6 +308,14 @@ final class OrderController extends BaseController
             ]);
         }
 
+        // 检查是否有未到期的旧套餐
+        if ($user->class > 0 && strtotime($user->class_expire) > time()) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '你当前还有未到期的套餐，请等待到期后再购买订阅',
+            ]);
+        }
+
         $content = json_decode($product->content);
 
         // 验证账单周期

@@ -15,6 +15,7 @@ use App\Models\OnlineLog;
 use App\Models\Order;
 use App\Models\Paylist;
 use App\Models\SubscribeLog;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Models\UserMoneyLog;
 use App\Utils\Tools;
@@ -158,6 +159,16 @@ final class Cron
 
         foreach ($paidUsers as $user) {
             if (strtotime($user->class_expire) < time()) {
+                // 跳过有活跃订阅的用户，订阅到期由 SubscriptionService 处理
+                $hasActiveSubscription = (new Subscription())
+                    ->where('user_id', $user->id)
+                    ->whereIn('status', ['active', 'pending_renewal'])
+                    ->exists();
+
+                if ($hasActiveSubscription) {
+                    continue;
+                }
+
                 $text = '你好，系统发现你的账号等级已经过期了。';
                 $reset_traffic = $_ENV['class_expire_reset_traffic'];
 
