@@ -63,9 +63,10 @@
                                 <label class="form-label col-3 col-form-label">类型</label>
                                 <div class="col">
                                     <select id="type" class="col form-select">
-                                        <option value="tabp">时间流量包</option>
+                                        <option value="subscription">订阅套餐</option>
                                         <option value="bandwidth">流量包</option>
-                                        <option value="time">时间包</option>
+                                        <option value="tabp">时间流量包(旧)</option>
+                                        <option value="time">时间包(旧)</option>
                                     </select>
                                 </div>
                             </div>
@@ -149,6 +150,40 @@
                                     </span>
                                 </label>
                             </div>
+                            <div id="subscription_option" style="display: none;">
+                                <div class="hr-text">
+                                    <span>订阅设置</span>
+                                </div>
+                                <div class="form-group mb-3 row">
+                                    <label class="form-label col-3 col-form-label">账单周期</label>
+                                    <div class="col">
+                                        <label class="form-check form-check-inline">
+                                            <input id="billing_cycle_month" class="form-check-input" type="checkbox" checked>
+                                            <span class="form-check-label">月付</span>
+                                        </label>
+                                        <label class="form-check form-check-inline">
+                                            <input id="billing_cycle_quarter" class="form-check-input" type="checkbox">
+                                            <span class="form-check-label">季付</span>
+                                        </label>
+                                        <label class="form-check form-check-inline">
+                                            <input id="billing_cycle_year" class="form-check-input" type="checkbox">
+                                            <span class="form-check-label">年付</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group mb-3 row">
+                                    <label class="form-label col-3 col-form-label">季付折扣</label>
+                                    <div class="col">
+                                        <input id="discount_quarter" type="text" class="form-control" value="1.0">
+                                    </div>
+                                </div>
+                                <div class="form-group mb-3 row">
+                                    <label class="form-label col-3 col-form-label">年付折扣</label>
+                                    <div class="col">
+                                        <input id="discount_year" type="text" class="form-control" value="1.0">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -163,7 +198,23 @@
     });
 
     $("#type").on("change", function () {
-        if (this.value === "bandwidth") {
+        if (this.value === "subscription") {
+            $("#time_option").hide();
+            $("#class_option").show();
+            $("#class_time_option").hide();
+            $("#bandwidth_option").show();
+            $("#node_group_option").show();
+            $("#speed_limit_option").show();
+            $("#ip_limit_option").show();
+            $("#subscription_option").show();
+            $("#time").prop("required", false);
+            $("#class").prop("required", true);
+            $("#class_time").prop("required", false);
+            $("#bandwidth").prop("required", true);
+            $("#node_group").prop("required", true);
+            $("#speed_limit").prop("required", true);
+            $("#ip_limit").prop("required", true);
+        } else if (this.value === "bandwidth") {
             $("#time_option").hide();
             $("#class_option").hide();
             $("#class_time_option").hide();
@@ -171,6 +222,7 @@
             $("#node_group_option").hide();
             $("#speed_limit_option").hide();
             $("#ip_limit_option").hide();
+            $("#subscription_option").hide();
             $("#time").prop("required", false);
             $("#class").prop("required", false);
             $("#class_time").prop("required", false);
@@ -186,6 +238,7 @@
             $("#node_group_option").show();
             $("#speed_limit_option").show();
             $("#ip_limit_option").show();
+            $("#subscription_option").hide();
             $("#time").prop("required", true);
             $("#class").prop("required", true);
             $("#class_time").prop("required", true);
@@ -201,6 +254,7 @@
             $("#node_group_option").show();
             $("#speed_limit_option").show();
             $("#ip_limit_option").show();
+            $("#subscription_option").hide();
             $("#time").prop("required", true);
             $("#class").prop("required", true);
             $("#class_time").prop("required", true);
@@ -229,6 +283,11 @@
                     {$key}: $("#{$key}").val(),
                     {/foreach}
                     new_user_required: $("#new_user_required").is(":checked"),
+                    billing_cycle_month: $("#billing_cycle_month").is(":checked"),
+                    billing_cycle_quarter: $("#billing_cycle_quarter").is(":checked"),
+                    billing_cycle_year: $("#billing_cycle_year").is(":checked"),
+                    discount_quarter: $("#discount_quarter").val(),
+                    discount_year: $("#discount_year").val(),
                 },
                 success: function (data) {
                     if (data.ret === 1) {
