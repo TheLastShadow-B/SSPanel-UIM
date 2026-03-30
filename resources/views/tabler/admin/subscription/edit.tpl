@@ -47,7 +47,7 @@
                             <div class="form-group mb-3 row">
                                 <label class="form-label col-3 col-form-label">用户邮箱</label>
                                 <div class="col">
-                                    <input type="text" class="form-control" value="{$user->email}" disabled>
+                                    <input type="text" class="form-control" value="{$userEmail}" disabled>
                                 </div>
                             </div>
                             <div class="form-group mb-3 row">

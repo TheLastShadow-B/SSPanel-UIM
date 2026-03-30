@@ -65,11 +65,13 @@ final class SubscriptionController extends BaseController
         $subscription->content = json_decode($subscription->product_content);
 
         $user = (new User())->find($subscription->user_id);
+        $userEmail = $user !== null ? $user->email : '用户已删除';
 
         return $response->write(
             $this->view()
                 ->assign('subscription', $subscription)
                 ->assign('user', $user)
+                ->assign('userEmail', $userEmail)
                 ->fetch('admin/subscription/edit.tpl')
         );
     }

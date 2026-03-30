@@ -210,6 +210,7 @@ final class SubscriptionService
 
             $user->u = 0;
             $user->d = 0;
+            $user->transfer_today = 0;
             $user->transfer_enable = Tools::gbToB($content->bandwidth);
             $user->save();
 
@@ -319,6 +320,13 @@ final class SubscriptionService
     {
         $renewalDays = (int) Config::obtain('subscription_renewal_days');
         $reminderDays = (int) ceil($renewalDays / 2);
+
+        // 如果提醒日与首次通知日相同，跳过（避免同一天发两封邮件）
+        if ($reminderDays === $renewalDays) {
+            echo Tools::toDateTime(time()) . ' 订阅续费二次提醒跳过（与首次通知日相同）' . PHP_EOL;
+            return;
+        }
+
         $targetDate = Carbon::today()->addDays($reminderDays)->format('Y-m-d');
 
         $subscriptions = (new Subscription())->where('status', 'pending_renewal')

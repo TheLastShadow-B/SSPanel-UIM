@@ -52,16 +52,10 @@
                                                         {* Discount badges *}
                                                         <div class="mb-3">
                                                             {if isset($sub->content->billing_cycle->quarter) && $sub->content->billing_cycle->quarter && isset($sub->content->discount->quarter) && $sub->content->discount->quarter < 1}
-                                                                <span class="badge bg-green-lt me-1">季付{$sub->content->discount->quarter * 10}折</span>
-                                                            {/if}
-                                                            {if isset($sub->content->billing_cycle->half_year) && $sub->content->billing_cycle->half_year && isset($sub->content->discount->half_year) && $sub->content->discount->half_year < 1}
-                                                                <span class="badge bg-green-lt me-1">半年付{$sub->content->discount->half_year * 10}折</span>
+                                                                <span class="badge bg-green-lt me-1">季付{$sub->content->discount->quarter * 10|string_format:"%.0f"}折</span>
                                                             {/if}
                                                             {if isset($sub->content->billing_cycle->year) && $sub->content->billing_cycle->year && isset($sub->content->discount->year) && $sub->content->discount->year < 1}
-                                                                <span class="badge bg-green-lt me-1">年付{$sub->content->discount->year * 10}折</span>
-                                                            {/if}
-                                                            {if isset($sub->content->billing_cycle->two_year) && $sub->content->billing_cycle->two_year && isset($sub->content->discount->two_year) && $sub->content->discount->two_year < 1}
-                                                                <span class="badge bg-green-lt me-1">两年付{$sub->content->discount->two_year * 10}折</span>
+                                                                <span class="badge bg-green-lt me-1">年付{$sub->content->discount->year * 10|string_format:"%.0f"}折</span>
                                                             {/if}
                                                         </div>
                                                         <div class="list-group list-group-flush">
