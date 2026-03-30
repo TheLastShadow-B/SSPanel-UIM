@@ -99,6 +99,8 @@ final class SubscriptionService
             $subscription->reset_day = (int) $today->format('d');
             $subscription->last_reset_date = $today->format('Y-m-d');
             $subscription->status = 'active';
+            $subscription->created_at = $today->format('Y-m-d H:i:s');
+            $subscription->updated_at = $today->format('Y-m-d H:i:s');
             $subscription->save();
 
             // 更新用户信息
@@ -158,6 +160,7 @@ final class SubscriptionService
             $subscription->start_date = $newStart->format('Y-m-d');
             $subscription->end_date = $newEnd->format('Y-m-d');
             $subscription->status = 'active';
+            $subscription->updated_at = Carbon::now()->format('Y-m-d H:i:s');
             $subscription->save();
 
             // 更新用户 class_expire
@@ -211,6 +214,7 @@ final class SubscriptionService
             $user->save();
 
             $subscription->last_reset_date = $today->format('Y-m-d');
+            $subscription->updated_at = Carbon::now()->format('Y-m-d H:i:s');
             $subscription->save();
 
             echo "订阅 #{$subscription->id} 用户 #{$user->id} 流量已重置" . PHP_EOL;
@@ -287,6 +291,7 @@ final class SubscriptionService
 
             // 更新订阅状态
             $subscription->status = 'pending_renewal';
+            $subscription->updated_at = Carbon::now()->format('Y-m-d H:i:s');
             $subscription->save();
 
             // 发送续费通知
@@ -393,6 +398,7 @@ final class SubscriptionService
 
             // 设置订阅状态为过期
             $subscription->status = 'expired';
+            $subscription->updated_at = Carbon::now()->format('Y-m-d H:i:s');
             $subscription->save();
 
             // 降级用户
