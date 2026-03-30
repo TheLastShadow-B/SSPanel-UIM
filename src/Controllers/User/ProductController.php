@@ -6,6 +6,7 @@ namespace App\Controllers\User;
 
 use App\Controllers\BaseController;
 use App\Models\Product;
+use App\Models\Subscription;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
@@ -19,8 +20,8 @@ final class ProductController extends BaseController
      */
     public function index(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $tabps = (new Product())->where('status', '1')
-            ->where('type', 'tabp')
+        $subscriptions = (new Product())->where('status', '1')
+            ->where('type', 'subscription')
             ->orderBy('id')
             ->get();
 
@@ -29,28 +30,25 @@ final class ProductController extends BaseController
             ->orderBy('id')
             ->get();
 
-        $times = (new Product())->where('status', '1')
-            ->where('type', 'time')
-            ->orderBy('id')
-            ->get();
-
-        foreach ($tabps as $tabp) {
-            $tabp->content = json_decode($tabp->content);
+        foreach ($subscriptions as $sub) {
+            $sub->content = json_decode($sub->content);
         }
 
         foreach ($bandwidths as $bandwidth) {
             $bandwidth->content = json_decode($bandwidth->content);
         }
 
-        foreach ($times as $time) {
-            $time->content = json_decode($time->content);
-        }
+        // 检查用户是否有活跃订阅
+        $hasActiveSubscription = (new Subscription())
+            ->where('user_id', $this->user->id)
+            ->whereIn('status', ['active', 'pending_renewal'])
+            ->exists();
 
         return $response->write(
             $this->view()
-                ->assign('tabps', $tabps)
+                ->assign('subscriptions', $subscriptions)
                 ->assign('bandwidths', $bandwidths)
-                ->assign('times', $times)
+                ->assign('hasActiveSubscription', $hasActiveSubscription)
                 ->fetch('user/product.tpl')
         );
     }
