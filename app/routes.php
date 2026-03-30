@@ -86,6 +86,8 @@ return static function (Slim\App $app): void {
         // 账户余额
         $group->get('/money', App\Controllers\User\MoneyController::class . ':index');
         $group->post('/giftcard', App\Controllers\User\MoneyController::class . ':applyGiftCard');
+        // 订阅管理
+        $group->get('/subscription', App\Controllers\User\SubscriptionController::class . ':index');
         // 产品页面
         $group->get('/product', App\Controllers\User\ProductController::class . ':index');
         // 订单页面
