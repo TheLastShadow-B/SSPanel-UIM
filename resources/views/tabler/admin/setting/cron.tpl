@@ -62,6 +62,13 @@
                                                        value="{$settings['daily_job_minute']}">
                                             </div>
                                         </div>
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">订阅到期前X天生成续费账单</label>
+                                            <div class="col">
+                                                <input id="subscription_renewal_days" type="number" class="form-control"
+                                                       value="{$settings['subscription_renewal_days']}" min="1" max="30">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="tab-pane show" id="finance_mail">

@@ -173,6 +173,7 @@
                 </div>
                 
                 <div class="col-lg-6 col-sm-12">
+                    <div class="vstack">
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">快速配置</h3>
@@ -289,6 +290,73 @@
                                 
                             </div>
                         </div>
+                    </div>
+                    {if $public_setting['enable_checkin']}
+                    <div class="card my-3">
+                        <div class="card-stamp">
+                            <div class="card-stamp-icon bg-green">
+                                <i class="ti ti-check"></i>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h3 class="card-title">每日签到</h3>
+                            <p>
+                                签到可领取
+                                {if $public_setting['checkin_min'] !== $public_setting['checkin_max']}
+                                &nbsp;
+                                <code>{$public_setting['checkin_min']} MB</code>
+                                至
+                                <code>{$public_setting['checkin_max']} MB</code>
+                                范围内的流量
+                                {else}
+                                <code>{$public_setting['checkin_min']} MB</code>
+                                {/if}
+                            </p>
+                            <p>
+                                上次签到时间：<code id="last-checkin-time">{$user->lastCheckInTime()}</code>
+                            </p>
+                        </div>
+                        <div class="card-footer">
+                            <div class="d-flex">
+                                {if !$user->isAbleToCheckin()}
+                                <button id="check-in" class="btn btn-primary ms-auto" disabled>已签到</button>
+                                {else}
+                                {if $public_setting['enable_checkin_captcha']}
+                                {include file='captcha/div.tpl'}
+                                {/if}
+                                <button id="check-in" class="btn btn-primary ms-auto"
+                                    hx-post="/user/checkin" hx-swap="none" hx-vals='js:{
+                                    {if $public_setting['enable_checkin_captcha']}
+                                    {include file='captcha/ajax.tpl'}
+                                    {/if}
+                                    }'>
+                                    签到
+                                </button>
+                                {/if}
+                            </div>
+                        </div>
+                    </div>
+                    {/if}
+                    <div class="card {if $public_setting['enable_checkin']}mb-0{else}my-3{/if}">
+                        <div class="ribbon ribbon-top bg-yellow">
+                            <i class="ti ti-bell-ringing icon"></i>
+                        </div>
+                        <div class="card-body">
+                            <h3 class="card-title">
+                                置顶公告
+                                {if $ann !== null}
+                                <span class="card-subtitle">{$ann->date}</span>
+                                {/if}
+                            </h3>
+                            <p class="text-secondary">
+                                {if $ann !== null}
+                                {$ann->content}
+                                {else}
+                                暂无公告
+                                {/if}
+                            </p>
+                        </div>
+                    </div>
                     </div>
                 </div>
 

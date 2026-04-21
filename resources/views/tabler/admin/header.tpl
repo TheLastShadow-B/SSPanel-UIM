@@ -251,6 +251,10 @@
                                             <i class="ti ti-list-details"></i>&nbsp;
                                             商品
                                         </a>
+                                        <a class="dropdown-item" href="/admin/subscription">
+                                            <i class="ti ti-refresh"></i>&nbsp;
+                                            订阅管理
+                                        </a>
                                         <a class="dropdown-item" href="/admin/order">
                                             <i class="ti ti-receipt"></i>&nbsp;
                                             订单
