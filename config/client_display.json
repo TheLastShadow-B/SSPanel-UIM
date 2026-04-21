@@ -84,6 +84,20 @@
           "storeUrl": "https://apps.apple.com/app/stash/id1596063349"
         }
       }
+    },
+    {
+      "name": "Surge 5",
+      "description": "iOS / macOS 商业级网络调试与代理工具",
+      "format": "surge",
+      "importUrl": "surge:///install-config?url={sub}/surge&name={name}",
+      "platforms": {
+        "iOS": {
+          "storeUrl": "https://apps.apple.com/us/app/surge-5/id1442620678"
+        },
+        "macOS": {
+          "storeUrl": "https://apps.apple.com/us/app/surge-5/id1442620678"
+        }
+      }
     }
   ],
   "icons": {

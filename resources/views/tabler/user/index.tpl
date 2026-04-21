@@ -246,6 +246,9 @@
                                             Trojan
                                         </button>
                                         {/if}
+                                        <button class="btn btn-outline-secondary copy" data-clipboard-text="{$UniversalSub}/surge">
+                                            Surge
+                                        </button>
                                     </div>
                                 </div>
                                 
