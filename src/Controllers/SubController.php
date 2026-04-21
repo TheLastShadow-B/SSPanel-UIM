@@ -30,7 +30,7 @@ final class SubController extends BaseController
     {
         $err_msg = '订阅链接无效';
         $subtype = $args['subtype'];
-        $subtype_list = ['json', 'clash', 'stash', 'sip008', 'singbox', 'v2rayjson', 'sip002', 'ss', 'v2ray', 'trojan'];
+        $subtype_list = ['json', 'clash', 'stash', 'sip008', 'singbox', 'v2rayjson', 'sip002', 'ss', 'v2ray', 'trojan', 'surge'];
 
         if (! $_ENV['Subscribe'] ||
             ! in_array($subtype, $subtype_list) ||
@@ -80,7 +80,7 @@ final class SubController extends BaseController
             );
         }
 
-        if ($subtype === 'clash' || $subtype === 'stash') {
+        if (in_array($subtype, ['clash', 'stash', 'surge'], true)) {
             return $response->withHeader('Subscription-Userinfo', $sub_details)
                 ->withHeader('Content-Disposition', $sub_content_disposition)
                 ->withHeader('Profile-Update-Interval', $sub_profile_update_interval)
