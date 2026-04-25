@@ -489,7 +489,7 @@ final class Surge extends Base
         return [
             // DNS
             'dns-server = system, 223.5.5.5, 119.29.29.29',
-            'encrypted-dns-server = https://1.1.1.1/dns-query',
+            'encrypted-dns-server = https://doh.pub/dns-query',
             'hijack-dns = 8.8.8.8:53, 8.8.4.4:53',
 
             // Domains that must resolve to real IPs (gaming / STUN / captive portal).
