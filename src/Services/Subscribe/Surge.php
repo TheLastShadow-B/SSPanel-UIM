@@ -38,12 +38,32 @@ final class Surge extends Base
     ];
 
     /**
-     * Rule-set URLs for the Apple & MS group (Surge pulls these directly).
+     * Apple → DIRECT (Apple has CN CDN; proxying is unnecessary).
      */
-    private const APPLE_MS_RULE_SETS = [
-        'DOMAIN-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_apple_cdn_set,Apple & MS,extended-matching',
-        'RULE-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_apple_services,Apple & MS,extended-matching',
-        'RULE-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_microsoft_services,Apple & MS,extended-matching',
+    private const APPLE_DIRECT_RULE_SETS = [
+        'DOMAIN-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_apple_cdn_set,DIRECT,extended-matching',
+        'RULE-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_apple_services,DIRECT,extended-matching',
+    ];
+
+    /**
+     * Microsoft → Microsoft & Apple group (user-selectable proxy).
+     */
+    private const MICROSOFT_RULE_SETS = [
+        'RULE-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_microsoft_services,Microsoft & Apple,extended-matching',
+    ];
+
+    /**
+     * Foreign streaming / entertainment → Stream group.
+     */
+    private const STREAM_RULE_SETS = [
+        'RULE-SET,https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Surge/GlobalMedia/GlobalMedia.list,Stream,extended-matching',
+    ];
+
+    /**
+     * Steam download CDN → Steam Download group.
+     */
+    private const STEAM_DOWNLOAD_RULE_SETS = [
+        'RULE-SET,https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Surge/SteamCN/SteamCN.list,Steam Download,extended-matching',
     ];
 
     public function getContent($user): string
@@ -344,10 +364,15 @@ final class Surge extends Base
     {
         $lines = [];
 
-        // Regional groups — empty region falls back to DIRECT so Surge never references an empty group.
+        // Regional groups — url-test for auto latency selection.
+        // Empty region falls back to a select-DIRECT placeholder so Surge never references an empty group.
         foreach (['HK', 'JP', 'US', 'TW'] as $region) {
-            $members = $regions[$region] === [] ? ['DIRECT'] : $regions[$region];
-            $lines[] = $region . ' = select, ' . implode(', ', $members);
+            if ($regions[$region] === []) {
+                $lines[] = $region . ' = select, DIRECT';
+            } else {
+                $lines[] = $region . ' = url-test, ' . implode(', ', $regions[$region])
+                    . ', url=http://www.gstatic.com/generate_204, interval=300, tolerance=50';
+            }
         }
 
         // Global — dynamic membership, only includes regions with at least one real node.
@@ -363,10 +388,16 @@ final class Surge extends Base
         $lines[] = 'Global = select, ' . implode(', ', $global_members);
 
         // Default Routing — top-level toggle.
-        $lines[] = 'Default Routing = select, Global, DIRECT';
+        $lines[] = 'Default Routing = select, Global, ' . implode(', ', $global_members) . ', DIRECT';
 
-        // Apple & MS — user may override to direct.
-        $lines[] = 'Apple & MS = select, Default Routing, Global, DIRECT';
+        // Microsoft & Apple — Apple goes DIRECT via rule-set; this group only catches Microsoft now.
+        $lines[] = 'Microsoft & Apple = select, Default Routing, ' . implode(', ', $global_members) . ', DIRECT';
+
+        // Stream — foreign streaming services.
+        $lines[] = 'Stream = select, Default Routing, ' . implode(', ', $global_members) . ', DIRECT';
+
+        // Steam Download — large CDN downloads, DIRECT often fastest in CN.
+        $lines[] = 'Steam Download = select, DIRECT, Default Routing, ' . implode(', ', $global_members);
 
         // AI Services — US + JP only, with empty-side fallback.
         $ai_members = [];
@@ -391,12 +422,44 @@ final class Surge extends Base
      */
     private function buildRules(): array
     {
-        $lines = self::APPLE_MS_RULE_SETS;
+        $lines = [];
+
+        // Specific overrides first.
+        $lines[] = 'DOMAIN-SUFFIX,wifiman.com,Default Routing';
+
+        // Apple → DIRECT (Apple's CN CDN works without proxy).
+        foreach (self::APPLE_DIRECT_RULE_SETS as $rule) {
+            $lines[] = $rule;
+        }
+
+        // Microsoft → Microsoft & Apple group.
+        foreach (self::MICROSOFT_RULE_SETS as $rule) {
+            $lines[] = $rule;
+        }
+
+        // Foreign streaming → Stream group.
+        foreach (self::STREAM_RULE_SETS as $rule) {
+            $lines[] = $rule;
+        }
+
+        // Steam download CDN → Steam Download group.
+        foreach (self::STEAM_DOWNLOAD_RULE_SETS as $rule) {
+            $lines[] = $rule;
+        }
 
         // AI Services RULE-SET URL is pending user confirmation — placeholder comment.
         $lines[] = '# AI Services RULE-SET URL pending — routes AI traffic via AI Services group when added';
 
+        // Reverse DNS infrastructure (PTR queries) — direct.
+        $lines[] = 'DOMAIN-SUFFIX,arpa,DIRECT';
+
+        // Private / loopback / link-local IPs (Surge built-in LAN ruleset).
+        $lines[] = 'RULE-SET,LAN,DIRECT';
+
+        // CN IP fallback.
         $lines[] = 'GEOIP,CN,DIRECT,no-resolve';
+
+        // Catch-all; dns-failed catches unresolvable domains and proxies them.
         $lines[] = 'FINAL,Default Routing,dns-failed';
 
         return $lines;
@@ -411,13 +474,35 @@ final class Surge extends Base
     private function buildGeneral(): array
     {
         return [
+            // DNS
             'dns-server = system, 223.5.5.5, 119.29.29.29',
-            'skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, localhost, *.local',
+            'encrypted-dns-server = https://1.1.1.1/dns-query',
+            'hijack-dns = 8.8.8.8:53, 8.8.4.4:53',
+
+            // Domains that must resolve to real IPs (gaming / STUN / captive portal).
+            'always-real-ip = *.lan, *.local, *.msftncsi.com, *.msftconnecttest.com, *.srv.nintendo.net, *.stun.playstation.net, *.xboxlive.com, *.battle.net, *.battlenet.com, *.battlenet.com.cn, *.blzstatic.cn, stun.cloudflare.com, stun.miwifi.com, turn.cloudflare.com, xbox.*.microsoft.com',
+
+            // System-level bypass (Surge does not see this traffic).
+            'skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10, 169.254.0.0/16, 224.0.0.0/4, localhost, *.local',
             'exclude-simple-hostnames = true',
+
+            // Connectivity tests.
             'internet-test-url = http://www.apple.com/library/test/success.html',
-            'proxy-test-url = http://www.apple.com/library/test/success.html',
+            'proxy-test-url = http://cp.cloudflare.com/generate_204',
+            'proxy-test-udp = apple.com@172.64.36.1',
             'test-timeout = 5',
-            'ipv6 = false',
+
+            // Network features.
+            'udp-priority = true',
+            'ipv6 = true',
+            'ipv6-vif = auto',
+            'auto-suspend = false',
+
+            // iOS Surge 5 specific.
+            'compatibility-mode = 5',
+            'hybrid = true',
+
+            // Misc.
             'allow-wifi-access = false',
             'loglevel = notify',
         ];
