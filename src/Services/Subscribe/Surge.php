@@ -490,19 +490,12 @@ final class Surge extends Base
 
             // Connectivity tests.
             'internet-test-url = http://www.apple.com/library/test/success.html',
-            'proxy-test-url = http://cp.cloudflare.com/generate_204',
-            'proxy-test-udp = apple.com@172.64.36.1',
+            'proxy-test-url = http://www.apple.com/library/test/success.html',
             'test-timeout = 5',
 
             // Network features.
-            'udp-priority = true',
-            'ipv6 = true',
-            'ipv6-vif = auto',
+            'ipv6 = false',
             'auto-suspend = false',
-
-            // iOS Surge 5 specific.
-            'compatibility-mode = 5',
-            'hybrid = true',
 
             // Misc.
             'allow-wifi-access = false',
