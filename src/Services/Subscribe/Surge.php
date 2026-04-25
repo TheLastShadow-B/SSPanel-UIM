@@ -364,7 +364,24 @@ final class Surge extends Base
     {
         $lines = [];
 
-        // Regional groups — url-test for auto latency selection.
+        // Compute regions that actually have nodes — used by Default Routing and Global.
+        $global_members = [];
+        foreach (['HK', 'JP', 'US', 'TW'] as $region) {
+            if ($regions[$region] !== []) {
+                $global_members[] = $region;
+            }
+        }
+        if ($global_members === []) {
+            $global_members = ['DIRECT'];
+        }
+
+        // 1. Default Routing — top-level toggle, first in client UI.
+        $lines[] = 'Default Routing = select, Global, ' . implode(', ', $global_members) . ', DIRECT';
+
+        // 2. Global — pick any region directly.
+        $lines[] = 'Global = select, ' . implode(', ', $global_members);
+
+        // 3. Regional groups — url-test for auto latency selection.
         // Empty region falls back to a select-DIRECT placeholder so Surge never references an empty group.
         foreach (['HK', 'JP', 'US', 'TW'] as $region) {
             if ($regions[$region] === []) {
@@ -375,31 +392,16 @@ final class Surge extends Base
             }
         }
 
-        // Global — dynamic membership, only includes regions with at least one real node.
-        $global_members = [];
-        foreach (['HK', 'JP', 'US', 'TW'] as $region) {
-            if ($regions[$region] !== []) {
-                $global_members[] = $region;
-            }
-        }
-        if ($global_members === []) {
-            $global_members = ['DIRECT'];
-        }
-        $lines[] = 'Global = select, ' . implode(', ', $global_members);
-
-        // Default Routing — top-level toggle.
-        $lines[] = 'Default Routing = select, Global, ' . implode(', ', $global_members) . ', DIRECT';
-
-        // Microsoft & Apple — Apple goes DIRECT via rule-set; this group only catches Microsoft now.
+        // 4. Microsoft & Apple — Apple goes DIRECT via rule-set; this group only catches Microsoft now.
         $lines[] = 'Microsoft & Apple = select, Default Routing, ' . implode(', ', $global_members) . ', DIRECT';
 
-        // Stream — foreign streaming services.
+        // 5. Stream — foreign streaming services.
         $lines[] = 'Stream = select, Default Routing, ' . implode(', ', $global_members) . ', DIRECT';
 
-        // Steam Download — large CDN downloads, DIRECT often fastest in CN.
+        // 6. Steam Download — large CDN downloads, DIRECT often fastest in CN.
         $lines[] = 'Steam Download = select, DIRECT, Default Routing, ' . implode(', ', $global_members);
 
-        // AI Services — US + JP only, with empty-side fallback.
+        // 7. AI Services — US + JP only, with empty-side fallback.
         $ai_members = [];
         if ($regions['US'] !== []) {
             $ai_members[] = 'US';
