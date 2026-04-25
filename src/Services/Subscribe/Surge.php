@@ -41,15 +41,15 @@ final class Surge extends Base
      * Apple → DIRECT (Apple has CN CDN; proxying is unnecessary).
      */
     private const APPLE_DIRECT_RULE_SETS = [
-        'DOMAIN-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_apple_cdn_set,DIRECT,extended-matching',
-        'RULE-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_apple_services,DIRECT,extended-matching',
+        'DOMAIN-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_apple_cdn_set,DIRECT,extended-matching',
+        'RULE-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_apple_services,DIRECT,extended-matching',
     ];
 
     /**
      * Microsoft → Microsoft & Apple group (user-selectable proxy).
      */
     private const MICROSOFT_RULE_SETS = [
-        'RULE-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_microsoft_services,Microsoft & Apple,extended-matching',
+        'RULE-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_microsoft_services,Microsoft & Apple,extended-matching',
     ];
 
     /**
