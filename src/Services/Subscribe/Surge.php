@@ -185,6 +185,9 @@ final class Surge extends Base
             }
         }
 
+        $udp = (bool) ($custom['udp'] ?? true);
+        $parts[] = 'udp-relay=' . ($udp ? 'true' : 'false');
+
         return implode(', ', $parts);
     }
 
@@ -204,6 +207,7 @@ final class Surge extends Base
         $port = $custom['offset_port_user'] ?? $custom['offset_port_node'] ?? 443;
         $server_key = $custom['server_key'] ?? '';
         $password = $server_key === '' ? $user_pk : $server_key . ':' . $user_pk;
+        $udp = (bool) ($custom['udp'] ?? true);
 
         return implode(', ', [
             'ss',
@@ -211,6 +215,7 @@ final class Surge extends Base
             (string) $port,
             'encrypt-method=' . $method,
             'password=' . $password,
+            'udp-relay=' . ($udp ? 'true' : 'false'),
         ]);
     }
 
@@ -283,6 +288,9 @@ final class Surge extends Base
             $parts[] = 'skip-cert-verify=' . ($allow_insecure ? 'true' : 'false');
         }
 
+        $udp = (bool) ($custom['udp'] ?? true);
+        $parts[] = 'udp-relay=' . ($udp ? 'true' : 'false');
+
         return implode(', ', $parts);
     }
 
@@ -326,6 +334,9 @@ final class Surge extends Base
                 $parts[] = 'ws-headers=Host:' . $ws_opts['headers']['Host'];
             }
         }
+
+        $udp = (bool) ($custom['udp'] ?? true);
+        $parts[] = 'udp-relay=' . ($udp ? 'true' : 'false');
 
         return implode(', ', $parts);
     }
@@ -491,11 +502,13 @@ final class Surge extends Base
             // Connectivity tests.
             'internet-test-url = http://www.apple.com/library/test/success.html',
             'proxy-test-url = http://cp.cloudflare.com/generate_204',
+            'proxy-test-udp = apple.com@172.64.36.1',
             'test-timeout = 5',
 
             // Network features.
             'udp-priority = true',
-            'ipv6 = false',
+            'ipv6 = true',
+            'ipv6-vif = auto',
             'auto-suspend = false',
 
             // iOS Surge 5 specific.
