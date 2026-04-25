@@ -387,7 +387,7 @@ final class Surge extends Base
         }
 
         // 1. Default Routing — top-level toggle, first in client UI.
-        $lines[] = 'Default Routing = select, Global, ' . implode(', ', $global_members) . ', DIRECT';
+        $lines[] = 'Default Routing = select, Global, DIRECT';
 
         // 2. Global — pick any region directly.
         $lines[] = 'Global = select, ' . implode(', ', $global_members);
