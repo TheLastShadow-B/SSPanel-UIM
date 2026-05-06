@@ -133,6 +133,39 @@ final class Clash extends Base
                     ];
 
                     break;
+                case 15:
+                    // Hysteria 2 (mihomo / Clash.Meta core)
+                    $hy2_port = $node_custom_config['offset_port_user'] ??
+                        ($node_custom_config['offset_port_node'] ?? 443);
+                    $hy2_opts = $node_custom_config['Hy2Opts'] ?? [];
+                    $host = $node_custom_config['host'] ?? '';
+                    $up_mbps = $hy2_opts['up_mbps'] ?? 0;
+                    $down_mbps = $hy2_opts['down_mbps'] ?? 0;
+                    $obfs = $hy2_opts['obfs'] ?? '';
+                    $obfs_password = $hy2_opts['obfs_password'] ?? '';
+
+                    $node = [
+                        'name' => $node_raw->name,
+                        'type' => 'hysteria2',
+                        'server' => $node_raw->server,
+                        'port' => (int) $hy2_port,
+                        'password' => $user->passwd,
+                        'sni' => $host,
+                        'skip-cert-verify' => false,
+                    ];
+
+                    if ($up_mbps > 0) {
+                        $node['up'] = (int) $up_mbps;
+                    }
+                    if ($down_mbps > 0) {
+                        $node['down'] = (int) $down_mbps;
+                    }
+                    if ($obfs !== '' && $obfs_password !== '') {
+                        $node['obfs'] = $obfs;
+                        $node['obfs-password'] = $obfs_password;
+                    }
+
+                    break;
                 case 14:
                     $trojan_port = $node_custom_config['offset_port_user'] ??
                         ($node_custom_config['offset_port_node'] ?? 443);
