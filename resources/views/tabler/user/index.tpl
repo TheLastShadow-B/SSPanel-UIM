@@ -1,22 +1,6 @@
 {include file='user/header.tpl'}
 
 <style>
-/* Animation classes for collapsible sections */
-.collapsible-section {
-    transition: all 0.35s ease;
-    overflow: hidden;
-}
-
-.collapsible-section.collapsing {
-    opacity: 0.3;
-    transform: scale(0.98);
-}
-
-.collapsible-section.expanded {
-    opacity: 1;
-    transform: scale(1);
-}
-
 /* Client item hover effects */
 .client-item:hover {
     border-color: var(--tblr-primary) !important;
@@ -598,7 +582,6 @@
     
 
     const CONFIG = {
-        ANIMATION_DURATION: 350,        // 动画持续时间（毫秒）
         FEEDBACK_TIMEOUT: 2000,         // 反馈提示持续时间（毫秒）
         CLIPBOARD_SUCCESS_TEXT: '已复制',
         CLIPBOARD_ERROR_TEXT: '复制失败，请手动选择并复制',
@@ -845,32 +828,9 @@
         });
     }
     
-    function initCollapseAnimations() {
-        const allPlatforms = document.getElementById('all-platforms');
-        const recommendedSection = document.querySelector('.recommended-section');
-        
-        if (!allPlatforms || !recommendedSection) return;
-        
-        recommendedSection.classList.add('collapsible-section');
-        
-        allPlatforms.addEventListener('show.bs.collapse', function (e) {
-            if (e.target !== allPlatforms) return;
-            recommendedSection.classList.add('collapsing');
-        });
-        
-        allPlatforms.addEventListener('hide.bs.collapse', function (e) {
-            if (e.target !== allPlatforms) return;
-            recommendedSection.classList.remove('collapsing');
-            setTimeout(function() {
-                recommendedSection.classList.add('expanded');
-            }, CONFIG.ANIMATION_DURATION);
-        });
-    }
-    
     document.addEventListener('DOMContentLoaded', function() {
         safeInit(initClientSelector, '客户端选择器');
         safeInit(initClipboard, '剪贴板功能');
-        safeInit(initCollapseAnimations, '折叠动画');
     });
     {/literal}
     </script>
