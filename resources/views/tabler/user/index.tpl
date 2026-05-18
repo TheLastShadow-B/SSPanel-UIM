@@ -1,14 +1,6 @@
 {include file='user/header.tpl'}
 
 <style>
-/* /user 首页不使用 hero —— 收掉 navbar-overlap 给 page-header 预留的深色延伸条 */
-header.navbar.navbar-overlap {
-    padding-bottom: 1rem !important;
-}
-.page-wrapper > .page-body {
-    margin-top: 0;
-}
-
 .client-item:hover {
     border-color: var(--tblr-primary) !important;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
@@ -132,6 +124,20 @@ header.navbar.navbar-overlap {
 </style>
 
 <div class="page-wrapper">
+    <div class="container-xl">
+        <div class="page-header d-print-none text-white">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">
+                        <span class="home-title">用户中心</span>
+                    </h2>
+                    <div class="page-pretitle my-3">
+                        <span class="home-subtitle">在这里查看账户信息和最新公告</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="page-body">
         <div class="container-xl">
             <div class="row row-cards row-deck">
