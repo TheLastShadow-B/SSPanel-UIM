@@ -21,26 +21,6 @@
       }
     },
     {
-      "name": "Clash Nyanpasu",
-      "description": "增强版 Clash 客户端",
-      "format": "clash",
-      "importUrl": "clash-nyanpasu://subscribe-remote-profile?url={sub}/clash&name={name}",
-      "platforms": {
-        "Windows": {
-          "ext": "exe",
-          "file": "Clash.Nyanpasu"
-        },
-        "macOS": {
-          "ext": "dmg",
-          "file": "Clash.Nyanpasu_aarch64"
-        },
-        "Linux": {
-          "ext": "AppImage",
-          "file": "Clash.Nyanpasu"
-        }
-      }
-    },
-    {
       "name": "CMFA",
       "description": "支持分应用代理的 Android 客户端",
       "format": "clash",
