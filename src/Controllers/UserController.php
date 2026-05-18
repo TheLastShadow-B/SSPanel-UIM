@@ -83,10 +83,6 @@ final class UserController extends BaseController
                 ->assign('UniversalSub', $universalSub)
                 ->assign('clientData', json_encode($clientData['clients']))
                 ->assign('platformIcons', json_encode($clientData['icons']))
-                ->assign('user_class', $this->user->class)
-                ->assign('user_money', $this->user->money)
-                ->assign('ip_limit', $this->user->node_iplimit)
-                ->assign('speed_limit', $this->user->node_speedlimit)
                 ->assign('online_ips', $online_ips)
                 ->fetch('user/index.tpl')
         );
