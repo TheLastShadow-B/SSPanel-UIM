@@ -116,7 +116,7 @@ final class Stripe extends Base
                             'product_data' => [
                                 'name' => 'Invoice #' . $invoice_id,
                             ],
-                            'unit_amount' => (int) ($exchange_amount),
+                            'unit_amount' => (int) round($exchange_amount),
                         ],
                         'quantity' => 1,
                     ],
@@ -127,8 +127,10 @@ final class Stripe extends Base
                         'trade_no' => $pl->tradeno,
                     ],
                 ],
-                'success_url' => $_ENV['baseUrl'] . '/user/invoice/' . $invoice_id . '/view',
-                'cancel_url' => $_ENV['baseUrl'] . '/user/invoice/' . $invoice_id . '/view',
+                'success_url' => $_ENV['baseUrl'] . '/user/invoice/' . $invoice_id . '/view?session_id={CHECKOUT_SESSION_ID}&paid=1',
+                'cancel_url' => $_ENV['baseUrl'] . '/user/invoice/' . $invoice_id . '/view?canceled=1',
+            ], [
+                'idempotency_key' => 'checkout_' . $pl->tradeno,
             ]);
         } catch (ApiErrorException) {
             return $response->withJson([
@@ -164,11 +166,9 @@ final class Stripe extends Base
 
         if ($event->type === 'payment_intent.succeeded' && $payment_intent->status === 'succeeded') {
             $this->postPayment($payment_intent->metadata->trade_no);
-
-            return $response->withStatus(204);
         }
 
-        return $response->withStatus(400);
+        return $response->withStatus(204);
     }
 
     /**

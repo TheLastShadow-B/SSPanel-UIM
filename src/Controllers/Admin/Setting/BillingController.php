@@ -91,6 +91,9 @@ final class BillingController extends BaseController
                 'url' => $_ENV['baseUrl'] . '/payment/notify/stripe',
                 'enabled_events' => [
                     'payment_intent.succeeded',
+                    'checkout.session.completed',
+                    'checkout.session.async_payment_succeeded',
+                    'checkout.session.async_payment_failed',
                 ],
             ]);
         } catch (ApiErrorException) {
