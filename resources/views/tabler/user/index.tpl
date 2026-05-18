@@ -455,57 +455,47 @@
         }
 
         function getSummaryChartConfig(usedMb, totalMb) {
-            var remainingMb = Math.max(0, totalMb - usedMb);
+            var percent = totalMb > 0 ? Math.min(100, (usedMb / totalMb) * 100) : 0;
+            var fmt = function (mb) {
+                return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(0) + ' MB';
+            };
             return {
                 chart: {
-                    type: 'donut',
+                    type: 'radialBar',
                     height: 260,
                     fontFamily: 'inherit',
                     animations: { enabled: false }
                 },
-                series: [Number(usedMb.toFixed(2)), Number(remainingMb.toFixed(2))],
-                labels: ['已用流量', '剩余流量'],
-                colors: ['#FF4500', 'rgba(127, 127, 127, 0.25)'],
-                stroke: { width: 0 },
-                tooltip: {
-                    theme: 'dark',
-                    y: { formatter: function (v) { return v.toFixed(2) + ' MB'; } }
-                },
+                series: [Number(percent.toFixed(2))],
+                labels: ['已用 ' + fmt(usedMb) + ' / ' + fmt(totalMb)],
+                colors: ['#FF4500'],
+                stroke: { lineCap: 'round' },
                 plotOptions: {
-                    pie: {
-                        donut: {
-                            size: '72%',
-                            labels: {
+                    radialBar: {
+                        hollow: { size: '62%' },
+                        track: {
+                            background: 'rgba(127, 127, 127, 0.18)',
+                            strokeWidth: '100%'
+                        },
+                        dataLabels: {
+                            name: {
                                 show: true,
-                                name: { show: true, fontSize: '13px', color: 'var(--tblr-secondary)' },
-                                value: {
-                                    show: true,
-                                    fontSize: '20px',
-                                    fontWeight: 600,
-                                    formatter: function (v) {
-                                        var n = Number(v);
-                                        return n >= 1024 ? (n / 1024).toFixed(2) + ' GB' : n.toFixed(0) + ' MB';
-                                    }
-                                },
-                                total: {
-                                    show: true,
-                                    label: '总额',
-                                    fontSize: '13px',
-                                    color: 'var(--tblr-secondary)',
-                                    formatter: function () {
-                                        return totalMb >= 1024
-                                            ? (totalMb / 1024).toFixed(2) + ' GB'
-                                            : totalMb.toFixed(0) + ' MB';
-                                    }
+                                fontSize: '12px',
+                                color: 'var(--tblr-secondary)',
+                                offsetY: 22
+                            },
+                            value: {
+                                show: true,
+                                fontSize: '28px',
+                                fontWeight: 600,
+                                color: 'var(--tblr-body-color)',
+                                offsetY: -12,
+                                formatter: function (v) {
+                                    return Number(v).toFixed(1) + '%';
                                 }
                             }
                         }
                     }
-                },
-                legend: {
-                    position: 'bottom',
-                    fontSize: '12px',
-                    markers: { width: 10, height: 10 }
                 }
             };
         }
