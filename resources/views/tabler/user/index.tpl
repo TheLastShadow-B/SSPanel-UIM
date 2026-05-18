@@ -252,7 +252,24 @@
                             </div>
 
                             {if $public_setting['traffic_log']}
-                            <div id="traffic-log" style="min-height: 260px"></div>
+                                {if $user->transfer_enable > 0}
+                                <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="图表切换">
+                                    <input type="radio" class="btn-check" name="traffic-chart-mode"
+                                           id="chart-mode-hourly" autocomplete="off" checked>
+                                    <label class="btn btn-outline-primary" for="chart-mode-hourly">
+                                        <i class="ti ti-clock-hour-4 me-1"></i>每小时用量
+                                    </label>
+                                    <input type="radio" class="btn-check" name="traffic-chart-mode"
+                                           id="chart-mode-summary" autocomplete="off">
+                                    <label class="btn btn-outline-primary" for="chart-mode-summary">
+                                        <i class="ti ti-chart-donut-2 me-1"></i>上限对比
+                                    </label>
+                                </div>
+                                {/if}
+                                <div id="traffic-log-hourly" style="min-height: 240px"></div>
+                                {if $user->transfer_enable > 0}
+                                <div id="traffic-log-summary" style="min-height: 240px; display: none;"></div>
+                                {/if}
                             {else}
                             <div class="text-center text-secondary py-5">
                                 <i class="ti ti-chart-line icon mb-2 d-block mx-auto"></i>
@@ -424,7 +441,7 @@
         }
 
         function initTrafficChart() {
-            var chartElement = document.getElementById('traffic-log');
+            var chartElement = document.getElementById('traffic-log-hourly');
             if (!chartElement || !window.ApexCharts) return;
 
             try {
@@ -433,12 +450,106 @@
                 var chart = new ApexCharts(chartElement, getTrafficChartConfig({$traffic_logs}, transferEnableMb));
                 chart.render();
             } catch (error) {
-                console.error('流量图表初始化失败:', error);
+                console.error('每小时流量图表初始化失败:', error);
             }
+        }
+
+        function getSummaryChartConfig(usedMb, totalMb) {
+            var remainingMb = Math.max(0, totalMb - usedMb);
+            return {
+                chart: {
+                    type: 'donut',
+                    height: 260,
+                    fontFamily: 'inherit',
+                    animations: { enabled: false }
+                },
+                series: [Number(usedMb.toFixed(2)), Number(remainingMb.toFixed(2))],
+                labels: ['已用流量', '剩余流量'],
+                colors: ['#FF4500', 'rgba(127, 127, 127, 0.25)'],
+                stroke: { width: 0 },
+                tooltip: {
+                    theme: 'dark',
+                    y: { formatter: function (v) { return v.toFixed(2) + ' MB'; } }
+                },
+                plotOptions: {
+                    pie: {
+                        donut: {
+                            size: '72%',
+                            labels: {
+                                show: true,
+                                name: { show: true, fontSize: '13px', color: 'var(--tblr-secondary)' },
+                                value: {
+                                    show: true,
+                                    fontSize: '20px',
+                                    fontWeight: 600,
+                                    formatter: function (v) {
+                                        var n = Number(v);
+                                        return n >= 1024 ? (n / 1024).toFixed(2) + ' GB' : n.toFixed(0) + ' MB';
+                                    }
+                                },
+                                total: {
+                                    show: true,
+                                    label: '总额',
+                                    fontSize: '13px',
+                                    color: 'var(--tblr-secondary)',
+                                    formatter: function () {
+                                        return totalMb >= 1024
+                                            ? (totalMb / 1024).toFixed(2) + ' GB'
+                                            : totalMb.toFixed(0) + ' MB';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                legend: {
+                    position: 'bottom',
+                    fontSize: '12px',
+                    markers: { width: 10, height: 10 }
+                }
+            };
+        }
+
+        var trafficSummaryChart = null;
+        function initTrafficChartSummary() {
+            if (trafficSummaryChart) return;
+            var el = document.getElementById('traffic-log-summary');
+            if (!el || !window.ApexCharts || !window.APP_CONFIG) return;
+
+            try {
+                var usedMb = (window.APP_CONFIG.usedBytes || 0) / 1048576;
+                var totalMb = (window.APP_CONFIG.transferEnableBytes || 0) / 1048576;
+                if (totalMb <= 0) return;
+                trafficSummaryChart = new ApexCharts(el, getSummaryChartConfig(usedMb, totalMb));
+                trafficSummaryChart.render();
+            } catch (error) {
+                console.error('流量上限图表初始化失败:', error);
+            }
+        }
+
+        function bindTrafficChartToggle() {
+            var hourlyRadio = document.getElementById('chart-mode-hourly');
+            var summaryRadio = document.getElementById('chart-mode-summary');
+            var hourlyEl = document.getElementById('traffic-log-hourly');
+            var summaryEl = document.getElementById('traffic-log-summary');
+            if (!hourlyRadio || !summaryRadio || !hourlyEl || !summaryEl) return;
+
+            summaryRadio.addEventListener('change', function () {
+                if (!this.checked) return;
+                hourlyEl.style.display = 'none';
+                summaryEl.style.display = '';
+                initTrafficChartSummary();
+            });
+            hourlyRadio.addEventListener('change', function () {
+                if (!this.checked) return;
+                summaryEl.style.display = 'none';
+                hourlyEl.style.display = '';
+            });
         }
 
         document.addEventListener("DOMContentLoaded", function () {
             initTrafficChart();
+            bindTrafficChartToggle();
         });
     </script>
     {/if}
@@ -451,7 +562,8 @@
         enableSsSub: {if $public_setting['enable_ss_sub']}true{else}false{/if},
         enableV2Sub: {if $public_setting['enable_v2_sub']}true{else}false{/if},
         enableTrojanSub: {if $public_setting['enable_trojan_sub']}true{else}false{/if},
-        transferEnableBytes: {$user->transfer_enable}
+        transferEnableBytes: {$user->transfer_enable},
+        usedBytes: {($user->u + $user->d)}
     };
 
     const platformIcons = {$platformIcons};
