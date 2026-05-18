@@ -30,7 +30,7 @@ final class SubController extends BaseController
     {
         $err_msg = '订阅链接无效';
         $subtype = $args['subtype'];
-        $subtype_list = ['json', 'clash', 'stash', 'sip008', 'singbox', 'v2rayjson', 'sip002', 'ss', 'v2ray', 'trojan', 'surge'];
+        $subtype_list = ['clash', 'stash', 'surge'];
 
         if (! $_ENV['Subscribe'] ||
             ! in_array($subtype, $subtype_list) ||
@@ -59,7 +59,6 @@ final class SubController extends BaseController
 
         $content_type = match ($subtype) {
             'clash', 'stash' => 'application/yaml',
-            'json','sip008','singbox','v2rayjson' => 'application/json',
             default => 'text/plain',
         };
 
@@ -80,16 +79,10 @@ final class SubController extends BaseController
             );
         }
 
-        if (in_array($subtype, ['clash', 'stash', 'surge'], true)) {
-            return $response->withHeader('Subscription-Userinfo', $sub_details)
-                ->withHeader('Content-Disposition', $sub_content_disposition)
-                ->withHeader('Profile-Update-Interval', $sub_profile_update_interval)
-                ->withHeader('Profile-Web-Page-Url', $sub_profile_web_page_url)
-                ->withHeader('Content-Type', $content_type)
-                ->write($sub_info);
-        }
-
         return $response->withHeader('Subscription-Userinfo', $sub_details)
+            ->withHeader('Content-Disposition', $sub_content_disposition)
+            ->withHeader('Profile-Update-Interval', $sub_profile_update_interval)
+            ->withHeader('Profile-Web-Page-Url', $sub_profile_web_page_url)
             ->withHeader('Content-Type', $content_type)
             ->write($sub_info);
     }
