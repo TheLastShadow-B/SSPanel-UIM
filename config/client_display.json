@@ -53,28 +53,6 @@
       }
     },
     {
-      "name": "ClashMi",
-      "description": "基于 Mihomo 内核的新客户端",
-      "format": "clash",
-      "importUrl": "clash://install-config?url={sub}/clash&name={name}",
-      "platforms": {
-        "Windows": {
-          "ext": "exe",
-          "file": "clashmi"
-        },
-        "Android": {
-          "ext": "apk",
-          "file": "clashmi_arm64"
-        },
-        "iOS": {
-          "storeUrl": "https://apps.apple.com/us/app/clash-mi/id6744321968"
-        },
-        "macOS": {
-          "storeUrl": "https://apps.apple.com/us/app/clash-mi/id6744321968"
-        }
-      }
-    },
-    {
       "name": "Stash",
       "description": "iOS 平台强大的网络工具",
       "format": "stash",
