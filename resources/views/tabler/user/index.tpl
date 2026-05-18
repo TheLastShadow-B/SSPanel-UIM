@@ -1,6 +1,14 @@
 {include file='user/header.tpl'}
 
 <style>
+/* /user 首页不使用 hero —— 收掉 navbar-overlap 给 page-header 预留的深色延伸条 */
+header.navbar.navbar-overlap {
+    padding-bottom: 1rem !important;
+}
+.page-wrapper > .page-body {
+    margin-top: 0;
+}
+
 .client-item:hover {
     border-color: var(--tblr-primary) !important;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
@@ -124,46 +132,6 @@
 </style>
 
 <div class="page-wrapper">
-    <div class="container-xl">
-        <div class="page-header d-print-none text-white">
-            <div class="row g-3 align-items-center">
-                <div class="col-auto">
-                    <span class="avatar avatar-lg avatar-rounded"
-                          style="background-image: url({$user->dice_bear})"></span>
-                </div>
-                <div class="col">
-                    <h2 class="page-title mb-1">
-                        <span class="home-title">{$user->user_name}</span>
-                    </h2>
-                    <div class="page-pretitle d-flex flex-wrap gap-2 align-items-center text-white-50">
-                        <span><i class="ti ti-mail me-1"></i>{$user->email}</span>
-                        <span class="text-white-50">·</span>
-                        <span>
-                            <i class="ti ti-shield-check me-1"></i>
-                            {if $user->class > 0}
-                            LV.{$user->class} · {$class_expire_days} 天到期
-                            {else}
-                            未购买套餐
-                            {/if}
-                        </span>
-                        <span class="text-white-50">·</span>
-                        <span><i class="ti ti-cloud me-1"></i>剩余 {$user->unusedTraffic()}</span>
-                    </div>
-                </div>
-                <div class="col-auto d-none d-md-block">
-                    {if $user->class === 0}
-                    <a href="/user/product" class="btn btn-primary">
-                        <i class="ti ti-shopping-cart me-1"></i>购买套餐
-                    </a>
-                    {else}
-                    <a href="/user/profile" class="btn btn-outline-light">
-                        <i class="ti ti-user me-1"></i>个人资料
-                    </a>
-                    {/if}
-                </div>
-            </div>
-        </div>
-    </div>
     <div class="page-body">
         <div class="container-xl">
             <div class="row row-cards row-deck">
