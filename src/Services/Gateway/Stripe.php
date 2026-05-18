@@ -103,7 +103,10 @@ final class Stripe extends Base
             $exchange_amount *= 100;
         }
 
-        $stripe = new StripeClient(Config::obtain('stripe_api_key'));
+        $stripe = new StripeClient([
+            'api_key' => Config::obtain('stripe_api_key'),
+            'stripe_version' => '2026-03-25.dahlia',
+        ]);
         $session = null;
 
         try {

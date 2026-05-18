@@ -13,8 +13,7 @@ use Slim\Http\ServerRequest;
 use Smarty\Exception;
 use Srmklive\PayPal\Services\PayPal;
 use Stripe\Exception\ApiErrorException;
-use Stripe\Stripe;
-use Stripe\WebhookEndpoint;
+use Stripe\StripeClient;
 use Throwable;
 
 final class BillingController extends BaseController
@@ -84,10 +83,13 @@ final class BillingController extends BaseController
     {
         $stripe_api_key = $request->getParam('stripe_api_key');
 
-        Stripe::setApiKey($stripe_api_key);
+        $stripe = new StripeClient([
+            'api_key' => $stripe_api_key,
+            'stripe_version' => '2026-03-25.dahlia',
+        ]);
 
         try {
-            WebhookEndpoint::create([
+            $stripe->webhookEndpoints->create([
                 'url' => $_ENV['baseUrl'] . '/payment/notify/stripe',
                 'enabled_events' => [
                     'payment_intent.succeeded',
