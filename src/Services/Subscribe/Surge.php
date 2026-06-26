@@ -352,7 +352,7 @@ final class Surge extends Base
 
         // Global — dynamic membership, only includes regions with at least one real node.
         $global_members = [];
-        foreach (['HK', 'JP', 'US', 'TW'] as $region) {
+        foreach (['HK', 'US', 'JP', 'TW'] as $region) {
             if ($regions[$region] !== []) {
                 $global_members[] = $region;
             }
@@ -363,7 +363,7 @@ final class Surge extends Base
         $lines[] = 'Global = select, ' . implode(', ', $global_members);
 
         // Default Routing — top-level toggle.
-        $lines[] = 'Default Routing = select, Global, DIRECT';
+        $lines[] = 'Default Routing = select, Global, DIRECT, REJECT';
 
         // Apple & MS — user may override to direct.
         $lines[] = 'Apple & MS = select, Default Routing, Global, DIRECT';
