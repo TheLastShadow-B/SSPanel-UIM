@@ -23,6 +23,7 @@ return new class() implements MigrationInterface {
             ADD COLUMN `hosted_invoice_url`     VARCHAR(512) NULL,
             ADD COLUMN `stripe_amount`          BIGINT       NULL,
             ADD COLUMN `stripe_currency`        VARCHAR(8)   NULL,
+            ADD COLUMN `last_paid_stripe_invoice_id` VARCHAR(64) NULL,
             ADD UNIQUE KEY `uniq_stripe_subscription_id` (`stripe_subscription_id`),
             ADD INDEX `idx_billing_provider` (`billing_provider`)");
 
@@ -73,7 +74,8 @@ return new class() implements MigrationInterface {
             DROP COLUMN `grace_until`,
             DROP COLUMN `hosted_invoice_url`,
             DROP COLUMN `stripe_amount`,
-            DROP COLUMN `stripe_currency`");
+            DROP COLUMN `stripe_currency`,
+            DROP COLUMN `last_paid_stripe_invoice_id`");
         $pdo->exec("ALTER TABLE `user` DROP COLUMN `stripe_customer_id`");
         $pdo->exec("DELETE FROM config WHERE item IN ('stripe_publishable_key','stripe_auto_billing_enabled','balance_auto_renew_enabled','stripe_grace_days')");
 

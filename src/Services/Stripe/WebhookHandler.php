@@ -226,12 +226,12 @@ final class WebhookHandler
      * is the customer on the invoice before acting (same pattern as P1.5).
      *
      * Idempotency: a re-delivery of the SAME event id is already a no-op (the
-     * StripeEvent UNIQUE guard in handle()). Stripe can also emit DIFFERENT
-     * event ids for the same logical invoice/period, so we ALSO guard on the
-     * invoice's billing period when the payload carries it: skip if the local
-     * end_date already covers (is at/after) the invoice period end — the period
-     * was already advanced, so a second advance cannot happen. When the payload
-     * omits period info (e.g. minimal fixtures), per-event dedup is the guard.
+     * StripeEvent UNIQUE guard in handle()). Stripe can also emit the SAME
+     * logical invoice under a DIFFERENT event id (e.g. invoice.paid vs
+     * invoice.payment_succeeded redelivery), which the StripeEvent dedup would
+     * NOT catch. We therefore ALSO guard on the Stripe INVOICE id: the renewal
+     * stores invoice->id in last_paid_stripe_invoice_id, and a second delivery
+     * of that same invoice id is a no-op — so a period advances exactly once.
      */
     private function handleInvoicePaid(Event $event): void
     {
@@ -273,16 +273,14 @@ final class WebhookHandler
             return;
         }
 
-        // Period-level idempotency guard for the cross-event-id case: Stripe can
+        // Per-invoice idempotency guard for the cross-event-id case: Stripe can
         // deliver the SAME logical invoice under a DIFFERENT event id (so the
-        // StripeEvent dedup in handle() would not catch it). The invoice carries
-        // the new billing period end; if our local end_date already covers it,
-        // this period was already advanced — bail before advancing twice.
-        $invoicePeriodEnd = $this->invoicePeriodEnd($invoice);
+        // StripeEvent dedup in handle() would not catch it). Keyed on the Stripe
+        // invoice id we stored on the last successful renewal — a redelivery of
+        // that same invoice is a no-op, so the period advances exactly once.
+        $invoiceId = $invoice->id ?? null;
 
-        if ($invoicePeriodEnd !== null
-            && Carbon::parse($subscription->end_date)->endOfDay()->greaterThanOrEqualTo($invoicePeriodEnd)
-        ) {
+        if ($invoiceId !== null && $subscription->last_paid_stripe_invoice_id === $invoiceId) {
             return;
         }
 
@@ -296,6 +294,12 @@ final class WebhookHandler
         $subscription->end_date = $newEnd->format('Y-m-d');
         $subscription->status = 'active';
         $subscription->stripe_status = 'active';
+        // Stamp the processed invoice id IN THE SAME save — this is the
+        // idempotency marker the guard above reads on redelivery.
+        $subscription->last_paid_stripe_invoice_id = $invoiceId;
+        // Mark this period's reset locally. resetSubscriptionBandwidth skips
+        // stripe subs (P0.10), so this never conflicts with the daily cron; it
+        // keeps last_reset_date coherent for the Stripe leg's own period.
         $subscription->last_reset_date = Carbon::today()->format('Y-m-d');
         $subscription->updated_at = $now;
         $subscription->save();
@@ -310,33 +314,6 @@ final class WebhookHandler
         $user->transfer_today = 0;
         $user->transfer_enable = Tools::gbToB($content->bandwidth);
         $user->save();
-    }
-
-    /**
-     * Best-effort extraction of an invoice's billing period END as a Carbon.
-     *
-     * A Stripe invoice exposes the renewed period both at the line-item level
-     * (`lines.data[].period.end`, the authoritative spot for a subscription line)
-     * and — for the whole invoice — as `period_end`. Both are unix timestamps.
-     * Returns null when neither is present (minimal fixtures), so the caller
-     * falls back to per-event dedup for replay safety.
-     */
-    private function invoicePeriodEnd(object $invoice): ?Carbon
-    {
-        $line = $invoice->lines->data[0] ?? null;
-        $linePeriodEnd = $line->period->end ?? null;
-
-        if (is_int($linePeriodEnd) && $linePeriodEnd > 0) {
-            return Carbon::createFromTimestamp($linePeriodEnd);
-        }
-
-        $periodEnd = $invoice->period_end ?? null;
-
-        if (is_int($periodEnd) && $periodEnd > 0) {
-            return Carbon::createFromTimestamp($periodEnd);
-        }
-
-        return null;
     }
 
     private function handleInvoiceFailed(Event $event): void

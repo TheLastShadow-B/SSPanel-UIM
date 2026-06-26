@@ -63,8 +63,10 @@ function makeInvoicePaidEvent(
 }
 
 /**
- * A richer invoice.paid event that also carries the billing period end (as a
- * real Stripe payload does), used to exercise the cross-event-id period guard.
+ * A richer invoice.paid event that also carries a REALISTIC Stripe billing
+ * period end (the next-period anchor instant — day after end_date at 00:00:00).
+ * Used to exercise the cross-event-id idempotency guard, which keys on the
+ * invoice id; the period fields mirror a real payload but are not the guard.
  */
 function makeInvoicePaidEventWithPeriod(
     string $evtId,
@@ -198,47 +200,54 @@ it('is idempotent: re-delivery of the same invoice.paid does not advance twice',
     expect((new StripeEvent())->where('event_id', 'evt_replay')->count())->toBe(1);
 });
 
-it('does not advance twice when the SAME invoice period arrives under a different event id', function () {
+it('does not advance twice when the SAME invoice id arrives under a different event id', function () {
     $user = makeInvoiceUser('cus_inv4');
     $sub = seedStripeSub($user->id, 'sub_inv4', '2026-07-31');
 
-    // The renewed period ends 2026-08-31 (matches the cycle advance below).
-    $periodEnd = Carbon::parse('2026-08-31')->endOfDay()->getTimestamp();
+    // REALISTIC Stripe anchor: period.end is the NEXT period's start instant,
+    // i.e. the day AFTER end_date at 00:00:00 (2026-09-01 00:00:00) — strictly
+    // LATER than end-of-day(end_date). This is exactly the value the old
+    // endOfDay/period-end guard mishandled; the invoice-id guard ignores it.
+    $periodEnd = Carbon::parse('2026-09-01 00:00:00')->getTimestamp();
 
     $handler = new WebhookHandler();
-    // First delivery: advances 2026-07-31 -> 2026-08-31.
+    // First delivery: advances 2026-07-31 -> 2026-08-31 and stamps the invoice id.
     $handler->handle(
-        makeInvoicePaidEventWithPeriod('evt_p1', 'cus_inv4', 'sub_inv4', 'subscription_cycle', 'in_p', $periodEnd)
+        makeInvoicePaidEventWithPeriod('evt_p1', 'cus_inv4', 'sub_inv4', 'subscription_cycle', 'in_same', $periodEnd)
     );
-    expect((new Subscription())->find($sub->id)->end_date)->toBe('2026-08-31');
+    $afterFirst = (new Subscription())->find($sub->id);
+    expect($afterFirst->end_date)->toBe('2026-08-31');
+    expect($afterFirst->last_paid_stripe_invoice_id)->toBe('in_same');
 
     // Second delivery: DIFFERENT event id (StripeEvent dedup will NOT catch it),
-    // but the SAME logical invoice period -> the period guard must block it.
+    // SAME invoice id -> the invoice-id guard must block a second advance.
     $handler->handle(
-        makeInvoicePaidEventWithPeriod('evt_p2', 'cus_inv4', 'sub_inv4', 'subscription_cycle', 'in_p', $periodEnd)
+        makeInvoicePaidEventWithPeriod('evt_p2', 'cus_inv4', 'sub_inv4', 'subscription_cycle', 'in_same', $periodEnd)
     );
 
     expect((new Subscription())->find($sub->id)->end_date)->toBe('2026-08-31'); // still once
 });
 
-it('advances again on the genuine NEXT cycle (later period end)', function () {
+it('advances again on the genuine NEXT cycle (different invoice id)', function () {
     $user = makeInvoiceUser('cus_inv5');
     $sub = seedStripeSub($user->id, 'sub_inv5', '2026-07-31');
 
     $handler = new WebhookHandler();
-    // Cycle 1: 2026-07-31 -> 2026-08-31.
+    // Cycle 1: 2026-07-31 -> 2026-08-31 (invoice in_c1).
     $handler->handle(makeInvoicePaidEventWithPeriod(
         'evt_c1', 'cus_inv5', 'sub_inv5', 'subscription_cycle', 'in_c1',
-        Carbon::parse('2026-08-31')->endOfDay()->getTimestamp()
+        Carbon::parse('2026-09-01 00:00:00')->getTimestamp()
     ));
     expect((new Subscription())->find($sub->id)->end_date)->toBe('2026-08-31');
 
-    // Cycle 2: a LATER period end -> must advance 2026-08-31 -> 2026-09-30.
+    // Cycle 2: a NEW invoice id -> must advance 2026-08-31 -> 2026-09-30.
     $handler->handle(makeInvoicePaidEventWithPeriod(
         'evt_c2', 'cus_inv5', 'sub_inv5', 'subscription_cycle', 'in_c2',
-        Carbon::parse('2026-09-30')->endOfDay()->getTimestamp()
+        Carbon::parse('2026-10-01 00:00:00')->getTimestamp()
     ));
-    expect((new Subscription())->find($sub->id)->end_date)->toBe('2026-09-30');
+    $afterSecond = (new Subscription())->find($sub->id);
+    expect($afterSecond->end_date)->toBe('2026-09-30');
+    expect($afterSecond->last_paid_stripe_invoice_id)->toBe('in_c2');
 });
 
 it('ignores a cycle invoice whose customer does not match the subscription', function () {

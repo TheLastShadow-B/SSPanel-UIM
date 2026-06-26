@@ -168,6 +168,7 @@ class TestDatabase
                 $table->string('hosted_invoice_url', 512)->nullable();
                 $table->bigInteger('stripe_amount')->nullable();
                 $table->string('stripe_currency', 8)->nullable();
+                $table->string('last_paid_stripe_invoice_id', 64)->nullable();
             });
         }
 

@@ -28,6 +28,7 @@ use Illuminate\Database\Query\Builder;
  * @property string $hosted_invoice_url
  * @property int    $stripe_amount
  * @property string $stripe_currency
+ * @property string $last_paid_stripe_invoice_id
  *
  * @mixin Builder
  */
