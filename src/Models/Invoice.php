@@ -58,6 +58,10 @@ final class Invoice extends Model
 
     public function refundToBalance(): void
     {
+        if ($this->billing_provider === 'stripe') {
+            throw new \RuntimeException('Stripe 订阅账单不支持退回余额，请在 Stripe 后台处理退款');
+        }
+
         if (in_array($this->status, ['paid_gateway', 'paid_balance', 'paid_admin'])) {
             $user = (new User())->find($this->user_id);
             $user->money += $this->price;
