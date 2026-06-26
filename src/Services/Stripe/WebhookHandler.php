@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Stripe;
 
+use App\Models\Config;
 use App\Models\Order;
 use App\Models\StripeEvent;
 use App\Models\Subscription;
@@ -316,9 +317,69 @@ final class WebhookHandler
         $user->save();
     }
 
+    /**
+     * invoice.payment_failed / invoice.payment_action_required: enter the
+     * dunning window. Shared handler for BOTH event types (routed together in
+     * handle()) — a failed charge and a charge that needs SCA/3DS both mean the
+     * period is unpaid and the customer must act.
+     *
+     *  - stripe_status -> 'past_due'.
+     *  - grace_until    -> now + Config('stripe_grace_days') (P0.1, default 7).
+     *  - hosted_invoice_url -> the invoice's hosted page (the SCA/3DS recovery
+     *    link the panel surfaces in P3).
+     *
+     * KEEP SERVICE: end_date / class_expire are NOT touched and the internal
+     * Subscription.status stays 'active'. The user keeps access for the whole
+     * grace/dunning window; the actual downgrade happens only on
+     * customer.subscription.deleted (P1.8) once Stripe gives up retrying.
+     *
+     * S5: bind via stripe_subscription_id, then assert the subscription's owner
+     * is the customer on the invoice before acting (same pattern as P1.5/P1.6).
+     *
+     * Idempotency: naturally idempotent — it sets fields to the same values on
+     * every delivery (no period advance, no counter mutation). A re-delivery of
+     * the SAME event id is already a no-op via the StripeEvent UNIQUE guard in
+     * handle(); a second delivery merely re-writes the identical past_due state.
+     */
     private function handleInvoiceFailed(Event $event): void
     {
-        // Implemented in Task P1.7.
+        $invoice = $event->data->object;
+        $stripeSubId = $invoice->subscription ?? null;
+        $customerId = $invoice->customer ?? null;
+
+        if ($stripeSubId === null || $customerId === null) {
+            return;
+        }
+
+        $subscription = (new Subscription())->where('stripe_subscription_id', $stripeSubId)->first();
+
+        if ($subscription === null) {
+            return;
+        }
+
+        // Only act on Stripe-managed subscriptions; never touch manual/balance.
+        if ($subscription->billing_provider !== 'stripe') {
+            return;
+        }
+
+        // S5: assert the subscription belongs to this customer (security).
+        $user = (new User())->find($subscription->user_id);
+
+        if ($user === null || $user->stripe_customer_id !== $customerId) {
+            return;
+        }
+
+        $graceDays = (int) Config::obtain('stripe_grace_days');
+
+        $now = Carbon::now();
+
+        $subscription->stripe_status = 'past_due';
+        $subscription->grace_until = $now->copy()->addDays($graceDays)->format('Y-m-d H:i:s');
+        $subscription->hosted_invoice_url = $invoice->hosted_invoice_url ?? null;
+        // KEEP SERVICE: status stays 'active'; end_date / class_expire untouched.
+        // Downgrade happens only on customer.subscription.deleted (P1.8).
+        $subscription->updated_at = $now->format('Y-m-d H:i:s');
+        $subscription->save();
     }
 
     private function handleSubscriptionDeleted(Event $event): void
