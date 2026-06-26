@@ -21,8 +21,11 @@ use App\Models\Order;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\DB;
+use App\Services\Stripe\StripeService;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
+use Stripe\PaymentIntent;
+use Stripe\StripeClient;
 
 if (! function_exists('ensureUserMoneyLogTable')) {
     /**
@@ -172,5 +175,63 @@ if (! function_exists('makeUnpaidRenewalInvoice')) {
         $invoice->save();
 
         return $invoice;
+    }
+}
+
+if (! function_exists('fakeCardStripe')) {
+    /**
+     * Stubbed StripeService for the off-session card path. `$pm` is the stored
+     * default payment method id (or null for "no card"); `$charge` is either a
+     * PaymentIntent status string ('succeeded'/'requires_action'/...) or a
+     * \Throwable to raise from chargeOffSession (e.g. a CardException decline).
+     * ensureCustomer is overridden so it never hits the network.
+     */
+    function fakeCardStripe(?string $pm, mixed $charge): StripeService
+    {
+        $client = new StripeClient(['api_key' => 'sk_test_autorenew_card']);
+
+        return new class ($client, $pm, $charge) extends StripeService {
+            /** @var array<int,array<string,mixed>> */
+            public array $chargeCalls = [];
+
+            public function __construct(StripeClient $c, public ?string $pm, public mixed $charge)
+            {
+                parent::__construct($c);
+            }
+
+            public function ensureCustomer(User $user): string
+            {
+                return $user->stripe_customer_id ?: 'cus_test_autorenew';
+            }
+
+            public function getDefaultPaymentMethod(string $customerId): ?string
+            {
+                return $this->pm;
+            }
+
+            public function chargeOffSession(
+                string $customerId,
+                string $paymentMethodId,
+                int $amountMinor,
+                string $currency,
+                string $idempotencyKey,
+                array $metadata = []
+            ): PaymentIntent {
+                $this->chargeCalls[] = compact(
+                    'customerId',
+                    'paymentMethodId',
+                    'amountMinor',
+                    'currency',
+                    'idempotencyKey',
+                    'metadata'
+                );
+
+                if ($this->charge instanceof \Throwable) {
+                    throw $this->charge;
+                }
+
+                return PaymentIntent::constructFrom(['id' => 'pi_autorenew_1', 'status' => $this->charge]);
+            }
+        };
     }
 }

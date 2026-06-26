@@ -39,59 +39,7 @@ afterEach(function () {
     StripeService::setInstance(new StripeService(new StripeClient(['api_key' => 'sk_test_x'])));
 });
 
-/**
- * Fake StripeService: a stored-card id (or null) and a charge outcome that is
- * either a PaymentIntent status string or a \Throwable to raise. ensureCustomer
- * is overridden so it never touches the network even without a customer id.
- */
-function fakeCardStripe(?string $pm, mixed $charge): StripeService
-{
-    $client = new StripeClient(['api_key' => 'sk_test_autorenew_card']);
-
-    return new class ($client, $pm, $charge) extends StripeService {
-        /** @var array<int,array<string,mixed>> */
-        public array $chargeCalls = [];
-
-        public function __construct(StripeClient $c, public ?string $pm, public mixed $charge)
-        {
-            parent::__construct($c);
-        }
-
-        public function ensureCustomer(\App\Models\User $user): string
-        {
-            return $user->stripe_customer_id ?: 'cus_test_autorenew';
-        }
-
-        public function getDefaultPaymentMethod(string $customerId): ?string
-        {
-            return $this->pm;
-        }
-
-        public function chargeOffSession(
-            string $customerId,
-            string $paymentMethodId,
-            int $amountMinor,
-            string $currency,
-            string $idempotencyKey,
-            array $metadata = []
-        ): \Stripe\PaymentIntent {
-            $this->chargeCalls[] = compact(
-                'customerId',
-                'paymentMethodId',
-                'amountMinor',
-                'currency',
-                'idempotencyKey',
-                'metadata'
-            );
-
-            if ($this->charge instanceof \Throwable) {
-                throw $this->charge;
-            }
-
-            return \Stripe\PaymentIntent::constructFrom(['id' => 'pi_autorenew_1', 'status' => $this->charge]);
-        }
-    };
-}
+// fakeCardStripe() lives in AutoRenewHelpers.php (shared with ProcessAutoRenewTest).
 
 it('returns false and leaves the invoice unpaid when there is no stored card', function () {
     $user = makeUserWithMoney(0.0);

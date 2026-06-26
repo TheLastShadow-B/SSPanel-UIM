@@ -559,6 +559,80 @@ final class SubscriptionService
     }
 
     /**
+     * 自动续费瀑布主流程（每日执行）。
+     *
+     * 选取自管(SELF_MANAGED)、auto_renew=1、当天(end_date=today)到期、状态为
+     * active/pending_renewal 且存在 unpaid 续费账单的订阅；对每个依次尝试：
+     *   1) 余额扣款成功 → 推进周期
+     *   2) 否则存档卡扣款成功 → 推进周期
+     *   3) 都失败 → 进入宽限期
+     * 续费成功后把对应续费订单标记为 activated 并 advanceRenewedPeriod 推进。
+     */
+    public static function processAutoRenew(): void
+    {
+        $today = Carbon::today()->format('Y-m-d');
+
+        $subscriptions = (new Subscription())
+            ->whereIn('status', ['active', 'pending_renewal'])
+            ->where('end_date', $today)
+            ->where('auto_renew', 1)
+            ->whereIn('billing_provider', self::SELF_MANAGED)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($subscriptions as $subscription) {
+            $user = (new User())->find($subscription->user_id);
+
+            if ($user === null) {
+                continue;
+            }
+
+            // 该订阅当前未取消/未过期/未激活的续费订单
+            $order = (new Order())
+                ->where('subscription_id', $subscription->id)
+                ->where('product_type', 'subscription')
+                ->whereNotIn('status', ['cancelled', 'expired', 'activated'])
+                ->orderByDesc('id')
+                ->first();
+
+            if ($order === null) {
+                continue;
+            }
+
+            // 订单对应的 unpaid 续费账单
+            $invoice = (new Invoice())
+                ->where('order_id', $order->id)
+                ->where('status', 'unpaid')
+                ->first();
+
+            if ($invoice === null) {
+                continue;
+            }
+
+            // 瀑布：余额优先，不足再走存档卡。
+            if (self::payRenewalFromBalance($subscription, $invoice)
+                || self::chargeRenewalToCard($subscription, $invoice)) {
+                $order->status = 'activated';
+                $order->update_time = time();
+                $order->save();
+
+                // 重读用户以拿到扣款后的最新余额，再推进周期。
+                $user = (new User())->find($subscription->user_id);
+                self::advanceRenewedPeriod($subscription, $user);
+
+                echo "订阅 #{$subscription->id} 自动续费成功" . PHP_EOL;
+                continue;
+            }
+
+            // 余额与存档卡都失败 → 进入宽限期。
+            self::enterGrace($subscription, $user);
+            echo "订阅 #{$subscription->id} 自动续费失败，进入宽限期" . PHP_EOL;
+        }
+
+        echo Tools::toDateTime(time()) . ' 订阅自动续费处理完成' . PHP_EOL;
+    }
+
+    /**
      * 过期订阅处理（每日执行）
      */
     public static function expireSubscription(): void
