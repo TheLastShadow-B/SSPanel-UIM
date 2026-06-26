@@ -574,18 +574,30 @@ final class SubscriptionService
 
             // Settle + record + claim order + advance — atomically, so the 5-min
             // activation chain can never re-select a paid renewal (exactly-once).
-            DB::transaction(static function () use ($sub, $fresh, $user, $amountMinor, $currency): void {
-                $fresh->status = 'paid_gateway';
-                $fresh->pay_time = time();
-                $fresh->update_time = time();
-                $fresh->save();
+            // Mirror payRenewalFromBalance: re-load the invoice under a row lock and re-assert it
+            // is still unpaid before settling. Under genuinely parallel daily-cron processes both
+            // can pass the pre-charge guard and charge once (the renew_inv_{id} idempotency key
+            // dedupes to a SINGLE charge), but only ONE may run the settle + advanceRenewedPeriod.
+            // If a concurrent actor already settled it, no-op here (that actor owns the advance);
+            // otherwise the period double-advances by one free cycle.
+            DB::transaction(static function () use ($sub, $invoice, $user, $amountMinor, $currency): void {
+                $locked = (new Invoice())->where('id', $invoice->id)->lockForUpdate()->first();
+
+                if ($locked === null || $locked->status !== 'unpaid') {
+                    return;
+                }
+
+                $locked->status = 'paid_gateway';
+                $locked->pay_time = time();
+                $locked->update_time = time();
+                $locked->save();
 
                 $sub->stripe_amount = $amountMinor;
                 $sub->stripe_currency = $currency;
                 $sub->updated_at = Carbon::now()->format('Y-m-d H:i:s');
                 $sub->save();
 
-                self::finalizeRenewal($sub, $fresh, $user);
+                self::finalizeRenewal($sub, $locked, $user);
             });
 
             return true;

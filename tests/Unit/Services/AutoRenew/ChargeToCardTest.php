@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 use App\Models\Config;
 use App\Models\Invoice;
+use App\Models\Order;
 use App\Models\Subscription;
+use App\Models\User;
 use App\Services\Exchange;
 use App\Services\Stripe\StripeService;
 use App\Services\SubscriptionService;
+use Carbon\Carbon;
+use Stripe\PaymentIntent;
 use Stripe\StripeClient;
 use Tests\TestDatabase;
 
@@ -181,4 +185,96 @@ it('returns false WITHOUT charging when the renewal cannot complete (invalid bil
     expect($fake->chargeCalls)->toHaveCount(0);
     expect((new Invoice())->find($inv->id)->status)->toBe('unpaid');
     expect((new Subscription())->find($sub->id)->stripe_amount)->toBeNull();
+});
+
+it('does not double-advance when a concurrent cron settles during the off-session charge', function () {
+    // Parallel daily-cron race: both processes pass the pre-charge guard while the invoice is
+    // still unpaid and each calls chargeOffSession once (Stripe's idempotency key dedupes to a
+    // SINGLE real charge). Then BOTH run the settle transaction. Without a row-locked re-check
+    // the second settle re-records the charge and advances the period a SECOND time = one free
+    // cycle. The settle must re-load the invoice under lockForUpdate and no-op if already settled.
+    $today = Carbon::today()->format('Y-m-d');
+    $user = makeUserWithMoney(0.0, class: 2);
+    $sub = makeSub($user, renewalPrice: 30.0, endDate: $today, status: 'pending_renewal', autoRenew: 1);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+
+    // Exactly one cycle forward from today — the only correct advance.
+    $expectedEnd = SubscriptionService::calculateEndDate(Carbon::parse($today)->addDay(), 'month')->format('Y-m-d');
+
+    // SEAM: chargeOffSession runs AFTER the pre-charge guard but BEFORE the settle transaction —
+    // precisely the window a parallel actor can win. Here a *concurrent* cron process fully settles
+    // the renewal (fresh instances, mimicking a separate process): invoice -> paid_balance, order ->
+    // activated, period advanced ONCE. Our subsequent settle must detect this and not advance again.
+    $stripe = new class (
+        new StripeClient(['api_key' => 'sk_test_race']),
+        (int) $inv->id,
+        (int) $inv->order_id,
+        (int) $sub->id
+    ) extends StripeService {
+        public int $chargeCount = 0;
+
+        public function __construct(StripeClient $c, public int $invId, public int $orderId, public int $subId)
+        {
+            parent::__construct($c);
+        }
+
+        public function ensureCustomer(User $user): string
+        {
+            return $user->stripe_customer_id ?: 'cus_race';
+        }
+
+        public function getDefaultPaymentMethod(string $customerId): ?string
+        {
+            return 'pm_card_1';
+        }
+
+        public function chargeOffSession(
+            string $customerId,
+            string $paymentMethodId,
+            int $amountMinor,
+            string $currency,
+            string $idempotencyKey,
+            array $metadata = []
+        ): PaymentIntent {
+            $this->chargeCount++;
+
+            // Concurrent actor's full settle (separate process -> fresh model instances).
+            $concInv = (new Invoice())->find($this->invId);
+            $concInv->status = 'paid_balance';
+            $concInv->pay_time = time();
+            $concInv->update_time = time();
+            $concInv->save();
+
+            $concOrder = (new Order())->find($this->orderId);
+            $concOrder->status = 'activated';
+            $concOrder->update_time = time();
+            $concOrder->save();
+
+            $concSub = (new Subscription())->find($this->subId);
+            $concUser = (new User())->find($concSub->user_id);
+            SubscriptionService::advanceRenewedPeriod($concSub, $concUser);
+
+            return PaymentIntent::constructFrom(['id' => 'pi_race', 'status' => 'succeeded']);
+        }
+    };
+    StripeService::setInstance($stripe);
+
+    ob_start();
+    $result = SubscriptionService::chargeRenewalToCard($sub, $inv);
+    ob_get_clean();
+
+    // The PI succeeded (idempotency dedupes the real charge), so the waterfall treats this as a
+    // success and does NOT fall through to grace.
+    expect($result)->toBeTrue();
+    expect($stripe->chargeCount)->toBe(1);
+
+    $freshSub = (new Subscription())->find($sub->id);
+    // Advanced exactly ONCE (by the concurrent actor); our settle re-checked under lock and no-op'd:
+    expect($freshSub->end_date)->toBe($expectedEnd);
+    // ...proven by our settle never recording a stripe charge...
+    expect($freshSub->stripe_amount)->toBeNull();
+    // ...nor overwriting the concurrent actor's paid_balance settlement to paid_gateway...
+    expect((new Invoice())->find($inv->id)->status)->toBe('paid_balance');
+    // ...nor re-touching the already-activated order.
+    expect((new Order())->find($inv->order_id)->status)->toBe('activated');
 });
