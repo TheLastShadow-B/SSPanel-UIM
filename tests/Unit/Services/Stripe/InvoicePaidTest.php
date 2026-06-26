@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\Invoice;
+use App\Models\Order;
 use App\Models\StripeEvent;
 use App\Models\Subscription;
 use App\Models\User;
@@ -144,6 +146,39 @@ function seedStripeSub(int $userId, string $stripeSubId, string $end): Subscript
     return $s;
 }
 
+function seedStripeOrderAndInvoice(User $user, Subscription $subscription): Invoice
+{
+    $order = new Order();
+    $order->user_id = $user->id;
+    $order->product_id = $subscription->product_id;
+    $order->product_type = 'subscription';
+    $order->product_name = 'Pro';
+    $order->product_content = $subscription->product_content;
+    $order->subscription_id = $subscription->id;
+    $order->coupon = '';
+    $order->price = $subscription->renewal_price;
+    $order->status = 'activated';
+    $order->billing_provider = 'stripe';
+    $order->create_time = time();
+    $order->update_time = time();
+    $order->save();
+
+    $invoice = new Invoice();
+    $invoice->user_id = $user->id;
+    $invoice->order_id = $order->id;
+    $invoice->content = json_encode([]);
+    $invoice->price = $order->price;
+    $invoice->status = 'unpaid';
+    $invoice->create_time = time();
+    $invoice->update_time = time();
+    $invoice->pay_time = 0;
+    $invoice->type = 'product';
+    $invoice->billing_provider = 'stripe';
+    $invoice->save();
+
+    return $invoice;
+}
+
 it('does not extend dates on subscription_create', function () {
     $user = makeInvoiceUser('cus_inv');
     $sub = seedStripeSub($user->id, 'sub_inv', '2026-07-31');
@@ -155,6 +190,23 @@ it('does not extend dates on subscription_create', function () {
     expect((new Subscription())->find($sub->id)->end_date)->toBe('2026-07-31');
     // class_expire was set by the (simulated) first-period grant; create is a no-op.
     expect((new User())->find($user->id)->class_expire)->toContain('2026-07-31');
+});
+
+it('marks the local invoice paid on subscription_create without extending dates', function () {
+    $user = makeInvoiceUser('cus_create_invoice');
+    $sub = seedStripeSub($user->id, 'sub_create_invoice', '2026-07-31');
+    $invoice = seedStripeOrderAndInvoice($user, $sub);
+
+    (new WebhookHandler())->handle(
+        makeInvoicePaidEvent('evt_create_invoice', 'cus_create_invoice', 'sub_create_invoice', 'subscription_create', 'in_create')
+    );
+
+    $freshSub = (new Subscription())->find($sub->id);
+    expect($freshSub->end_date)->toBe('2026-07-31');
+
+    $freshInvoice = (new Invoice())->find($invoice->id);
+    expect($freshInvoice->status)->toBe('paid_gateway');
+    expect((int) $freshInvoice->pay_time)->toBeGreaterThan(0);
 });
 
 it('advances end_date and class_expire on subscription_cycle and resets bandwidth', function () {
@@ -273,4 +325,62 @@ it('ignores a cycle invoice for a non-stripe (manual/balance) subscription', fun
     );
 
     expect((new Subscription())->find($sub->id)->end_date)->toBe('2026-07-31'); // untouched
+});
+
+it('marks a stripe subscription expired and revokes access on invoice payment failure', function () {
+    $user = makeInvoiceUser('cus_fail');
+    $user->class = 1;
+    $user->transfer_enable = Tools::gbToB(10);
+    $user->save();
+
+    $sub = seedStripeSub($user->id, 'sub_fail', '2026-07-31');
+
+    (new WebhookHandler())->handle(\Stripe\Event::constructFrom([
+        'id' => 'evt_fail',
+        'type' => 'invoice.payment_failed',
+        'data' => ['object' => [
+            'customer' => 'cus_fail',
+            'subscription' => 'sub_fail',
+            'hosted_invoice_url' => 'https://invoice.stripe.test/fail',
+            'next_payment_attempt' => Carbon::parse('2026-08-02 00:00:00')->getTimestamp(),
+        ]],
+    ]));
+
+    $fresh = (new Subscription())->find($sub->id);
+    expect($fresh->status)->toBe('expired');
+    expect($fresh->stripe_status)->toBe('past_due');
+    expect((int) $fresh->auto_renew)->toBe(0);
+    expect($fresh->hosted_invoice_url)->toBe('https://invoice.stripe.test/fail');
+
+    $freshUser = (new User())->find($user->id);
+    expect((int) $freshUser->class)->toBe(0);
+    expect((int) $freshUser->transfer_enable)->toBe(0);
+});
+
+it('marks a stripe subscription cancelled and revokes access on subscription deleted', function () {
+    $user = makeInvoiceUser('cus_deleted');
+    $user->class = 1;
+    $user->transfer_enable = Tools::gbToB(10);
+    $user->save();
+
+    $sub = seedStripeSub($user->id, 'sub_deleted', '2026-07-31');
+
+    (new WebhookHandler())->handle(\Stripe\Event::constructFrom([
+        'id' => 'evt_deleted',
+        'type' => 'customer.subscription.deleted',
+        'data' => ['object' => [
+            'id' => 'sub_deleted',
+            'customer' => 'cus_deleted',
+            'status' => 'canceled',
+        ]],
+    ]));
+
+    $fresh = (new Subscription())->find($sub->id);
+    expect($fresh->status)->toBe('cancelled');
+    expect($fresh->stripe_status)->toBe('canceled');
+    expect((int) $fresh->auto_renew)->toBe(0);
+
+    $freshUser = (new User())->find($user->id);
+    expect((int) $freshUser->class)->toBe(0);
+    expect((int) $freshUser->transfer_enable)->toBe(0);
 });

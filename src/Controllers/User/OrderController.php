@@ -462,7 +462,8 @@ final class OrderController extends BaseController
 
         if ($isStripe) {
             // 解析（创建/复用）周期对应的 recurring Price，币种换算在创建时锁定。
-            $resolved = \App\Services\Stripe\PriceResolver::resolve($product, $billingCycle);
+            // Stripe 价格必须使用本地最终应付价，避免优惠券订单被 Stripe 按原价扣款。
+            $resolved = \App\Services\Stripe\PriceResolver::resolve($product, $billingCycle, $buyPrice);
 
             // 不传 payment_method_types（动态支付方式）；mode 在 StripeService 内固定为 subscription。
             $session = \App\Services\Stripe\StripeService::getInstance()->createSubscriptionCheckout(

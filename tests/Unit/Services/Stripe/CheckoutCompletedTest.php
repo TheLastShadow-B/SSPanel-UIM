@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\StripeEvent;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Stripe\StripeService;
@@ -43,16 +45,22 @@ afterEach(function () {
     StripeService::setInstance(new StripeService(new StripeClient(['api_key' => 'sk_test_x'])));
 });
 
-function makeCheckoutEvent(string $evtId, string $customer, string $sub): \Stripe\Event
-{
+function makeCheckoutEvent(
+    string $evtId,
+    string $customer,
+    string $sub,
+    ?string $paymentStatus = 'paid',
+    string $type = 'checkout.session.completed'
+): \Stripe\Event {
     return \Stripe\Event::constructFrom([
         'id' => $evtId,
-        'type' => 'checkout.session.completed',
+        'type' => $type,
         'data' => ['object' => [
             'id' => 'cs_1',
             'mode' => 'subscription',
             'customer' => $customer,
             'subscription' => $sub,
+            'payment_status' => $paymentStatus,
         ]],
     ]);
 }
@@ -164,6 +172,24 @@ function makeCheckoutOrder(User $user, int $class, int $bandwidth): Order
     return $order;
 }
 
+function makeCheckoutInvoice(User $user, Order $order): Invoice
+{
+    $invoice = new Invoice();
+    $invoice->user_id = $user->id;
+    $invoice->order_id = $order->id;
+    $invoice->content = json_encode([]);
+    $invoice->price = $order->price;
+    $invoice->status = 'unpaid';
+    $invoice->create_time = time();
+    $invoice->update_time = time();
+    $invoice->pay_time = 0;
+    $invoice->type = 'product';
+    $invoice->billing_provider = 'stripe';
+    $invoice->save();
+
+    return $invoice;
+}
+
 it('creates a local subscription and grants membership on checkout completed', function () {
     $user = makeCheckoutUser('cus_p15');
     $order = makeCheckoutOrder($user, 2, 50);
@@ -245,4 +271,88 @@ it('ignores a session whose customer maps to no local user', function () {
     (new WebhookHandler())->handle(makeCheckoutEvent('evt_nouser', 'cus_unknown', 'sub_nouser'));
 
     expect((new Subscription())->where('stripe_subscription_id', 'sub_nouser')->count())->toBe(0);
+});
+
+it('does not grant access while checkout payment is still unpaid', function () {
+    $user = makeCheckoutUser('cus_pending');
+    $order = makeCheckoutOrder($user, 2, 50);
+
+    StripeService::setInstance(fakeCheckoutStripeService([
+        'sspanel_user_id' => (string) $user->id,
+        'product_id' => '7',
+        'billing_cycle' => 'month',
+        'order_id' => (string) $order->id,
+        'invoice_id' => '0',
+    ]));
+
+    (new WebhookHandler())->handle(makeCheckoutEvent('evt_pending', 'cus_pending', 'sub_pending', 'unpaid'));
+
+    expect((new Subscription())->where('stripe_subscription_id', 'sub_pending')->count())->toBe(0);
+    expect((new Order())->find($order->id)->status)->toBe('pending_payment');
+    expect((int) (new User())->find($user->id)->class)->toBe(0);
+});
+
+it('marks the initial local invoice paid when checkout completes with a paid session', function () {
+    $user = makeCheckoutUser('cus_invoice');
+    $order = makeCheckoutOrder($user, 2, 50);
+    $invoice = makeCheckoutInvoice($user, $order);
+
+    StripeService::setInstance(fakeCheckoutStripeService([
+        'sspanel_user_id' => (string) $user->id,
+        'product_id' => '7',
+        'billing_cycle' => 'month',
+        'order_id' => (string) $order->id,
+        'invoice_id' => (string) $invoice->id,
+    ]));
+
+    (new WebhookHandler())->handle(makeCheckoutEvent('evt_invoice', 'cus_invoice', 'sub_invoice'));
+
+    $freshInvoice = (new Invoice())->find($invoice->id);
+    expect($freshInvoice->status)->toBe('paid_gateway');
+    expect((int) $freshInvoice->pay_time)->toBeGreaterThan(0);
+});
+
+it('does not record an event as processed when checkout side effects throw', function () {
+    $user = makeCheckoutUser('cus_throw');
+    $order = makeCheckoutOrder($user, 2, 50);
+
+    $client = new class extends StripeClient {
+        public function __construct()
+        {
+            parent::__construct(['api_key' => 'sk_test_throw']);
+        }
+
+        public function __get($name)
+        {
+            if ($name === 'subscriptions') {
+                return new class {
+                    public function retrieve($id, $params = null, $opts = null): \Stripe\Subscription
+                    {
+                        throw new RuntimeException('stripe unavailable');
+                    }
+                };
+            }
+
+            return parent::__get($name);
+        }
+    };
+
+    StripeService::setInstance(new class ($client) extends StripeService {
+        public function __construct(private StripeClient $fakeClient)
+        {
+            parent::__construct($fakeClient);
+        }
+
+        public function client(): StripeClient
+        {
+            return $this->fakeClient;
+        }
+    });
+
+    expect(fn () => (new WebhookHandler())->handle(
+        makeCheckoutEvent('evt_side_effect_fails', 'cus_throw', 'sub_throw')
+    ))->toThrow(RuntimeException::class);
+
+    expect((new StripeEvent())->where('event_id', 'evt_side_effect_fails')->exists())->toBeFalse();
+    expect((new Subscription())->where('stripe_subscription_id', 'sub_throw')->exists())->toBeFalse();
 });

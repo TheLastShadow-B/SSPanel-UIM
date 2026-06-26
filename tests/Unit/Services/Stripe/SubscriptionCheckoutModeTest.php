@@ -7,6 +7,7 @@ use App\Models\Config;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\UserCoupon;
 use App\Models\User;
 use App\Services\Cache;
 use App\Services\Stripe\StripeService;
@@ -177,6 +178,93 @@ function subFakeStripeService(): StripeService
     };
 }
 
+function subFakeCreatingStripeService(): StripeService
+{
+    $client = new class extends StripeClient {
+        public array $createCalls = [];
+
+        public array $allCalls = [];
+
+        public function __construct()
+        {
+            parent::__construct(['api_key' => 'sk_test_sub_create']);
+        }
+
+        public function __get($name)
+        {
+            if ($name === 'prices') {
+                return new class ($this) {
+                    public function __construct(private $owner) {}
+
+                    public function all($params = null, $opts = null)
+                    {
+                        $this->owner->allCalls[] = $params;
+
+                        return (object) ['data' => []];
+                    }
+
+                    public function create($params = null, $opts = null)
+                    {
+                        $this->owner->createCalls[] = $params;
+
+                        return (object) ['id' => 'price_discounted_1'];
+                    }
+                };
+            }
+
+            return parent::__get($name);
+        }
+    };
+
+    return new class ($client) extends StripeService {
+        public array $checkoutCalls = [];
+
+        public function __construct(public StripeClient $fakeClient)
+        {
+            parent::__construct($fakeClient);
+        }
+
+        public function client(): StripeClient
+        {
+            return $this->fakeClient;
+        }
+
+        public function createSubscriptionCheckout(
+            $user,
+            $priceId,
+            $metadata,
+            $successUrl,
+            $cancelUrl
+        ): Session {
+            $this->checkoutCalls[] = compact('priceId', 'metadata', 'successUrl', 'cancelUrl');
+
+            return Session::constructFrom([
+                'id' => 'cs_test_sub_discount',
+                'url' => 'https://checkout.stripe.test/cs_test_sub_discount',
+            ]);
+        }
+    };
+}
+
+function makeFixedCoupon(string $code, float $amount): UserCoupon
+{
+    $coupon = new UserCoupon();
+    $coupon->code = $code;
+    $coupon->content = json_encode(['type' => 'fixed', 'value' => $amount]);
+    $coupon->limit = json_encode([
+        'disabled' => false,
+        'product_id' => '',
+        'use_time' => 0,
+        'total_use_time' => 0,
+    ]);
+    $coupon->use_count = 0;
+    $coupon->create_time = time();
+    $coupon->expire_time = 0;
+    $coupon->save();
+
+    return $coupon;
+}
+
 it('keeps the manual path unchanged: stamps billing_provider=manual on order and invoice', function () {
     $user = makeSubBuyer();
     $product = makeSubProduct();
@@ -316,4 +404,48 @@ it('stamps billing_provider=stripe on order+invoice when the master switch is ON
         expect($call['metadata']['billing_cycle'])->toBe('month');
         expect($call['metadata']['order_id'])->toBe((string) $order->id);
     }
+});
+
+it('creates the Stripe recurring price from the discounted subscription price', function () {
+    if (! extension_loaded('redis')) {
+        $this->markTestSkipped('ext-redis not available; resolve() needs Exchange (Redis)');
+    }
+
+    Config::query()->updateOrInsert(
+        ['item' => 'stripe_auto_billing_enabled'],
+        ['value' => '1', 'class' => 'billing', 'type' => 'bool']
+    );
+    Config::query()->updateOrInsert(
+        ['item' => 'stripe_currency'],
+        ['value' => 'USD', 'class' => 'billing', 'type' => 'string']
+    );
+
+    (new Cache())->initRedis()->setex('exchange_rate:CNY_USD', 3600, 0.10);
+
+    $fake = subFakeCreatingStripeService();
+    StripeService::setInstance($fake);
+
+    $user = makeSubBuyer();
+    $product = makeSubProduct();
+    makeFixedCoupon('SAVE3', 3.0);
+
+    $GLOBALS['user'] = $user;
+
+    $response = (new OrderController())->subscription(subRequest([
+        'type' => 'subscription',
+        'product_id' => (string) $product->id,
+        'billing_cycle' => 'month',
+        'coupon' => 'SAVE3',
+        'auto_renew_provider' => 'stripe',
+    ]), subResponse(), []);
+
+    expect($response->getHeaderLine('HX-Redirect'))->toBe('https://checkout.stripe.test/cs_test_sub_discount');
+    expect($fake->fakeClient->createCalls)->toHaveCount(1);
+    expect($fake->fakeClient->createCalls[0]['unit_amount'])->toBe(70);
+    expect($fake->checkoutCalls[0]['priceId'])->toBe('price_discounted_1');
+
+    $order = (new Order())->where('user_id', $user->id)->first();
+    $invoice = (new Invoice())->where('user_id', $user->id)->first();
+    expect((float) $order->price)->toBe(7.0);
+    expect((float) $invoice->price)->toBe(7.0);
 });

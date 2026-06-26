@@ -254,6 +254,18 @@ class TestDatabase
                 $table->dateTime('created_at');
             });
         }
+
+        if (!$schema->hasTable('user_coupon')) {
+            $schema->create('user_coupon', function (Blueprint $table) {
+                $table->increments('id');
+                $table->string('code')->unique();
+                $table->text('content');
+                $table->text('limit');
+                $table->integer('use_count')->default(0);
+                $table->integer('create_time')->default(0);
+                $table->integer('expire_time')->default(0);
+            });
+        }
     }
 
     public static function dropTables(): void
@@ -261,7 +273,7 @@ class TestDatabase
         $capsule = DB::getCapsule();
         $schema = $capsule->schema();
         
-        $tables = ['stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'product', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
+        $tables = ['user_coupon', 'stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'product', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
         
         foreach ($tables as $table) {
             if ($schema->hasTable($table)) {

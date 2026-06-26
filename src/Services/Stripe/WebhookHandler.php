@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Stripe;
 
+use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\StripeEvent;
 use App\Models\Subscription;
@@ -13,6 +14,7 @@ use App\Utils\Tools;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Stripe\Event;
+use function in_array;
 use function json_decode;
 use function time;
 
@@ -25,12 +27,8 @@ use function time;
  *  - Routing: dispatch by `$event->type` to a per-type handler.
  *  - Unknown / not-yet-implemented types are safe no-ops.
  *
- * The per-type handler bodies are filled in by later tasks:
- *  - handleCheckoutCompleted    (P1.5)
- *  - handleInvoicePaid          (P1.6)
- *  - handleInvoiceFailed        (P1.7)
- *  - handleSubscriptionDeleted  (P1.8)
- *  - setup_intent.succeeded     (P3.3, extended P5.3)
+ * Event rows are recorded only after the selected handler returns, so Stripe
+ * redeliveries are still able to retry failed side effects.
  */
 final class WebhookHandler
 {
@@ -39,14 +37,38 @@ final class WebhookHandler
      */
     public function handle(Event $event): void
     {
-        // Idempotency. The UNIQUE constraint on event_id is the authoritative
-        // guard; the exists() check is a cheap fast-path. Catching the
-        // duplicate-insert QueryException closes the check-then-insert race
-        // (Stripe redelivers events, and deliveries can overlap).
         if ((new StripeEvent())->where('event_id', $event->id)->exists()) {
             return;
         }
 
+        switch ($event->type) {
+            case 'checkout.session.completed':
+            case 'checkout.session.async_payment_succeeded':
+                $this->handleCheckoutCompleted($event);
+                break;
+            case 'invoice.paid':
+                $this->handleInvoicePaid($event);
+                break;
+            case 'invoice.payment_failed':
+            case 'invoice.payment_action_required':
+                $this->handleInvoiceFailed($event);
+                break;
+            case 'customer.subscription.deleted':
+                $this->handleSubscriptionDeleted($event);
+                break;
+            case 'customer.subscription.updated':
+            case 'checkout.session.async_payment_failed':
+            case 'setup_intent.succeeded':
+            default:
+                // Handled in later tasks / no-op for unknown types.
+                break;
+        }
+
+        $this->recordProcessedEvent($event);
+    }
+
+    private function recordProcessedEvent(Event $event): void
+    {
         try {
             $record = new StripeEvent();
             $record->event_id = $event->id;
@@ -62,27 +84,6 @@ final class WebhookHandler
             }
 
             throw $e;
-        }
-
-        switch ($event->type) {
-            case 'checkout.session.completed':
-                $this->handleCheckoutCompleted($event);
-                break;
-            case 'invoice.paid':
-                $this->handleInvoicePaid($event);
-                break;
-            case 'invoice.payment_failed':
-            case 'invoice.payment_action_required':
-                $this->handleInvoiceFailed($event);
-                break;
-            case 'customer.subscription.deleted':
-                $this->handleSubscriptionDeleted($event);
-                break;
-            case 'customer.subscription.updated':
-            case 'setup_intent.succeeded':
-            default:
-                // Handled in later tasks / no-op for unknown types.
-                break;
         }
     }
 
@@ -116,6 +117,12 @@ final class WebhookHandler
         $session = $event->data->object;
 
         if (($session->mode ?? null) !== 'subscription') {
+            return;
+        }
+
+        if ($event->type === 'checkout.session.completed'
+            && ! in_array($session->payment_status ?? null, ['paid', 'no_payment_required'], true)
+        ) {
             return;
         }
 
@@ -206,6 +213,19 @@ final class WebhookHandler
         $order->subscription_id = $subscription->id;
         $order->update_time = time();
         $order->save();
+
+        $invoiceId = $metadata->invoice_id ?? null;
+
+        if ($invoiceId !== null) {
+            $invoice = (new Invoice())->find((int) $invoiceId);
+
+            if ($invoice !== null && (int) $invoice->order_id === (int) $order->id) {
+                $invoice->status = 'paid_gateway';
+                $invoice->pay_time = time();
+                $invoice->update_time = time();
+                $invoice->save();
+            }
+        }
     }
 
     /**
@@ -265,6 +285,8 @@ final class WebhookHandler
         // First invoice of a brand-new subscription: dates already set by
         // checkout.session.completed (P1.5). No-op on dates here.
         if ($reason === 'subscription_create') {
+            $this->markInitialInvoicePaidForSubscription($subscription);
+
             return;
         }
 
@@ -318,11 +340,114 @@ final class WebhookHandler
 
     private function handleInvoiceFailed(Event $event): void
     {
-        // Implemented in Task P1.7.
+        $invoice = $event->data->object;
+        $stripeSubId = $invoice->subscription ?? null;
+        $customerId = $invoice->customer ?? null;
+
+        if ($stripeSubId === null || $customerId === null) {
+            return;
+        }
+
+        $subscription = (new Subscription())->where('stripe_subscription_id', $stripeSubId)->first();
+
+        if ($subscription === null || $subscription->billing_provider !== 'stripe') {
+            return;
+        }
+
+        $user = (new User())->find($subscription->user_id);
+
+        if ($user === null || $user->stripe_customer_id !== $customerId) {
+            return;
+        }
+
+        $subscription->status = 'expired';
+        $subscription->stripe_status = 'past_due';
+        $subscription->auto_renew = 0;
+        $subscription->hosted_invoice_url = $invoice->hosted_invoice_url ?? null;
+        $subscription->grace_until = isset($invoice->next_payment_attempt)
+            ? Carbon::createFromTimestamp((int) $invoice->next_payment_attempt)->format('Y-m-d H:i:s')
+            : null;
+        $subscription->updated_at = Carbon::now()->format('Y-m-d H:i:s');
+        $subscription->save();
+
+        $this->revokeAccessIfNoOtherActiveSubscription($user, (int) $subscription->id);
+    }
+
+    private function markInitialInvoicePaidForSubscription(Subscription $subscription): void
+    {
+        $order = (new Order())
+            ->where('subscription_id', $subscription->id)
+            ->where('billing_provider', 'stripe')
+            ->first();
+
+        if ($order === null) {
+            return;
+        }
+
+        $invoice = (new Invoice())
+            ->where('order_id', $order->id)
+            ->where('billing_provider', 'stripe')
+            ->first();
+
+        if ($invoice === null || $invoice->status === 'paid_gateway') {
+            return;
+        }
+
+        $invoice->status = 'paid_gateway';
+        $invoice->pay_time = time();
+        $invoice->update_time = time();
+        $invoice->save();
     }
 
     private function handleSubscriptionDeleted(Event $event): void
     {
-        // Implemented in Task P1.8.
+        $stripeSub = $event->data->object;
+        $stripeSubId = $stripeSub->id ?? null;
+        $customerId = $stripeSub->customer ?? null;
+
+        if ($stripeSubId === null || $customerId === null) {
+            return;
+        }
+
+        $subscription = (new Subscription())->where('stripe_subscription_id', $stripeSubId)->first();
+
+        if ($subscription === null || $subscription->billing_provider !== 'stripe') {
+            return;
+        }
+
+        $user = (new User())->find($subscription->user_id);
+
+        if ($user === null || $user->stripe_customer_id !== $customerId) {
+            return;
+        }
+
+        $subscription->status = 'cancelled';
+        $subscription->stripe_status = $stripeSub->status ?? 'canceled';
+        $subscription->auto_renew = 0;
+        $subscription->updated_at = Carbon::now()->format('Y-m-d H:i:s');
+        $subscription->save();
+
+        $this->revokeAccessIfNoOtherActiveSubscription($user, (int) $subscription->id);
+    }
+
+    private function revokeAccessIfNoOtherActiveSubscription(User $user, int $subscriptionId): void
+    {
+        $hasOtherActiveSubscription = (new Subscription())
+            ->where('user_id', $user->id)
+            ->where('id', '<>', $subscriptionId)
+            ->whereIn('status', ['active', 'pending_renewal'])
+            ->exists();
+
+        if ($hasOtherActiveSubscription) {
+            return;
+        }
+
+        $user->u = 0;
+        $user->d = 0;
+        $user->transfer_today = 0;
+        $user->transfer_enable = 0;
+        $user->class = 0;
+        $user->class_expire = Carbon::now()->format('Y-m-d H:i:s');
+        $user->save();
     }
 }
