@@ -16,7 +16,6 @@ use App\Utils\Tools;
 use Carbon\Carbon;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Http\Client\ClientExceptionInterface;
-use Stripe\Exception\ApiErrorException;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 use function ceil;
 use function date;
@@ -173,6 +172,23 @@ final class SubscriptionService
         $user->transfer_today = 0;
         $user->transfer_enable = Tools::gbToB($content->bandwidth);
         $user->class_expire = $newEnd->format('Y-m-d') . ' 23:59:59';
+        $user->save();
+    }
+
+    /**
+     * 订阅失效后降级用户：清零会员等级、套餐流量与限速等权益。
+     * 由 expireSubscription（自然过期）与 terminateLapsed（宽限超时）共用。
+     */
+    private static function downgradeUser(User $user): void
+    {
+        $user->class = 0;
+        $user->transfer_enable = 0;
+        $user->node_group = 0;
+        $user->node_speedlimit = 0;
+        $user->node_iplimit = 0;
+        $user->u = 0;
+        $user->d = 0;
+        $user->transfer_today = 0;
         $user->save();
     }
 
@@ -411,15 +427,37 @@ final class SubscriptionService
     }
 
     /**
+     * 续费扣款成功后的原子收尾（必须在结算事务内调用）。
+     *
+     * 把对应续费订单置为终态 activated，并推进订阅周期。订单一旦与账单结算落在同一次提交
+     * 中变为 activated，每 5 分钟的 processPendingOrder → processRenewalActivation 激活链
+     * 就再也选不中它（该链只取 pending_payment / pending_activation），从而保证“一次成功扣款
+     * 只推进一个周期”（exactly-once），且不会出现“已扣款未推进”的中间态。
+     */
+    private static function finalizeRenewal(Subscription $sub, Invoice $invoice, User $user): void
+    {
+        $order = (new Order())->find($invoice->order_id);
+
+        if ($order !== null && $order->status !== 'activated') {
+            $order->status = 'activated';
+            $order->update_time = time();
+            $order->save();
+        }
+
+        self::advanceRenewedPeriod($sub, $user);
+    }
+
+    /**
      * 用站内余额结算一张续费账单。
      *
      * 在数据库事务内对账单加行锁后复查：仅当账单仍为 unpaid 且用户余额足额时才扣款，
      * 写 UserMoneyLog（扣款额记为负数，镜像 InvoiceController 的余额支付），并把账单标记为
-     * paid_balance + pay_time。成功返回 true，否则（账单已支付/余额不足/账单不存在）返回 false。
+     * paid_balance + pay_time。扣款成功后在“同一事务内”原子收尾（订单置 activated + 推进周期，
+     * 见 finalizeRenewal）。成功返回 true，否则（账单已支付/余额不足/账单不存在）返回 false。
      */
     public static function payRenewalFromBalance(Subscription $sub, Invoice $invoice): bool
     {
-        return (bool) DB::transaction(static function () use ($invoice): bool {
+        return (bool) DB::transaction(static function () use ($sub, $invoice): bool {
             $locked = (new Invoice())->where('id', $invoice->id)->lockForUpdate()->first();
 
             if ($locked === null || $locked->status !== 'unpaid') {
@@ -451,6 +489,9 @@ final class SubscriptionService
             $locked->update_time = time();
             $locked->save();
 
+            // 与结算同一事务内推进，保证 exactly-once。
+            self::finalizeRenewal($sub, $locked, $user);
+
             return true;
         });
     }
@@ -458,11 +499,14 @@ final class SubscriptionService
     /**
      * 余额不足时的兜底：用 Stripe 存档卡 off-session 扣款结算续费账单。
      *
-     * 先取客户默认卡：无卡直接返回 false（此分支在 FX 换算之前，不触 Redis/网络）。
-     * 有卡则把 CNY renewal_price 经 Exchange 换成 stripe_currency 再转最小单位，带幂等键
-     * renew_inv_{invoiceId} 扣款。PI status==='succeeded' → 账单标 paid_gateway、把实扣额记到
-     * subscription.stripe_amount/stripe_currency，返回 true；卡被拒(CardException/ApiErrorException)
-     * 或非 succeeded → 返回 false（绝不抛出）。
+     * 先取客户默认卡：无卡直接返回 false（此分支在 FX 换算之前，不触 Redis/网络）。有卡则在
+     * 扣款“之前”重读账单一次：若已非 unpaid（并发被结算）则直接返回 false 不扣款——幂等键无法
+     * 防住此种重复扣款。随后把 CNY renewal_price 经 Exchange 换成 stripe_currency 再转最小单位，
+     * 带幂等键 renew_inv_{invoiceId} 扣款。PI status==='succeeded' → 在一个事务内把账单标
+     * paid_gateway、记 subscription.stripe_amount/stripe_currency、并原子收尾（订单置 activated +
+     * 推进周期，见 finalizeRenewal），返回 true。任何失败（卡被拒、Stripe API、FX 抛
+     * GuzzleException/RedisException 等）一律按“未扣款 → false”处理：捕获 \Throwable，绝不抛出，
+     * 以便上层据此进入宽限期。
      */
     public static function chargeRenewalToCard(Subscription $sub, Invoice $invoice): bool
     {
@@ -483,8 +527,17 @@ final class SubscriptionService
                 return false;
             }
 
+            // Re-load fresh right before charging: a concurrent actor may have settled
+            // this invoice (e.g. the user paid it manually). The idempotency key does
+            // NOT protect this case, so refuse to charge anything that is no longer unpaid.
+            $fresh = (new Invoice())->find($invoice->id);
+
+            if ($fresh === null || $fresh->status !== 'unpaid') {
+                return false;
+            }
+
             $currency = (string) Config::obtain('stripe_currency');
-            $fxAmount = (new Exchange())->exchange((float) $sub->renewal_price, 'CNY', $currency);
+            $fxAmount = Exchange::getInstance()->exchange((float) $sub->renewal_price, 'CNY', $currency);
             $amountMinor = PriceResolver::toMinorUnits((float) $fxAmount, $currency);
 
             $paymentIntent = $stripe->chargeOffSession(
@@ -500,19 +553,26 @@ final class SubscriptionService
                 return false;
             }
 
-            $invoice->status = 'paid_gateway';
-            $invoice->pay_time = time();
-            $invoice->update_time = time();
-            $invoice->save();
+            // Settle + record + claim order + advance — atomically, so the 5-min
+            // activation chain can never re-select a paid renewal (exactly-once).
+            DB::transaction(static function () use ($sub, $fresh, $user, $amountMinor, $currency): void {
+                $fresh->status = 'paid_gateway';
+                $fresh->pay_time = time();
+                $fresh->update_time = time();
+                $fresh->save();
 
-            $sub->stripe_amount = $amountMinor;
-            $sub->stripe_currency = $currency;
-            $sub->updated_at = Carbon::now()->format('Y-m-d H:i:s');
-            $sub->save();
+                $sub->stripe_amount = $amountMinor;
+                $sub->stripe_currency = $currency;
+                $sub->updated_at = Carbon::now()->format('Y-m-d H:i:s');
+                $sub->save();
+
+                self::finalizeRenewal($sub, $fresh, $user);
+            });
 
             return true;
-        } catch (ApiErrorException $e) {
-            // Card declined / Stripe API error -> let the caller fall through to grace.
+        } catch (\Throwable $e) {
+            // ANY failure (card declined, Stripe API, FX/Redis/Guzzle) -> no charge applied
+            // from the caller's standpoint -> false, so the waterfall falls through to grace.
             echo $e->getMessage() . PHP_EOL;
 
             return false;
@@ -561,12 +621,14 @@ final class SubscriptionService
     /**
      * 自动续费瀑布主流程（每日执行）。
      *
-     * 选取自管(SELF_MANAGED)、auto_renew=1、当天(end_date=today)到期、状态为
-     * active/pending_renewal 且存在 unpaid 续费账单的订阅；对每个依次尝试：
-     *   1) 余额扣款成功 → 推进周期
-     *   2) 否则存档卡扣款成功 → 推进周期
+     * 选取自管(SELF_MANAGED)、auto_renew=1、已到期(end_date <= today，'<=' 兼容漏跑当日)、
+     * 状态为 active/pending_renewal 且存在 unpaid 续费账单的订阅；对每个依次尝试：
+     *   1) 余额扣款成功 → 结算并原子推进周期
+     *   2) 否则存档卡扣款成功 → 结算并原子推进周期
      *   3) 都失败 → 进入宽限期
-     * 续费成功后把对应续费订单标记为 activated 并 advanceRenewedPeriod 推进。
+     * 扣款方法在“结算的同一事务内”把续费订单置 activated 并 advanceRenewedPeriod 推进
+     * （见 finalizeRenewal），因此本方法成功分支无需再动订单/周期。每个订阅各自包裹 try/catch：
+     * 单个订阅的意外异常只记录并 continue，绝不连累整批每日任务。
      */
     public static function processAutoRenew(): void
     {
@@ -574,59 +636,59 @@ final class SubscriptionService
 
         $subscriptions = (new Subscription())
             ->whereIn('status', ['active', 'pending_renewal'])
-            ->where('end_date', $today)
+            ->where('end_date', '<=', $today)
             ->where('auto_renew', 1)
             ->whereIn('billing_provider', self::SELF_MANAGED)
             ->orderBy('id')
             ->get();
 
         foreach ($subscriptions as $subscription) {
-            $user = (new User())->find($subscription->user_id);
-
-            if ($user === null) {
-                continue;
-            }
-
-            // 该订阅当前未取消/未过期/未激活的续费订单
-            $order = (new Order())
-                ->where('subscription_id', $subscription->id)
-                ->where('product_type', 'subscription')
-                ->whereNotIn('status', ['cancelled', 'expired', 'activated'])
-                ->orderByDesc('id')
-                ->first();
-
-            if ($order === null) {
-                continue;
-            }
-
-            // 订单对应的 unpaid 续费账单
-            $invoice = (new Invoice())
-                ->where('order_id', $order->id)
-                ->where('status', 'unpaid')
-                ->first();
-
-            if ($invoice === null) {
-                continue;
-            }
-
-            // 瀑布：余额优先，不足再走存档卡。
-            if (self::payRenewalFromBalance($subscription, $invoice)
-                || self::chargeRenewalToCard($subscription, $invoice)) {
-                $order->status = 'activated';
-                $order->update_time = time();
-                $order->save();
-
-                // 重读用户以拿到扣款后的最新余额，再推进周期。
+            try {
                 $user = (new User())->find($subscription->user_id);
-                self::advanceRenewedPeriod($subscription, $user);
 
-                echo "订阅 #{$subscription->id} 自动续费成功" . PHP_EOL;
+                if ($user === null) {
+                    continue;
+                }
+
+                // 该订阅当前未取消/未过期/未激活的续费订单
+                $order = (new Order())
+                    ->where('subscription_id', $subscription->id)
+                    ->where('product_type', 'subscription')
+                    ->whereNotIn('status', ['cancelled', 'expired', 'activated'])
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($order === null) {
+                    continue;
+                }
+
+                // 订单对应的 unpaid 续费账单
+                $invoice = (new Invoice())
+                    ->where('order_id', $order->id)
+                    ->where('status', 'unpaid')
+                    ->first();
+
+                if ($invoice === null) {
+                    continue;
+                }
+
+                // 瀑布：余额优先，不足再走存档卡。两者均在结算事务内原子完成
+                // 订单 activated + 推进周期（exactly-once），此处无需再处理。
+                if (self::payRenewalFromBalance($subscription, $invoice)
+                    || self::chargeRenewalToCard($subscription, $invoice)) {
+                    echo "订阅 #{$subscription->id} 自动续费成功" . PHP_EOL;
+                    continue;
+                }
+
+                // 余额与存档卡都失败 → 进入宽限期。
+                self::enterGrace($subscription, $user);
+                echo "订阅 #{$subscription->id} 自动续费失败，进入宽限期" . PHP_EOL;
+            } catch (\Throwable $e) {
+                // 单个订阅出错不得中断整批：记录并继续下一个。
+                echo "订阅 #{$subscription->id} 自动续费异常：" . $e->getMessage() . PHP_EOL;
+
                 continue;
             }
-
-            // 余额与存档卡都失败 → 进入宽限期。
-            self::enterGrace($subscription, $user);
-            echo "订阅 #{$subscription->id} 自动续费失败，进入宽限期" . PHP_EOL;
         }
 
         echo Tools::toDateTime(time()) . ' 订阅自动续费处理完成' . PHP_EOL;
@@ -635,15 +697,15 @@ final class SubscriptionService
     /**
      * 自然过期处理（每日执行）。
      *
-     * 仅处理用户已取消自动续费(auto_renew=0)、当天到期(end_date=today)的 pending_renewal
-     * 订阅；auto_renew=1 的到期订阅交由 processAutoRenew / 宽限期 / terminateLapsed 处理。
+     * 仅处理用户已取消自动续费(auto_renew=0)、已到期(end_date <= today，'<=' 兼容漏跑当日)的
+     * pending_renewal 订阅；auto_renew=1 的到期订阅交由 processAutoRenew / 宽限期 / terminateLapsed 处理。
      */
     public static function expireSubscription(): void
     {
         $today = Carbon::today()->format('Y-m-d');
 
         $subscriptions = (new Subscription())->where('status', 'pending_renewal')
-            ->where('end_date', $today)
+            ->where('end_date', '<=', $today)
             ->where('auto_renew', 0)
             ->whereIn('billing_provider', self::SELF_MANAGED)
             ->get();
@@ -682,15 +744,7 @@ final class SubscriptionService
             $user = (new User())->find($subscription->user_id);
 
             if ($user !== null) {
-                $user->class = 0;
-                $user->transfer_enable = 0;
-                $user->node_group = 0;
-                $user->node_speedlimit = 0;
-                $user->node_iplimit = 0;
-                $user->u = 0;
-                $user->d = 0;
-                $user->transfer_today = 0;
-                $user->save();
+                self::downgradeUser($user);
 
                 // 发送过期通知
                 try {
@@ -715,8 +769,10 @@ final class SubscriptionService
      * 宽限期超时终止（每日执行）。
      *
      * 处理 auto_renew=1、自管、状态 pending_renewal、grace_until 已过且续费账单仍 unpaid 的
-     * 订阅：作废续费订单与账单（status='cancelled'，使其不可再支付）、订阅置 expired、降级用户、
-     * 发送“已失效”邮件。若账单已在宽限内被付掉(paid_*)则跳过，交由正常激活链处理。
+     * 订阅：把续费订单与账单置 status='cancelled'、订阅置 expired、降级用户、发送“已失效”邮件。
+     * 作废后该账单不再可支付由 InvoiceController::payBalance 的顶部守卫强制保证（仅 status==='unpaid'
+     * 的账单可走余额支付，cancelled 一律拒绝、不扣余额）。若账单已在宽限内被付掉(paid_*)则跳过，
+     * 交由正常激活链处理。
      */
     public static function terminateLapsed(): void
     {
@@ -748,7 +804,7 @@ final class SubscriptionService
                 continue;
             }
 
-            // 作废订单与账单，使其不可再支付。
+            // 作废订单与账单；不可再支付由 InvoiceController::payBalance 的状态守卫强制保证。
             $order->status = 'cancelled';
             $order->update_time = time();
             $order->save();
@@ -766,15 +822,7 @@ final class SubscriptionService
             $user = (new User())->find($subscription->user_id);
 
             if ($user !== null) {
-                $user->class = 0;
-                $user->transfer_enable = 0;
-                $user->node_group = 0;
-                $user->node_speedlimit = 0;
-                $user->node_iplimit = 0;
-                $user->u = 0;
-                $user->d = 0;
-                $user->transfer_today = 0;
-                $user->save();
+                self::downgradeUser($user);
 
                 try {
                     Notification::notifyUser(

@@ -23,4 +23,8 @@
                     </div>
                 </div>
 
+{* 外层 <body> 与 3 个布局 wrapper <div> 在此故意不闭合，由 footer.tpl 统一闭合
+   （footer 末尾额外的 3 个 </div> + </body></html>）——与全部 subscription_*.tpl 共用同一套
+   header/footer 布局契约。整封邮件 header+body+footer 渲染后标签是平衡的（13/13 个 div、1/1 个
+   body）。切勿在此补 </div>/</body>，否则会与 footer 重复闭合、产生畸形 HTML。 *}
 {include file='footer.tpl'}
