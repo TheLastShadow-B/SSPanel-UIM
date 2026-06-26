@@ -1341,6 +1341,15 @@
         "mark": "文档仅付费用户可见"
     },
     {
+        "item": "docs_url",
+        "value": "https://sanas-organization-3.gitbook.io/untitled/",
+        "class": "feature",
+        "is_public": 1,
+        "type": "string",
+        "default": "",
+        "mark": "使用文档地址"
+    },
+    {
         "item": "traffic_log",
         "value": "0",
         "class": "feature",

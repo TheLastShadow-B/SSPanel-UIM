@@ -88,6 +88,15 @@
                                                 </select>
                                             </div>
                                         </div>
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">使用文档地址</label>
+                                            <div class="col">
+                                                <input id="docs_url" type="text" class="form-control"
+                                                       placeholder="https://docs.example.com"
+                                                       value="{$settings['docs_url']}">
+                                                <small class="form-hint">顶部导航「使用文档」链接的目标地址，留空则隐藏该入口</small>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="tab-pane" id="log">
