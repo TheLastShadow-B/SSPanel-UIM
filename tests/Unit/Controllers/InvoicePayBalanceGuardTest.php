@@ -117,6 +117,23 @@ it('rejects paying a cancelled invoice and leaves the balance untouched', functi
     expect((new Invoice())->find($invoice->id)->status)->toBe('cancelled');
 });
 
+it('rejects paying a processing invoice (mid off-session charge) and leaves the balance untouched', function () {
+    // 'processing' is the sentinel chargeRenewalToCard sets while it holds an off-session card
+    // charge in flight. The user must NOT be able to settle it from balance in that window, or the
+    // renewal is charged twice (P1-4). The guard rejects it (not in ['unpaid','partially_paid']).
+    $user = payGuardUser(100.0);
+    $invoice = payGuardInvoice($user, 'processing', 30.0);
+
+    $response = payGuardCall($user, $invoice->id);
+
+    $body = json_decode((string) $response->getBody(), true);
+    expect($body['ret'])->toBe(0);
+
+    // No money moved; invoice still processing (left for the card path to settle or release).
+    expect((float) (new User())->find($user->id)->money)->toBe(100.0);
+    expect((new Invoice())->find($invoice->id)->status)->toBe('processing');
+});
+
 it('still settles a genuinely unpaid invoice from balance (guard does not over-block)', function () {
     $user = payGuardUser(100.0);
     $invoice = payGuardInvoice($user, 'unpaid', 30.0);

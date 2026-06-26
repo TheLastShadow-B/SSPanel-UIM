@@ -497,16 +497,30 @@ final class SubscriptionService
     }
 
     /**
+     * 续费账单被某次扣款“认领”后的过期判定（秒）。短事务把 unpaid → processing 占位；占位方在
+     * processing 与 settle/revert 之间崩溃（进程被杀/部署）会遗留一行 processing。超过本阈值即视为
+     * “上一次尝试已崩溃”，允许下一次以同一幂等键 renew_inv_{id} 重新认领并扣款（Stripe 去重为单笔）。
+     */
+    private const RENEWAL_CLAIM_STALE_SECONDS = 600;
+
+    /**
      * 余额不足时的兜底：用 Stripe 存档卡 off-session 扣款结算续费账单。
      *
-     * 先取客户默认卡：无卡直接返回 false（此分支在 FX 换算之前，不触 Redis/网络）。有卡则在
-     * 扣款“之前”重读账单一次：若已非 unpaid（并发被结算）则直接返回 false 不扣款——幂等键无法
-     * 防住此种重复扣款。随后把 CNY renewal_price 经 Exchange 换成 stripe_currency 再转最小单位，
-     * 带幂等键 renew_inv_{invoiceId} 扣款。PI status==='succeeded' → 在一个事务内把账单标
-     * paid_gateway、记 subscription.stripe_amount/stripe_currency、并原子收尾（订单置 activated +
-     * 推进周期，见 finalizeRenewal），返回 true。任何失败（卡被拒、Stripe API、FX 抛
-     * GuzzleException/RedisException 等）一律按“未扣款 → false”处理：捕获 \Throwable，绝不抛出，
-     * 以便上层据此进入宽限期。
+     * 关键不变量（修复 P1-4 双扣窗口）：扣款“之前”先用一笔短事务对账单加行锁“认领”——仅当账单仍为
+     * unpaid 时把它置为哨兵态 processing 并落库；若已非 unpaid 一律不扣款返回 false。这样并发的手动
+     * 余额支付/其它网关一旦先结算，本路径就再也认领不到、绝不触发存档卡扣款（renew_inv_{id} 幂等键
+     * 只能去重两次 cron 扣款，挡不住并发手动支付，故认领是唯一正确防线）。唯一例外：processing 行
+     * 若 update_time 已超过 RENEWAL_CLAIM_STALE_SECONDS（上一次认领后崩溃），允许重新认领并以同一
+     * 幂等键重扣（Stripe 去重为单笔，安全）。
+     *
+     * 流程：先取客户默认卡（无卡直接 false，未认领、不触 FX/网络）→ 校验 billing_cycle 可推进
+     * （非法周期会让 calculateEndDate 的 match 抛错；advanceRenewedPeriod 已不再读取 bandwidth，故
+     * 不再要求 product_content 携带 bandwidth）→ 认领 → CNY renewal_price 经 Exchange 换成
+     * stripe_currency 转最小单位、带幂等键扣款。PI status==='succeeded' → 在一个事务内对账单加锁、
+     * 复核仍为 processing 后标 paid_gateway、记 subscription.stripe_amount/stripe_currency、并原子收尾
+     * （订单置 activated + 推进周期，见 finalizeRenewal），返回 true。任何失败（卡被拒、Stripe API、FX 抛
+     * GuzzleException/RedisException、PI 非 succeeded）一律：把账单从 processing 回滚为 unpaid（宽限内
+     * 用户仍可自行支付）后返回 false，捕获 \Throwable 绝不抛出，以便上层据此进入宽限期。
      */
     public static function chargeRenewalToCard(Subscription $sub, Invoice $invoice): bool
     {
@@ -517,46 +531,61 @@ final class SubscriptionService
         }
 
         $stripe = StripeService::getInstance();
+        $claimed = false;
 
         try {
             $customerId = $stripe->ensureCustomer($user);
             $paymentMethodId = $stripe->getDefaultPaymentMethod($customerId);
 
-            // No stored card -> bail out before any FX/charge work.
+            // No stored card -> bail out before claiming or any FX/charge work (invoice untouched).
             if ($paymentMethodId === null) {
                 return false;
             }
 
-            // Re-load fresh right before charging: a concurrent actor may have settled
-            // this invoice (e.g. the user paid it manually). The idempotency key does
-            // NOT protect this case, so refuse to charge anything that is no longer unpaid.
-            $fresh = (new Invoice())->find($invoice->id);
+            // PRE-VALIDATE before claiming/charging. advanceRenewedPeriod's calculateEndDate match
+            // has no default arm, so a corrupt billing_cycle would throw UnhandledMatchError in the
+            // post-charge settle = card debited, nothing recorded. Bail to false (-> grace) WITHOUT
+            // touching the invoice if it cannot complete. (Fix-1 follow-up: advanceRenewedPeriod no
+            // longer reads `bandwidth`, so product_content is no longer required to carry it.)
+            if (! in_array($sub->billing_cycle, ['month', 'quarter', 'year'], true)) {
+                return false;
+            }
 
-            if ($fresh === null || $fresh->status !== 'unpaid') {
+            // CLAIM-BEFORE-CHARGE (P1-4): a short, row-locked transaction that flips unpaid ->
+            // processing so a concurrent settler (manual payBalance / another gateway) cannot slip
+            // a second settlement in between this check and the off-session charge. If the invoice
+            // is no longer unpaid we do NOT charge — EXCEPT a STALE 'processing' row (a prior
+            // attempt that crashed before settle/revert) is re-claimable: re-charging reuses the
+            // renew_inv_{id} idempotency key so Stripe dedupes to a SINGLE charge.
+            $claimed = (bool) DB::transaction(static function () use ($invoice): bool {
+                $locked = (new Invoice())->where('id', $invoice->id)->lockForUpdate()->first();
+
+                if ($locked === null) {
+                    return false;
+                }
+
+                $isFreshClaim = $locked->status === 'unpaid';
+                $isStaleReclaim = $locked->status === 'processing'
+                    && (int) $locked->update_time < time() - self::RENEWAL_CLAIM_STALE_SECONDS;
+
+                if (! $isFreshClaim && ! $isStaleReclaim) {
+                    return false;
+                }
+
+                $locked->status = 'processing';
+                $locked->update_time = time();
+                $locked->save();
+
+                return true;
+            });
+
+            if (! $claimed) {
                 return false;
             }
 
             $currency = (string) Config::obtain('stripe_currency');
             $fxAmount = Exchange::getInstance()->exchange((float) $sub->renewal_price, 'CNY', $currency);
             $amountMinor = PriceResolver::toMinorUnits((float) $fxAmount, $currency);
-
-            // PRE-VALIDATE before the irreversible off-session charge. chargeOffSession runs
-            // BEFORE the DB transaction that records the charge + advances the period; if that
-            // transaction were to throw DETERMINISTICALLY the card would be debited yet nothing
-            // recorded (invoice stays unpaid -> grace) = customer charged for no service. The two
-            // known deterministic faults: a corrupt billing_cycle makes advanceRenewedPeriod's
-            // calculateEndDate match throw UnhandledMatchError; a product_content that does not
-            // decode to an object carrying `bandwidth` breaks the membership/quota reset. Verify
-            // the renewal can complete and bail to false (-> grace) WITHOUT charging if it cannot.
-            // (Transient DB faults remain safe to retry via the renew_inv_{id} idempotency key.)
-            $renewalContent = json_decode((string) $sub->product_content);
-
-            if (! in_array($sub->billing_cycle, ['month', 'quarter', 'year'], true)
-                || ! $renewalContent instanceof \stdClass
-                || ! isset($renewalContent->bandwidth)
-            ) {
-                return false;
-            }
 
             $paymentIntent = $stripe->chargeOffSession(
                 $customerId,
@@ -568,21 +597,21 @@ final class SubscriptionService
             );
 
             if ($paymentIntent->status !== 'succeeded') {
+                // Not charged (or not captured) -> release the claim so the user can still pay.
+                self::releaseRenewalClaim((int) $invoice->id);
+
                 return false;
             }
 
-            // Settle + record + claim order + advance — atomically, so the 5-min
-            // activation chain can never re-select a paid renewal (exactly-once).
-            // Mirror payRenewalFromBalance: re-load the invoice under a row lock and re-assert it
-            // is still unpaid before settling. Under genuinely parallel daily-cron processes both
-            // can pass the pre-charge guard and charge once (the renew_inv_{id} idempotency key
-            // dedupes to a SINGLE charge), but only ONE may run the settle + advanceRenewedPeriod.
-            // If a concurrent actor already settled it, no-op here (that actor owns the advance);
-            // otherwise the period double-advances by one free cycle.
+            // Settle + record + claim order + advance — atomically, so the 5-min activation chain
+            // can never re-select a paid renewal (exactly-once). Re-load under a row lock and only
+            // settle if the invoice is still OUR 'processing' claim. If a concurrent actor already
+            // settled it (e.g. the line-190 seam flips it to paid_balance mid-charge), no-op here:
+            // that actor owns the advance, so we neither re-record the charge nor double-advance.
             DB::transaction(static function () use ($sub, $invoice, $user, $amountMinor, $currency): void {
                 $locked = (new Invoice())->where('id', $invoice->id)->lockForUpdate()->first();
 
-                if ($locked === null || $locked->status !== 'unpaid') {
+                if ($locked === null || $locked->status !== 'processing') {
                     return;
                 }
 
@@ -601,11 +630,38 @@ final class SubscriptionService
 
             return true;
         } catch (\Throwable $e) {
-            // ANY failure (card declined, Stripe API, FX/Redis/Guzzle) -> no charge applied
-            // from the caller's standpoint -> false, so the waterfall falls through to grace.
+            // ANY failure (card declined, Stripe API, FX/Redis/Guzzle) -> no charge applied from the
+            // caller's standpoint -> false, so the waterfall falls through to grace. Release our
+            // claim (processing -> unpaid) first so the renewal stays payable during the grace window.
+            if ($claimed) {
+                self::releaseRenewalClaim((int) $invoice->id);
+            }
+
             echo $e->getMessage() . PHP_EOL;
 
             return false;
+        }
+    }
+
+    /**
+     * 回滚一次失败的存档卡扣款认领：在事务内对账单加行锁，仅当它仍为本次认领留下的 processing 时
+     * 回退为 unpaid（宽限内用户仍可自行支付）。回滚自身的异常一律吞掉——它运行在失败/异常收尾路径，
+     * 绝不可二次抛出连累上层瀑布。
+     */
+    private static function releaseRenewalClaim(int $invoiceId): void
+    {
+        try {
+            DB::transaction(static function () use ($invoiceId): void {
+                $locked = (new Invoice())->where('id', $invoiceId)->lockForUpdate()->first();
+
+                if ($locked !== null && $locked->status === 'processing') {
+                    $locked->status = 'unpaid';
+                    $locked->update_time = time();
+                    $locked->save();
+                }
+            });
+        } catch (\Throwable $e) {
+            echo $e->getMessage() . PHP_EOL;
         }
     }
 

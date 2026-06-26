@@ -278,3 +278,112 @@ it('does not double-advance when a concurrent cron settles during the off-sessio
     // ...nor re-touching the already-activated order.
     expect((new Order())->find($inv->order_id)->status)->toBe('activated');
 });
+
+it('reverts the invoice from processing back to unpaid when the charge fails (claim released)', function () {
+    $user = makeUserWithMoney(0.0);
+    $sub = makeSub($user, renewalPrice: 30.0);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+
+    // SEAM: capture the invoice status AT CHARGE TIME — it must be 'processing', proving the
+    // claim landed BEFORE the off-session charge (closing the double-charge window) — then throw
+    // a decline. The catch must release the claim ('processing' -> 'unpaid') so the user can still
+    // settle the renewal manually during the grace window.
+    $declined = \Stripe\Exception\CardException::factory(
+        'Your card was declined.',
+        402,
+        null,
+        null,
+        null,
+        'card_declined',
+        'card_declined'
+    );
+    $stripe = new class (new StripeClient(['api_key' => 'sk_test_revert']), (int) $inv->id, $declined) extends StripeService {
+        public ?string $statusAtCharge = null;
+
+        public function __construct(StripeClient $c, public int $invId, public \Throwable $err)
+        {
+            parent::__construct($c);
+        }
+
+        public function ensureCustomer(User $user): string
+        {
+            return $user->stripe_customer_id ?: 'cus_revert';
+        }
+
+        public function getDefaultPaymentMethod(string $customerId): ?string
+        {
+            return 'pm_card_1';
+        }
+
+        public function chargeOffSession(
+            string $customerId,
+            string $paymentMethodId,
+            int $amountMinor,
+            string $currency,
+            string $idempotencyKey,
+            array $metadata = []
+        ): PaymentIntent {
+            $this->statusAtCharge = (new Invoice())->find($this->invId)->status;
+
+            throw $this->err;
+        }
+    };
+    StripeService::setInstance($stripe);
+
+    ob_start();
+    $result = SubscriptionService::chargeRenewalToCard($sub, $inv);
+    ob_get_clean();
+
+    expect($result)->toBeFalse();
+    // The claim landed before the charge...
+    expect($stripe->statusAtCharge)->toBe('processing');
+    // ...and was released back to unpaid (still payable during grace).
+    expect((new Invoice())->find($inv->id)->status)->toBe('unpaid');
+    expect((new Subscription())->find($sub->id)->stripe_amount)->toBeNull();
+});
+
+it('reclaims a STALE processing invoice (crashed prior attempt > 600s ago) and charges it once', function () {
+    $user = makeUserWithMoney(0.0);
+    $sub = makeSub($user, renewalPrice: 30.0);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+
+    // A prior attempt claimed the invoice (-> processing) then crashed before it could settle or
+    // revert, leaving a STALE lease (update_time far in the past). The next run must reclaim and
+    // charge; the renew_inv_{id} idempotency key keeps Stripe to a SINGLE real charge.
+    $inv->status = 'processing';
+    $inv->update_time = time() - 3600;
+    $inv->save();
+
+    $fake = fakeCardStripe('pm_card_1', 'succeeded');
+    StripeService::setInstance($fake);
+
+    ob_start();
+    $result = SubscriptionService::chargeRenewalToCard($sub, $inv);
+    ob_get_clean();
+
+    expect($result)->toBeTrue();
+    expect($fake->chargeCalls)->toHaveCount(1);
+    expect($fake->chargeCalls[0]['idempotencyKey'])->toBe('renew_inv_' . $inv->id);
+    expect((new Invoice())->find($inv->id)->status)->toBe('paid_gateway');
+    expect((int) (new Subscription())->find($sub->id)->stripe_amount)->toBe(300);
+});
+
+it('does NOT reclaim a FRESH processing invoice (another worker owns the in-flight charge)', function () {
+    $user = makeUserWithMoney(0.0);
+    $sub = makeSub($user, renewalPrice: 30.0);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+
+    // Freshly claimed by a concurrent worker (recent update_time): that worker owns the charge.
+    // We must NOT reclaim or charge — return false and touch nothing.
+    $inv->status = 'processing';
+    $inv->update_time = time();
+    $inv->save();
+
+    $fake = fakeCardStripe('pm_card_1', 'succeeded');
+    StripeService::setInstance($fake);
+
+    expect(SubscriptionService::chargeRenewalToCard($sub, $inv))->toBeFalse();
+    expect($fake->chargeCalls)->toHaveCount(0);
+    expect((new Invoice())->find($inv->id)->status)->toBe('processing');
+    expect((new Subscription())->find($sub->id)->stripe_amount)->toBeNull();
+});
