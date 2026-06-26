@@ -165,7 +165,14 @@ final class Cron
                     ->whereIn('status', ['active', 'pending_renewal'])
                     ->exists();
 
-                if ($hasActiveSubscription) {
+                // 跳过 Stripe 腿仍在生效/宽限的用户，class_expire 由 webhook 推进
+                $hasLiveStripeSubscription = (new Subscription())
+                    ->where('user_id', $user->id)
+                    ->whereNotNull('stripe_subscription_id')
+                    ->whereIn('stripe_status', ['active', 'past_due', 'trialing'])
+                    ->exists();
+
+                if ($hasActiveSubscription || $hasLiveStripeSubscription) {
                     continue;
                 }
 
