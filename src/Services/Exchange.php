@@ -10,8 +10,24 @@ use RedisException;
 use function json_decode;
 use function round;
 
-final class Exchange
+class Exchange
 {
+    /**
+     * Process-wide singleton so callers (e.g. SubscriptionService::chargeRenewalToCard)
+     * can be exercised with an offline fake. Mirrors StripeService::getInstance/setInstance.
+     */
+    private static ?self $instance = null;
+
+    public static function getInstance(): self
+    {
+        return self::$instance ??= new self();
+    }
+
+    public static function setInstance(self $instance): void
+    {
+        self::$instance = $instance;
+    }
+
     /**
      * @throws GuzzleException
      * @throws RedisException
