@@ -382,8 +382,82 @@ final class WebhookHandler
         $subscription->save();
     }
 
+    /**
+     * customer.subscription.deleted: Stripe has given up retrying (the dunning
+     * window from P1.7 elapsed) and cancelled the subscription. This is the
+     * ONLY Stripe-leg downgrade path — handleInvoiceFailed deliberately keeps
+     * service through the grace window; the user only loses access here.
+     *
+     *  - local Subscription.status -> 'expired', stripe_status -> 'canceled'.
+     *  - downgrade the user, mirroring SubscriptionService::expireSubscription's
+     *    field writes EXACTLY so a Stripe cancellation and a self-built expiry
+     *    leave the user in an identical downgraded state (class=0,
+     *    transfer_enable=0, node_group=0, node_speedlimit=0, node_iplimit=0,
+     *    u=0, d=0, transfer_today=0).
+     *
+     * S5: bind via stripe_subscription_id, then assert the subscription's owner
+     * is the customer on the event before acting (same pattern as P1.5/P1.6/P1.7).
+     *
+     * Only act on billing_provider='stripe'; never downgrade a manual/balance
+     * subscription off a Stripe event.
+     *
+     * Idempotency: a re-delivery of the SAME event id is already a no-op via the
+     * StripeEvent UNIQUE guard in handle(). Stripe can also emit the deletion
+     * under a DIFFERENT event id; we therefore ALSO guard on the local status
+     * already being 'expired' — a second delivery is then a safe no-op that does
+     * NOT re-downgrade a user who may have re-upgraded in the meantime.
+     */
     private function handleSubscriptionDeleted(Event $event): void
     {
-        // Implemented in Task P1.8.
+        $object = $event->data->object;
+        $stripeSubId = $object->id ?? null;
+        $customerId = $object->customer ?? null;
+
+        if ($stripeSubId === null || $customerId === null) {
+            return;
+        }
+
+        $subscription = (new Subscription())->where('stripe_subscription_id', $stripeSubId)->first();
+
+        if ($subscription === null) {
+            return;
+        }
+
+        // Only act on Stripe-managed subscriptions; never touch manual/balance.
+        if ($subscription->billing_provider !== 'stripe') {
+            return;
+        }
+
+        // Idempotency for the cross-event-id case: a second delivery of the
+        // deletion (different event id, so the StripeEvent dedup in handle()
+        // would not catch it) must be a safe no-op. Guard on the terminal local
+        // status so we never re-downgrade a user who re-upgraded after expiry.
+        if ($subscription->status === 'expired') {
+            return;
+        }
+
+        // S5: assert the subscription belongs to this customer (security).
+        $user = (new User())->find($subscription->user_id);
+
+        if ($user === null || $user->stripe_customer_id !== $customerId) {
+            return;
+        }
+
+        $subscription->status = 'expired';
+        $subscription->stripe_status = 'canceled';
+        $subscription->updated_at = Carbon::now()->format('Y-m-d H:i:s');
+        $subscription->save();
+
+        // Downgrade — the ONLY Stripe-leg downgrade. Mirrors the user field
+        // writes in SubscriptionService::expireSubscription EXACTLY.
+        $user->class = 0;
+        $user->transfer_enable = 0;
+        $user->node_group = 0;
+        $user->node_speedlimit = 0;
+        $user->node_iplimit = 0;
+        $user->u = 0;
+        $user->d = 0;
+        $user->transfer_today = 0;
+        $user->save();
     }
 }
