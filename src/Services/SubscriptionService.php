@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\UserMoneyLog;
 use App\Utils\Tools;
 use Carbon\Carbon;
 use GuzzleHttp\Exception\GuzzleException;
@@ -386,6 +387,51 @@ final class SubscriptionService
         }
 
         echo Tools::toDateTime(time()) . ' 订阅续费二次提醒完成' . PHP_EOL;
+    }
+
+    /**
+     * 用站内余额结算一张续费账单。
+     *
+     * 在数据库事务内对账单加行锁后复查：仅当账单仍为 unpaid 且用户余额足额时才扣款，
+     * 写 UserMoneyLog（扣款额记为负数，镜像 InvoiceController 的余额支付），并把账单标记为
+     * paid_balance + pay_time。成功返回 true，否则（账单已支付/余额不足/账单不存在）返回 false。
+     */
+    public static function payRenewalFromBalance(Subscription $sub, Invoice $invoice): bool
+    {
+        return (bool) DB::transaction(static function () use ($invoice): bool {
+            $locked = (new Invoice())->where('id', $invoice->id)->lockForUpdate()->first();
+
+            if ($locked === null || $locked->status !== 'unpaid') {
+                return false;
+            }
+
+            $user = (new User())->where('id', $locked->user_id)->lockForUpdate()->first();
+
+            if ($user === null || (float) $user->money < (float) $locked->price) {
+                return false;
+            }
+
+            $moneyBefore = (float) $user->money;
+            $moneyAfter = $moneyBefore - (float) $locked->price;
+
+            $user->money = $moneyAfter;
+            $user->save();
+
+            (new UserMoneyLog())->add(
+                (int) $user->id,
+                $moneyBefore,
+                $moneyAfter,
+                -(float) $locked->price,
+                '订阅续费扣款 账单 #' . $locked->id
+            );
+
+            $locked->status = 'paid_balance';
+            $locked->pay_time = time();
+            $locked->update_time = time();
+            $locked->save();
+
+            return true;
+        });
     }
 
     /**
