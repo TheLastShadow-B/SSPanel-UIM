@@ -95,6 +95,15 @@ final class InvoiceController extends BaseController
             ]);
         }
 
+        // 只有未支付账单可走余额支付。作废/已过期/已支付（含被 terminateLapsed 取消的失效续费
+        // 账单）一律拒绝，绝不扣减余额——这正是“失效账单不可再支付”的强制点。
+        if ($invoice->status !== 'unpaid') {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '该账单当前状态不支持余额支付',
+            ]);
+        }
+
         $user = $this->user;
 
         if ($user->is_shadow_banned) {
