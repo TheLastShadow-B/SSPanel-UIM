@@ -10,10 +10,13 @@ use App\Models\Order;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\UserMoneyLog;
+use App\Services\Stripe\PriceResolver;
+use App\Services\Stripe\StripeService;
 use App\Utils\Tools;
 use Carbon\Carbon;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Http\Client\ClientExceptionInterface;
+use Stripe\Exception\ApiErrorException;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 use function ceil;
 use function date;
@@ -432,6 +435,70 @@ final class SubscriptionService
 
             return true;
         });
+    }
+
+    /**
+     * 余额不足时的兜底：用 Stripe 存档卡 off-session 扣款结算续费账单。
+     *
+     * 先取客户默认卡：无卡直接返回 false（此分支在 FX 换算之前，不触 Redis/网络）。
+     * 有卡则把 CNY renewal_price 经 Exchange 换成 stripe_currency 再转最小单位，带幂等键
+     * renew_inv_{invoiceId} 扣款。PI status==='succeeded' → 账单标 paid_gateway、把实扣额记到
+     * subscription.stripe_amount/stripe_currency，返回 true；卡被拒(CardException/ApiErrorException)
+     * 或非 succeeded → 返回 false（绝不抛出）。
+     */
+    public static function chargeRenewalToCard(Subscription $sub, Invoice $invoice): bool
+    {
+        $user = (new User())->find($sub->user_id);
+
+        if ($user === null) {
+            return false;
+        }
+
+        $stripe = StripeService::getInstance();
+
+        try {
+            $customerId = $stripe->ensureCustomer($user);
+            $paymentMethodId = $stripe->getDefaultPaymentMethod($customerId);
+
+            // No stored card -> bail out before any FX/charge work.
+            if ($paymentMethodId === null) {
+                return false;
+            }
+
+            $currency = (string) Config::obtain('stripe_currency');
+            $fxAmount = (new Exchange())->exchange((float) $sub->renewal_price, 'CNY', $currency);
+            $amountMinor = PriceResolver::toMinorUnits((float) $fxAmount, $currency);
+
+            $paymentIntent = $stripe->chargeOffSession(
+                $customerId,
+                $paymentMethodId,
+                $amountMinor,
+                $currency,
+                'renew_inv_' . $invoice->id,
+                ['invoice_id' => (string) $invoice->id]
+            );
+
+            if ($paymentIntent->status !== 'succeeded') {
+                return false;
+            }
+
+            $invoice->status = 'paid_gateway';
+            $invoice->pay_time = time();
+            $invoice->update_time = time();
+            $invoice->save();
+
+            $sub->stripe_amount = $amountMinor;
+            $sub->stripe_currency = $currency;
+            $sub->updated_at = Carbon::now()->format('Y-m-d H:i:s');
+            $sub->save();
+
+            return true;
+        } catch (ApiErrorException $e) {
+            // Card declined / Stripe API error -> let the caller fall through to grace.
+            echo $e->getMessage() . PHP_EOL;
+
+            return false;
+        }
     }
 
     /**
