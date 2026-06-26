@@ -151,8 +151,13 @@ final class SubscriptionService
      *
      * newStart = end_date + 1 天；newEnd = calculateEndDate(newStart, cycle)。
      * 更新订阅起止日、置 status='active'、清空 grace_until；用户 class_expire 对齐到
-     * newEnd 23:59:59，并按 product_content 重置本周期流量（u=d=transfer_today=0,
-     * transfer_enable=gbToB(bandwidth)）。
+     * newEnd 23:59:59。
+     *
+     * 续期只推进周期与有效期，绝不在此重置流量：generateRenewalOrder 会在到期前最多
+     * subscription_renewal_days（默认 7）天就生成续费账单，若在此提前重置流量，提前付款的
+     * 用户会立刻获得额外带宽，且 last_reset_date 未推进会导致当周期 reset_day 再被
+     * resetSubscriptionBandwidth 重置一次。本周期流量归 resetSubscriptionBandwidth 在
+     * reset_day 当天唯一负责。
      */
     public static function advanceRenewedPeriod(Subscription $sub, User $user): void
     {
@@ -166,12 +171,6 @@ final class SubscriptionService
         $sub->updated_at = Carbon::now()->format('Y-m-d H:i:s');
         $sub->save();
 
-        $content = json_decode($sub->product_content);
-
-        $user->u = 0;
-        $user->d = 0;
-        $user->transfer_today = 0;
-        $user->transfer_enable = Tools::gbToB($content->bandwidth);
         $user->class_expire = $newEnd->format('Y-m-d') . ' 23:59:59';
         $user->save();
     }
