@@ -21,6 +21,7 @@ use App\Models\Order;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\DB;
+use App\Services\Exchange;
 use App\Services\Stripe\StripeService;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
@@ -175,6 +176,30 @@ if (! function_exists('makeUnpaidRenewalInvoice')) {
         $invoice->save();
 
         return $invoice;
+    }
+}
+
+if (! function_exists('fakeExchange')) {
+    /**
+     * Offline Exchange stub so the card path (CNY -> stripe_currency FX) needs no
+     * Redis/network. `$rateOrThrowable` is either a numeric FX rate (the fake
+     * returns round($amount * rate, 2), so 30 CNY @ 0.10 -> 3.00 -> 300 minor) or
+     * a \Throwable to raise (to prove chargeRenewalToCard swallows FX failures).
+     */
+    function fakeExchange(mixed $rateOrThrowable): Exchange
+    {
+        return new class ($rateOrThrowable) extends Exchange {
+            public function __construct(public mixed $rateOrThrowable) {}
+
+            public function exchange(float $amount, string $from, string $to): float
+            {
+                if ($this->rateOrThrowable instanceof \Throwable) {
+                    throw $this->rateOrThrowable;
+                }
+
+                return round($amount * (float) $this->rateOrThrowable, 2);
+            }
+        };
     }
 }
 

@@ -40,6 +40,20 @@ it('expireSubscription naturally expires an auto_renew=0 subscription due today'
     expect((int) (new User())->find($user->id)->class)->toBe(0);
 });
 
+it('expireSubscription also expires an auto_renew=0 subscription whose end_date already passed', function () {
+    // Missed-cron resilience: end_date in the past must still be swept (<= today).
+    $yesterday = Carbon::yesterday()->format('Y-m-d');
+    $user = makeUserWithMoney(0.0, class: 3);
+    $sub = makeSub($user, endDate: $yesterday, status: 'pending_renewal', autoRenew: 0, billingProvider: 'manual');
+
+    ob_start();
+    SubscriptionService::expireSubscription();
+    ob_get_clean();
+
+    expect((new Subscription())->find($sub->id)->status)->toBe('expired');
+    expect((int) (new User())->find($user->id)->class)->toBe(0);
+});
+
 it('expireSubscription leaves an auto_renew=1 subscription for the renewal waterfall', function () {
     $today = Carbon::today()->format('Y-m-d');
     $user = makeUserWithMoney(0.0, class: 3);
