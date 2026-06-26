@@ -16,6 +16,7 @@ use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function in_array;
 use function json_decode;
 use function json_encode;
 use function time;
@@ -95,9 +96,11 @@ final class InvoiceController extends BaseController
             ]);
         }
 
-        // 只有未支付账单可走余额支付。作废/已过期/已支付（含被 terminateLapsed 取消的失效续费
-        // 账单）一律拒绝，绝不扣减余额——这正是“失效账单不可再支付”的强制点。
-        if ($invoice->status !== 'unpaid') {
+        // 仅“可支付”状态可走余额支付：unpaid 与 partially_paid（部分支付后用余额补齐余款，
+        // view.tpl 为其渲染有效的余额支付按钮，Gateway/Base 与 Cron::processPendingOrder 也都
+        // 视其为仍待支付）。其余状态（作废/已过期/已支付，含被 terminateLapsed 取消的失效续费
+        // 账单）一律拒绝、绝不扣减余额——cancelled 仍被挡住，这正是“失效账单不可再支付”的强制点。
+        if (! in_array($invoice->status, ['unpaid', 'partially_paid'], true)) {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '该账单当前状态不支持余额支付',

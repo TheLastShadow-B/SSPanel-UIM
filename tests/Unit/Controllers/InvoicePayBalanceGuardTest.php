@@ -128,3 +128,18 @@ it('still settles a genuinely unpaid invoice from balance (guard does not over-b
     expect((float) (new User())->find($user->id)->money)->toBe(70.0);
     expect((new Invoice())->find($invoice->id)->status)->toBe('paid_balance');
 });
+
+it('accepts completing a partially_paid invoice from balance (still payable, not over-blocked)', function () {
+    // A partially_paid invoice is still payable: view.tpl renders an active 余额支付
+    // button for it, and Gateway/Base + Cron::processPendingOrder both treat it as
+    // outstanding. The guard must let the user finish paying it from balance.
+    $user = payGuardUser(100.0);
+    $invoice = payGuardInvoice($user, 'partially_paid', 30.0);
+
+    $response = payGuardCall($user, $invoice->id);
+
+    // Settled from balance: redirects (not a JSON error), balance deducted.
+    expect($response->getHeaderLine('HX-Redirect'))->toBe('/user/invoice');
+    expect((float) (new User())->find($user->id)->money)->toBe(70.0);
+    expect((new Invoice())->find($invoice->id)->status)->toBe('paid_balance');
+});
