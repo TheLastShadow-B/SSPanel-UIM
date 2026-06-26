@@ -61,6 +61,7 @@ use const PHP_EOL;
  * @property int    $is_dark_mode 是否启用暗黑模式
  * @property int    $is_inactive 是否处于闲置状态
  * @property string $locale 显示语言
+ * @property string $stripe_customer_id Stripe Customer ID
  *
  * @mixin Builder
  */

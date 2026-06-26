@@ -20,6 +20,14 @@ use Illuminate\Database\Query\Builder;
  * @property string $status
  * @property string $created_at
  * @property string $updated_at
+ * @property string $billing_provider
+ * @property int    $auto_renew
+ * @property string $stripe_subscription_id
+ * @property string $stripe_status
+ * @property string $grace_until
+ * @property string $hosted_invoice_url
+ * @property int    $stripe_amount
+ * @property string $stripe_currency
  *
  * @mixin Builder
  */

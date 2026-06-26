@@ -37,5 +37,10 @@ foreach ($directories as $dir) {
     }
 }
 
-require_once __DIR__ . '/helpers.php';
+// NOTE: tests/Helpers.php is auto-loaded by Pest's BootFiles bootstrapper
+// (Pest\Bootstrappers\BootFiles::STRUCTURE). Do NOT require it here as well:
+// on a case-insensitive filesystem (e.g. macOS) the manual lowercase
+// `helpers.php` and Pest's canonical `Helpers.php` resolve to the same file
+// but are distinct keys for require_once/include_once, causing a fatal
+// "Cannot redeclare function createTestUser()".
 

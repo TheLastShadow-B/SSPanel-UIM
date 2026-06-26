@@ -19,6 +19,7 @@ use Illuminate\Database\Query\Builder;
  * @property string $status          订单状态
  * @property int    $create_time     创建时间
  * @property int    $update_time     更新时间
+ * @property string $billing_provider 计费提供方
  *
  * @mixin Builder
  */
