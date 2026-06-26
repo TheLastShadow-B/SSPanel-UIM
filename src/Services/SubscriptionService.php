@@ -111,16 +111,7 @@ final class SubscriptionService
             $subscription->save();
 
             // 更新用户信息
-            $user->u = 0;
-            $user->d = 0;
-            $user->transfer_today = 0;
-            $user->transfer_enable = Tools::gbToB($content->bandwidth);
-            $user->class = $content->class;
-            $user->class_expire = $endDate->format('Y-m-d') . ' 23:59:59';
-            $user->node_group = $content->node_group;
-            $user->node_speedlimit = $content->speed_limit;
-            $user->node_iplimit = $content->ip_limit;
-            $user->save();
+            self::grantMembershipFromContent($user, $content, $endDate->format('Y-m-d') . ' 23:59:59');
 
             // 更新订单状态
             $order->status = 'activated';
@@ -131,6 +122,24 @@ final class SubscriptionService
         }
 
         echo Tools::toDateTime(time()) . ' 新订阅激活处理完成' . PHP_EOL;
+    }
+
+    /**
+     * 把套餐内容(product_content)中的会员权益写入用户。
+     * 共享给:新订阅激活、续期、Stripe webhook、换套餐。
+     */
+    public static function grantMembershipFromContent(User $user, object $content, string $classExpire): void
+    {
+        $user->u = 0;
+        $user->d = 0;
+        $user->transfer_today = 0;
+        $user->transfer_enable = Tools::gbToB($content->bandwidth);
+        $user->class = $content->class;
+        $user->class_expire = $classExpire;
+        $user->node_group = $content->node_group;
+        $user->node_speedlimit = $content->speed_limit;
+        $user->node_iplimit = $content->ip_limit;
+        $user->save();
     }
 
     /**
