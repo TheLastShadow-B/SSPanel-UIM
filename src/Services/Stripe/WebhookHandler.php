@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services\Stripe;
 
+use App\Models\Order;
 use App\Models\StripeEvent;
+use App\Models\Subscription;
+use App\Models\User;
+use App\Services\SubscriptionService;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Stripe\Event;
+use function json_decode;
+use function time;
 
 /**
  * Top-level Stripe webhook dispatcher.
@@ -88,9 +94,117 @@ final class WebhookHandler
             || ($e->getCode() === '23000');
     }
 
+    /**
+     * checkout.session.completed (subscription mode): create the local
+     * Subscription row + run the FIRST-PERIOD membership grant.
+     *
+     * Idempotent on the UNIQUE stripe_subscription_id: this event can be
+     * redelivered, AND invoice.paid(subscription_create) also fires for the
+     * first period (P1.6 no-ops on dates), so the first-period grant must
+     * happen exactly once — here.
+     *
+     * S5: the session is bound to a local user via the server-stored
+     * stripe_customer_id (never a client-supplied id). The purchase metadata
+     * ({sspanel_user_id, product_id, billing_cycle, order_id, invoice_id}) was
+     * set as subscription_data.metadata in P1.3, so it lives on the Stripe
+     * SUBSCRIPTION object — retrieved here via the injectable StripeService so
+     * it stays stubbable in tests.
+     */
     private function handleCheckoutCompleted(Event $event): void
     {
-        // Implemented in Task P1.5.
+        $session = $event->data->object;
+
+        if (($session->mode ?? null) !== 'subscription') {
+            return;
+        }
+
+        $stripeSubId = $session->subscription ?? null;
+        $customerId = $session->customer ?? null;
+
+        if ($stripeSubId === null || $customerId === null) {
+            return;
+        }
+
+        // S5: bind the event to a local user via the server-stored customer id.
+        $user = (new User())->where('stripe_customer_id', $customerId)->first();
+
+        if ($user === null) {
+            return;
+        }
+
+        // Idempotent on the UNIQUE stripe_subscription_id: a replay (or the
+        // first invoice.paid) must NOT create a 2nd row or re-grant membership.
+        if ((new Subscription())->where('stripe_subscription_id', $stripeSubId)->exists()) {
+            return;
+        }
+
+        // Metadata + the locked recurring price live on the Stripe subscription.
+        $stripeSub = StripeService::getInstance()->client()->subscriptions->retrieve($stripeSubId);
+        $metadata = $stripeSub->metadata ?? null;
+
+        $billingCycle = $metadata->billing_cycle ?? 'month';
+        $orderId = $metadata->order_id ?? null;
+
+        $order = $orderId !== null ? (new Order())->find((int) $orderId) : null;
+
+        if ($order === null) {
+            return;
+        }
+
+        $content = json_decode($order->product_content);
+        $today = Carbon::today();
+        $endDate = SubscriptionService::calculateEndDate($today, $billingCycle);
+
+        // Locked price from the resolved Stripe Price (P1.3), if present.
+        $priceItem = $stripeSub->items->data[0]->price ?? null;
+        $stripeAmount = $priceItem->unit_amount ?? null;
+        $stripeCurrency = $priceItem->currency ?? null;
+
+        $now = Carbon::now()->format('Y-m-d H:i:s');
+
+        try {
+            $subscription = new Subscription();
+            $subscription->user_id = $user->id;
+            $subscription->product_id = $order->product_id;
+            $subscription->product_content = $order->product_content;
+            $subscription->billing_cycle = $billingCycle;
+            $subscription->renewal_price = $order->price;
+            $subscription->start_date = $today->format('Y-m-d');
+            $subscription->end_date = $endDate->format('Y-m-d');
+            $subscription->reset_day = (int) $today->format('d');
+            $subscription->last_reset_date = $today->format('Y-m-d');
+            $subscription->status = 'active';
+            $subscription->billing_provider = 'stripe';
+            $subscription->auto_renew = 1;
+            $subscription->stripe_subscription_id = $stripeSubId;
+            $subscription->stripe_status = 'active';
+            $subscription->stripe_amount = $stripeAmount;
+            $subscription->stripe_currency = $stripeCurrency;
+            $subscription->created_at = $now;
+            $subscription->updated_at = $now;
+            $subscription->save();
+        } catch (QueryException $e) {
+            // A concurrent delivery already created this subscription. The
+            // first-period grant belongs to that winner — no-op here.
+            if ($this->isUniqueViolation($e)) {
+                return;
+            }
+
+            throw $e;
+        }
+
+        // FIRST-PERIOD membership grant (shared helper — never re-inlined).
+        SubscriptionService::grantMembershipFromContent(
+            $user,
+            $content,
+            $endDate->format('Y-m-d') . ' 23:59:59'
+        );
+
+        // Activate + link the pending order back to the new subscription.
+        $order->status = 'activated';
+        $order->subscription_id = $subscription->id;
+        $order->update_time = time();
+        $order->save();
     }
 
     private function handleInvoicePaid(Event $event): void
