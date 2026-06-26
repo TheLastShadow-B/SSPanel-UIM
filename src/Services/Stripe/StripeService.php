@@ -8,6 +8,7 @@ use App\Models\Config;
 use App\Models\User;
 use Stripe\Checkout\Session;
 use Stripe\Collection;
+use Stripe\PaymentIntent;
 use Stripe\SetupIntent;
 use Stripe\StripeClient;
 use Stripe\Subscription;
@@ -101,6 +102,32 @@ class StripeService
             'customer' => $customerId,
             'usage' => 'off_session',
             'metadata' => $metadata,
+        ]);
+    }
+
+    /**
+     * Off-session one-time charge against a stored card.
+     *
+     * NOTE: deliberately NOT passing payment_method_types (dynamic payment methods).
+     */
+    public function chargeOffSession(
+        string $customerId,
+        string $paymentMethodId,
+        int $amountMinor,
+        string $currency,
+        string $idempotencyKey,
+        array $metadata = []
+    ): PaymentIntent {
+        return $this->client()->paymentIntents->create([
+            'amount' => $amountMinor,
+            'currency' => $currency,
+            'customer' => $customerId,
+            'payment_method' => $paymentMethodId,
+            'off_session' => true,
+            'confirm' => true,
+            'metadata' => $metadata,
+        ], [
+            'idempotency_key' => $idempotencyKey,
         ]);
     }
 
