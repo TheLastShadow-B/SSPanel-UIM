@@ -9,6 +9,7 @@ use App\Models\StripeEvent;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\SubscriptionService;
+use App\Utils\Tools;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Stripe\Event;
@@ -207,9 +208,135 @@ final class WebhookHandler
         $order->save();
     }
 
+    /**
+     * invoice.paid (subscription mode): advance the local period on a RENEWAL.
+     *
+     *  - billing_reason='subscription_create' (the FIRST invoice): NO date
+     *    change. The first-period membership grant already happened in P1.5's
+     *    handleCheckoutCompleted; this invoice fires for the same period, so it
+     *    must NOT advance end_date / class_expire (idempotency of period 1).
+     *  - billing_reason='subscription_cycle' (a RENEWAL): advance the local
+     *    Subscription end_date + the user's class_expire by one billing cycle
+     *    and reset the period's bandwidth (the Stripe-leg bandwidth reset lives
+     *    HERE per P0.10 / §12.4). Date math mirrors
+     *    SubscriptionService::processRenewalActivation; the bandwidth reset
+     *    mirrors resetSubscriptionBandwidth.
+     *
+     * S5: bind via stripe_subscription_id, then assert the subscription's owner
+     * is the customer on the invoice before acting (same pattern as P1.5).
+     *
+     * Idempotency: a re-delivery of the SAME event id is already a no-op (the
+     * StripeEvent UNIQUE guard in handle()). Stripe can also emit DIFFERENT
+     * event ids for the same logical invoice/period, so we ALSO guard on the
+     * invoice's billing period when the payload carries it: skip if the local
+     * end_date already covers (is at/after) the invoice period end — the period
+     * was already advanced, so a second advance cannot happen. When the payload
+     * omits period info (e.g. minimal fixtures), per-event dedup is the guard.
+     */
     private function handleInvoicePaid(Event $event): void
     {
-        // Implemented in Task P1.6.
+        $invoice = $event->data->object;
+        $stripeSubId = $invoice->subscription ?? null;
+        $customerId = $invoice->customer ?? null;
+        $reason = $invoice->billing_reason ?? null;
+
+        if ($stripeSubId === null || $customerId === null) {
+            return;
+        }
+
+        $subscription = (new Subscription())->where('stripe_subscription_id', $stripeSubId)->first();
+
+        if ($subscription === null) {
+            return;
+        }
+
+        // Only act on Stripe-managed subscriptions; never touch manual/balance.
+        if ($subscription->billing_provider !== 'stripe') {
+            return;
+        }
+
+        // S5: assert the subscription belongs to this customer (security).
+        $user = (new User())->find($subscription->user_id);
+
+        if ($user === null || $user->stripe_customer_id !== $customerId) {
+            return;
+        }
+
+        // First invoice of a brand-new subscription: dates already set by
+        // checkout.session.completed (P1.5). No-op on dates here.
+        if ($reason === 'subscription_create') {
+            return;
+        }
+
+        // Only renewals advance the period.
+        if ($reason !== 'subscription_cycle') {
+            return;
+        }
+
+        // Period-level idempotency guard for the cross-event-id case: Stripe can
+        // deliver the SAME logical invoice under a DIFFERENT event id (so the
+        // StripeEvent dedup in handle() would not catch it). The invoice carries
+        // the new billing period end; if our local end_date already covers it,
+        // this period was already advanced — bail before advancing twice.
+        $invoicePeriodEnd = $this->invoicePeriodEnd($invoice);
+
+        if ($invoicePeriodEnd !== null
+            && Carbon::parse($subscription->end_date)->endOfDay()->greaterThanOrEqualTo($invoicePeriodEnd)
+        ) {
+            return;
+        }
+
+        // Renewal date math — mirrors SubscriptionService::processRenewalActivation.
+        $newStart = Carbon::parse($subscription->end_date)->addDay();
+        $newEnd = SubscriptionService::calculateEndDate($newStart, $subscription->billing_cycle);
+
+        $now = Carbon::now()->format('Y-m-d H:i:s');
+
+        $subscription->start_date = $newStart->format('Y-m-d');
+        $subscription->end_date = $newEnd->format('Y-m-d');
+        $subscription->status = 'active';
+        $subscription->stripe_status = 'active';
+        $subscription->last_reset_date = Carbon::today()->format('Y-m-d');
+        $subscription->updated_at = $now;
+        $subscription->save();
+
+        // class_expire advance + Stripe-leg bandwidth reset for the new period
+        // — mirrors SubscriptionService::resetSubscriptionBandwidth.
+        $content = json_decode($subscription->product_content);
+
+        $user->class_expire = $newEnd->format('Y-m-d') . ' 23:59:59';
+        $user->u = 0;
+        $user->d = 0;
+        $user->transfer_today = 0;
+        $user->transfer_enable = Tools::gbToB($content->bandwidth);
+        $user->save();
+    }
+
+    /**
+     * Best-effort extraction of an invoice's billing period END as a Carbon.
+     *
+     * A Stripe invoice exposes the renewed period both at the line-item level
+     * (`lines.data[].period.end`, the authoritative spot for a subscription line)
+     * and — for the whole invoice — as `period_end`. Both are unix timestamps.
+     * Returns null when neither is present (minimal fixtures), so the caller
+     * falls back to per-event dedup for replay safety.
+     */
+    private function invoicePeriodEnd(object $invoice): ?Carbon
+    {
+        $line = $invoice->lines->data[0] ?? null;
+        $linePeriodEnd = $line->period->end ?? null;
+
+        if (is_int($linePeriodEnd) && $linePeriodEnd > 0) {
+            return Carbon::createFromTimestamp($linePeriodEnd);
+        }
+
+        $periodEnd = $invoice->period_end ?? null;
+
+        if (is_int($periodEnd) && $periodEnd > 0) {
+            return Carbon::createFromTimestamp($periodEnd);
+        }
+
+        return null;
     }
 
     private function handleInvoiceFailed(Event $event): void
