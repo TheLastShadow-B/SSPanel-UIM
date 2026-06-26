@@ -520,6 +520,45 @@ final class SubscriptionService
     }
 
     /**
+     * 余额与存档卡都失败时进入 N 天宽限期（服务不断）。
+     *
+     * 先把状态落库：grace_until = end_date + grace_days（默认 3，'Y-m-d H:i:s'）、订阅置
+     * pending_renewal、用户 class_expire 延到 grace_until 保活——状态变更绝不被发信影响。
+     * 状态保存后再尝试发送续费失败邮件，模板缺失/渠道异常一律被 try/catch 吞掉。
+     */
+    public static function enterGrace(Subscription $sub, User $user): void
+    {
+        $graceDays = (int) Config::obtain('stripe_grace_days');
+
+        if ($graceDays <= 0) {
+            $graceDays = 3;
+        }
+
+        $graceUntil = Carbon::parse($sub->end_date)->addDays($graceDays)->format('Y-m-d H:i:s');
+
+        // STATE FIRST: persist grace before attempting any notification.
+        $sub->status = 'pending_renewal';
+        $sub->grace_until = $graceUntil;
+        $sub->updated_at = Carbon::now()->format('Y-m-d H:i:s');
+        $sub->save();
+
+        // 保活：把会员有效期延到宽限截止，不降级。
+        $user->class_expire = $graceUntil;
+        $user->save();
+
+        try {
+            Notification::notifyUser(
+                $user,
+                $_ENV['appName'] . '-订阅续费失败',
+                '你好，本次自动续费未能成功，请在 ' . $graceDays . ' 天内完成支付，否则订阅将到期失效。',
+                'subscription_renewal_failed.tpl'
+            );
+        } catch (GuzzleException|ClientExceptionInterface|TelegramSDKException $e) {
+            echo $e->getMessage() . PHP_EOL;
+        }
+    }
+
+    /**
      * 过期订阅处理（每日执行）
      */
     public static function expireSubscription(): void
