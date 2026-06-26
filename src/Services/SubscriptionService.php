@@ -147,6 +147,36 @@ final class SubscriptionService
     }
 
     /**
+     * 推进一个订阅到下一计费周期（自动续费成功 / 手动续费激活共用）。
+     *
+     * newStart = end_date + 1 天；newEnd = calculateEndDate(newStart, cycle)。
+     * 更新订阅起止日、置 status='active'、清空 grace_until；用户 class_expire 对齐到
+     * newEnd 23:59:59，并按 product_content 重置本周期流量（u=d=transfer_today=0,
+     * transfer_enable=gbToB(bandwidth)）。
+     */
+    public static function advanceRenewedPeriod(Subscription $sub, User $user): void
+    {
+        $newStart = Carbon::parse($sub->end_date)->addDay();
+        $newEnd = self::calculateEndDate($newStart, $sub->billing_cycle);
+
+        $sub->start_date = $newStart->format('Y-m-d');
+        $sub->end_date = $newEnd->format('Y-m-d');
+        $sub->status = 'active';
+        $sub->grace_until = null;
+        $sub->updated_at = Carbon::now()->format('Y-m-d H:i:s');
+        $sub->save();
+
+        $content = json_decode($sub->product_content);
+
+        $user->u = 0;
+        $user->d = 0;
+        $user->transfer_today = 0;
+        $user->transfer_enable = Tools::gbToB($content->bandwidth);
+        $user->class_expire = $newEnd->format('Y-m-d') . ' 23:59:59';
+        $user->save();
+    }
+
+    /**
      * 处理续费订阅激活（每5分钟执行）
      */
     public static function processRenewalActivation(): void
@@ -173,20 +203,8 @@ final class SubscriptionService
                 continue;
             }
 
-            // 计算新的日期
-            $newStart = Carbon::parse($subscription->end_date)->addDay();
-            $newEnd = self::calculateEndDate($newStart, $subscription->billing_cycle);
-
-            // 更新订阅
-            $subscription->start_date = $newStart->format('Y-m-d');
-            $subscription->end_date = $newEnd->format('Y-m-d');
-            $subscription->status = 'active';
-            $subscription->updated_at = Carbon::now()->format('Y-m-d H:i:s');
-            $subscription->save();
-
-            // 更新用户 class_expire
-            $user->class_expire = $newEnd->format('Y-m-d') . ' 23:59:59';
-            $user->save();
+            // 推进周期、对齐 class_expire 并按套餐重置流量（与自动续费共用 DRY）
+            self::advanceRenewedPeriod($subscription, $user);
 
             // 更新订单状态
             $order->status = 'activated';
