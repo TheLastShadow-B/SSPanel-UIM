@@ -188,6 +188,40 @@
                                                        value="{$settings['stripe_max_recharge']}">
                                             </div>
                                         </div>
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">Publishable Key</label>
+                                            <div class="col">
+                                                <input id="stripe_publishable_key" type="text" class="form-control"
+                                                       value="{$settings['stripe_publishable_key']}">
+                                            </div>
+                                        </div>
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">自动续费（订阅）</label>
+                                            <div class="col">
+                                                <select id="stripe_auto_billing_enabled" class="col form-select">
+                                                    <option value="0">停用</option>
+                                                    <option value="1" {if $settings['stripe_auto_billing_enabled']}selected{/if}>启用
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">余额自动续费</label>
+                                            <div class="col">
+                                                <select id="balance_auto_renew_enabled" class="col form-select">
+                                                    <option value="0">停用</option>
+                                                    <option value="1" {if $settings['balance_auto_renew_enabled']}selected{/if}>启用
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">宽限期天数（整数）</label>
+                                            <div class="col">
+                                                <input id="stripe_grace_days" type="text" class="form-control"
+                                                       value="{$settings['stripe_grace_days']}">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="tab-pane" id="epay">

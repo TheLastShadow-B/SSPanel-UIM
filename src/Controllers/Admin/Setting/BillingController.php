@@ -96,6 +96,12 @@ final class BillingController extends BaseController
                     'checkout.session.completed',
                     'checkout.session.async_payment_succeeded',
                     'checkout.session.async_payment_failed',
+                    'invoice.paid',
+                    'invoice.payment_failed',
+                    'invoice.payment_action_required',
+                    'customer.subscription.updated',
+                    'customer.subscription.deleted',
+                    'setup_intent.succeeded',
                 ],
             ]);
         } catch (ApiErrorException) {
