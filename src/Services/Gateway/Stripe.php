@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Paylist;
 use App\Services\Auth;
 use App\Services\Exchange;
+use App\Services\Stripe\WebhookHandler;
 use App\Services\View;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
@@ -167,11 +168,18 @@ final class Stripe extends Base
             ]);
         }
 
-        $payment_intent = $event->data->object;
+        // One-time Stripe charges (mode:'payment') still flow through postPayment.
+        $object = $event->data->object;
 
-        if ($event->type === 'payment_intent.succeeded' && $payment_intent->status === 'succeeded') {
-            $this->postPayment($payment_intent->metadata->trade_no);
+        if ($event->type === 'payment_intent.succeeded' && $object->status === 'succeeded') {
+            $this->postPayment($object->metadata->trade_no);
+
+            return $response->withStatus(204);
         }
+
+        // All other events (subscription auto-billing) go through the handler,
+        // which dedups on stripe_event and dispatches by type.
+        (new WebhookHandler())->handle($event);
 
         return $response->withStatus(204);
     }
