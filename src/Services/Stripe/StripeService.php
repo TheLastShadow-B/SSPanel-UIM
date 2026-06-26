@@ -144,6 +144,36 @@ class StripeService
         ]);
     }
 
+    /**
+     * Customer's stored default payment method (invoice_settings.default_payment_method),
+     * or null when none is set. The field may come back as a bare id string or an
+     * expanded object, so resolve both forms.
+     */
+    public function getDefaultPaymentMethod(string $customerId): ?string
+    {
+        $customer = $this->client()->customers->retrieve($customerId, []);
+
+        $pm = $customer->invoice_settings->default_payment_method ?? null;
+        if ($pm === null) {
+            return null;
+        }
+
+        return is_string($pm) ? $pm : ($pm->id ?? null);
+    }
+
+    /**
+     * Attach a payment method and set it as the customer's default. Unlike
+     * setDefaultPaymentMethod(), this does NOT touch any subscription.
+     */
+    public function setCustomerDefaultPaymentMethod(string $customerId, string $paymentMethodId): void
+    {
+        $this->client()->paymentMethods->attach($paymentMethodId, ['customer' => $customerId]);
+
+        $this->client()->customers->update($customerId, [
+            'invoice_settings' => ['default_payment_method' => $paymentMethodId],
+        ]);
+    }
+
     public function cancelAtPeriodEnd(string $subscriptionId): void
     {
         $this->client()->subscriptions->update($subscriptionId, [
