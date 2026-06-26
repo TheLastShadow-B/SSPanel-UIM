@@ -633,7 +633,10 @@ final class SubscriptionService
     }
 
     /**
-     * 过期订阅处理（每日执行）
+     * 自然过期处理（每日执行）。
+     *
+     * 仅处理用户已取消自动续费(auto_renew=0)、当天到期(end_date=today)的 pending_renewal
+     * 订阅；auto_renew=1 的到期订阅交由 processAutoRenew / 宽限期 / terminateLapsed 处理。
      */
     public static function expireSubscription(): void
     {
@@ -641,6 +644,7 @@ final class SubscriptionService
 
         $subscriptions = (new Subscription())->where('status', 'pending_renewal')
             ->where('end_date', $today)
+            ->where('auto_renew', 0)
             ->whereIn('billing_provider', self::SELF_MANAGED)
             ->get();
 
@@ -705,5 +709,88 @@ final class SubscriptionService
         }
 
         echo Tools::toDateTime(time()) . ' 订阅过期处理完成' . PHP_EOL;
+    }
+
+    /**
+     * 宽限期超时终止（每日执行）。
+     *
+     * 处理 auto_renew=1、自管、状态 pending_renewal、grace_until 已过且续费账单仍 unpaid 的
+     * 订阅：作废续费订单与账单（status='cancelled'，使其不可再支付）、订阅置 expired、降级用户、
+     * 发送“已失效”邮件。若账单已在宽限内被付掉(paid_*)则跳过，交由正常激活链处理。
+     */
+    public static function terminateLapsed(): void
+    {
+        $now = Carbon::now()->format('Y-m-d H:i:s');
+
+        $subscriptions = (new Subscription())->where('status', 'pending_renewal')
+            ->where('auto_renew', 1)
+            ->whereIn('billing_provider', self::SELF_MANAGED)
+            ->whereNotNull('grace_until')
+            ->where('grace_until', '<', $now)
+            ->get();
+
+        foreach ($subscriptions as $subscription) {
+            $order = (new Order())
+                ->where('subscription_id', $subscription->id)
+                ->where('product_type', 'subscription')
+                ->whereNotIn('status', ['cancelled', 'expired', 'activated'])
+                ->orderByDesc('id')
+                ->first();
+
+            if ($order === null) {
+                continue;
+            }
+
+            $invoice = (new Invoice())->where('order_id', $order->id)->first();
+
+            // 宽限内已支付 → 跳过，留给正常激活链。
+            if ($invoice === null || $invoice->status !== 'unpaid') {
+                continue;
+            }
+
+            // 作废订单与账单，使其不可再支付。
+            $order->status = 'cancelled';
+            $order->update_time = time();
+            $order->save();
+
+            $invoice->status = 'cancelled';
+            $invoice->update_time = time();
+            $invoice->save();
+
+            // 订阅过期
+            $subscription->status = 'expired';
+            $subscription->updated_at = Carbon::now()->format('Y-m-d H:i:s');
+            $subscription->save();
+
+            // 降级用户
+            $user = (new User())->find($subscription->user_id);
+
+            if ($user !== null) {
+                $user->class = 0;
+                $user->transfer_enable = 0;
+                $user->node_group = 0;
+                $user->node_speedlimit = 0;
+                $user->node_iplimit = 0;
+                $user->u = 0;
+                $user->d = 0;
+                $user->transfer_today = 0;
+                $user->save();
+
+                try {
+                    Notification::notifyUser(
+                        $user,
+                        $_ENV['appName'] . '-订阅已过期',
+                        '你好，你的订阅已超过宽限期仍未完成续费，账户服务已被停止。如需继续使用，请重新购买订阅。',
+                        'subscription_expired.tpl'
+                    );
+                } catch (GuzzleException|ClientExceptionInterface|TelegramSDKException $e) {
+                    echo $e->getMessage() . PHP_EOL;
+                }
+            }
+
+            echo "订阅 #{$subscription->id} 宽限期已过，已终止" . PHP_EOL;
+        }
+
+        echo Tools::toDateTime(time()) . ' 宽限期终止处理完成' . PHP_EOL;
     }
 }
