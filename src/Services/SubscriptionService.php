@@ -200,7 +200,9 @@ final class SubscriptionService
      */
     public static function resetSubscriptionBandwidth(): void
     {
-        $subscriptions = (new Subscription())->where('status', 'active')->get();
+        $subscriptions = (new Subscription())->where('status', 'active')
+            ->whereIn('billing_provider', self::SELF_MANAGED)
+            ->get();
         $today = Carbon::today();
 
         foreach ($subscriptions as $subscription) {
