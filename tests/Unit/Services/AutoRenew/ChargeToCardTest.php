@@ -156,3 +156,29 @@ it('returns false when the PaymentIntent is not succeeded (e.g. requires_action)
     expect(SubscriptionService::chargeRenewalToCard($sub, $inv))->toBeFalse();
     expect((new Invoice())->find($inv->id)->status)->toBe('unpaid');
 });
+
+it('returns false WITHOUT charging when the renewal cannot complete (invalid billing_cycle -> no orphan charge)', function () {
+    $user = makeUserWithMoney(0.0);
+    $sub = makeSub($user, renewalPrice: 30.0);
+
+    // A corrupt billing_cycle: advanceRenewedPeriod -> calculateEndDate match has no
+    // 'week' arm and no default, so the post-charge transaction would throw
+    // UnhandledMatchError. Without pre-validation the card is debited but nothing is
+    // recorded (invoice stays unpaid -> grace) = customer charged for no service.
+    $sub->billing_cycle = 'week';
+    $sub->save();
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+
+    $fake = fakeCardStripe('pm_card_1', 'succeeded');
+    StripeService::setInstance($fake);
+
+    ob_start();
+    $result = SubscriptionService::chargeRenewalToCard($sub, $inv);
+    ob_get_clean();
+
+    expect($result)->toBeFalse();
+    // The pre-validation fired BEFORE chargeOffSession -> the card is never touched.
+    expect($fake->chargeCalls)->toHaveCount(0);
+    expect((new Invoice())->find($inv->id)->status)->toBe('unpaid');
+    expect((new Subscription())->find($sub->id)->stripe_amount)->toBeNull();
+});

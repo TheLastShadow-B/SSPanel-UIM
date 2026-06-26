@@ -19,6 +19,7 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Telegram\Bot\Exceptions\TelegramSDKException;
 use function ceil;
 use function date;
+use function in_array;
 use function json_decode;
 use function json_encode;
 use function min;
@@ -539,6 +540,24 @@ final class SubscriptionService
             $currency = (string) Config::obtain('stripe_currency');
             $fxAmount = Exchange::getInstance()->exchange((float) $sub->renewal_price, 'CNY', $currency);
             $amountMinor = PriceResolver::toMinorUnits((float) $fxAmount, $currency);
+
+            // PRE-VALIDATE before the irreversible off-session charge. chargeOffSession runs
+            // BEFORE the DB transaction that records the charge + advances the period; if that
+            // transaction were to throw DETERMINISTICALLY the card would be debited yet nothing
+            // recorded (invoice stays unpaid -> grace) = customer charged for no service. The two
+            // known deterministic faults: a corrupt billing_cycle makes advanceRenewedPeriod's
+            // calculateEndDate match throw UnhandledMatchError; a product_content that does not
+            // decode to an object carrying `bandwidth` breaks the membership/quota reset. Verify
+            // the renewal can complete and bail to false (-> grace) WITHOUT charging if it cannot.
+            // (Transient DB faults remain safe to retry via the renew_inv_{id} idempotency key.)
+            $renewalContent = json_decode((string) $sub->product_content);
+
+            if (! in_array($sub->billing_cycle, ['month', 'quarter', 'year'], true)
+                || ! $renewalContent instanceof \stdClass
+                || ! isset($renewalContent->bandwidth)
+            ) {
+                return false;
+            }
 
             $paymentIntent = $stripe->chargeOffSession(
                 $customerId,
