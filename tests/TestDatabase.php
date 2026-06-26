@@ -205,6 +205,19 @@ class TestDatabase
             });
         }
 
+        if (!$schema->hasTable('paylist')) {
+            $schema->create('paylist', function (Blueprint $table) {
+                $table->increments('id');
+                $table->integer('userid');
+                $table->decimal('total', 12, 2)->default(0);
+                $table->tinyInteger('status')->default(0);
+                $table->integer('invoice_id')->default(0);
+                $table->string('tradeno')->default('');
+                $table->string('gateway')->default('');
+                $table->integer('datetime')->nullable();
+            });
+        }
+
         if (!$schema->hasTable('email_queue')) {
             $schema->create('email_queue', function (Blueprint $table) {
                 $table->increments('id');
@@ -231,7 +244,7 @@ class TestDatabase
         $capsule = DB::getCapsule();
         $schema = $capsule->schema();
         
-        $tables = ['stripe_event', 'email_queue', 'invoice', 'order', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
+        $tables = ['stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
         
         foreach ($tables as $table) {
             if ($schema->hasTable($table)) {

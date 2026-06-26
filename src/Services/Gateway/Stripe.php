@@ -49,7 +49,10 @@ final class Stripe extends Base
     public function purchase(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $invoice_id = $this->antiXss->xss_clean($request->getParam('invoice_id'));
-        $invoice = (new Invoice())->find($invoice_id);
+        $user = Auth::getUser();
+        $invoice = (new Invoice())->where('id', $invoice_id)
+            ->where('user_id', $user->id)
+            ->first();
 
         if ($invoice === null) {
             return $response->withJson([
@@ -69,7 +72,6 @@ final class Stripe extends Base
             ]);
         }
 
-        $user = Auth::getUser();
         $pl = (new Paylist())->where('invoice_id', $invoice_id)->first();
 
         if ($pl === null) {
