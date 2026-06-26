@@ -5,6 +5,7 @@ declare(strict_types=1);
 /**
  * Create test user
  */
+if (! function_exists('createTestUser')) {
 function createTestUser(array $attributes = []): \App\Models\User
 {
     $faker = \Faker\Factory::create();
@@ -35,10 +36,12 @@ function createTestUser(array $attributes = []): \App\Models\User
     
     return $user;
 }
+}
 
 /**
  * Create test node
  */
+if (! function_exists('createTestNode')) {
 function createTestNode(array $attributes = []): \App\Models\Node
 {
     static $nodeId = 1;
@@ -63,10 +66,12 @@ function createTestNode(array $attributes = []): \App\Models\Node
     
     return $node;
 }
+}
 
 /**
  * Assert response is JSON format
  */
+if (! function_exists('assertJsonResponse')) {
 function assertJsonResponse($response): array
 {
     $contentType = $response->getHeaderLine('Content-Type');
@@ -78,10 +83,12 @@ function assertJsonResponse($response): array
     
     return $data;
 }
+}
 
 /**
  * Assert successful response
  */
+if (! function_exists('assertSuccessResponse')) {
 function assertSuccessResponse($response): void
 {
     PHPUnit\Framework\Assert::assertEquals(200, $response->getStatusCode());
@@ -89,10 +96,12 @@ function assertSuccessResponse($response): void
     $data = assertJsonResponse($response);
     PHPUnit\Framework\Assert::assertEquals(1, $data['ret'] ?? $data['success'] ?? 0);
 }
+}
 
 /**
  * Create test config
  */
+if (! function_exists('createTestConfig')) {
 function createTestConfig(array $items = []): void
 {
     $defaults = [
@@ -109,10 +118,12 @@ function createTestConfig(array $items = []): void
         \App\Models\Config::set($key, $value);
     }
 }
+}
 
 /**
  * Clean test database
  */
+if (! function_exists('cleanTestDatabase')) {
 function cleanTestDatabase(): void
 {
     $db = \App\Services\DB::getPdo();
@@ -127,10 +138,12 @@ function cleanTestDatabase(): void
     
     $db->exec('SET FOREIGN_KEY_CHECKS = 1');
 }
+}
 
 /**
  * Run SQL file
  */
+if (! function_exists('runSqlFile')) {
 function runSqlFile(string $file): void
 {
     $sql = file_get_contents($file);
@@ -143,4 +156,5 @@ function runSqlFile(string $file): void
     foreach ($statements as $statement) {
         $db->exec($statement);
     }
+}
 }
