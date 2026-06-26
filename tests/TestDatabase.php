@@ -70,6 +70,7 @@ class TestDatabase
                 $table->string('slack_id')->nullable();
                 $table->string('im_type')->default('');
                 $table->string('im_value')->default('');
+                $table->string('stripe_customer_id', 64)->nullable();
                 $table->timestamps();
             });
         }
@@ -126,14 +127,96 @@ class TestDatabase
                 $table->index('log_time');
             });
         }
+
+        if (!$schema->hasTable('config')) {
+            $schema->create('config', function (Blueprint $table) {
+                $table->increments('id');
+                $table->string('item')->unique();
+                $table->text('value')->nullable();
+                $table->string('class')->default('');
+                $table->tinyInteger('is_public')->default(0);
+                $table->string('type')->default('string');
+                $table->text('default')->nullable();
+                $table->string('mark')->default('');
+            });
+        }
+
+        if (!$schema->hasTable('subscription')) {
+            $schema->create('subscription', function (Blueprint $table) {
+                $table->increments('id');
+                $table->integer('user_id');
+                $table->integer('product_id');
+                $table->text('product_content');
+                $table->string('billing_cycle');
+                $table->decimal('renewal_price', 12, 2);
+                $table->string('start_date');
+                $table->string('end_date');
+                $table->tinyInteger('reset_day');
+                $table->string('last_reset_date');
+                $table->string('status')->default('active');
+                $table->string('created_at');
+                $table->string('updated_at');
+                $table->string('billing_provider', 16)->default('manual');
+                $table->tinyInteger('auto_renew')->default(0);
+                $table->string('stripe_subscription_id', 64)->nullable();
+                $table->string('stripe_status', 24)->nullable();
+                $table->dateTime('grace_until')->nullable();
+                $table->string('hosted_invoice_url', 512)->nullable();
+                $table->bigInteger('stripe_amount')->nullable();
+                $table->string('stripe_currency', 8)->nullable();
+            });
+        }
+
+        if (!$schema->hasTable('order')) {
+            $schema->create('order', function (Blueprint $table) {
+                $table->increments('id');
+                $table->integer('user_id');
+                $table->integer('product_id');
+                $table->string('product_type');
+                $table->string('product_name')->default('');
+                $table->text('product_content');
+                $table->integer('subscription_id')->nullable();
+                $table->string('coupon')->default('');
+                $table->decimal('price', 12, 2);
+                $table->string('status');
+                $table->integer('create_time');
+                $table->integer('update_time');
+                $table->string('billing_provider', 16)->default('manual');
+            });
+        }
+
+        if (!$schema->hasTable('invoice')) {
+            $schema->create('invoice', function (Blueprint $table) {
+                $table->increments('id');
+                $table->string('type');
+                $table->integer('user_id');
+                $table->integer('order_id');
+                $table->text('content');
+                $table->decimal('price', 12, 2);
+                $table->string('status');
+                $table->integer('create_time');
+                $table->integer('update_time');
+                $table->integer('pay_time')->nullable();
+                $table->string('billing_provider', 16)->default('manual');
+            });
+        }
+
+        if (!$schema->hasTable('stripe_event')) {
+            $schema->create('stripe_event', function (Blueprint $table) {
+                $table->bigIncrements('id');
+                $table->string('event_id', 64)->unique();
+                $table->string('type', 64);
+                $table->dateTime('created_at');
+            });
+        }
     }
-    
+
     public static function dropTables(): void
     {
         $capsule = DB::getCapsule();
         $schema = $capsule->schema();
         
-        $tables = ['user_traffic_log', 'node_online_log', 'node', 'user'];
+        $tables = ['stripe_event', 'invoice', 'order', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
         
         foreach ($tables as $table) {
             if ($schema->hasTable($table)) {

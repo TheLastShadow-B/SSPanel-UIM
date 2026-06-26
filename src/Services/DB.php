@@ -32,6 +32,11 @@ final class DB extends Manager
         $db->getDatabaseManager()->connection('default')->enableQueryLog();
     }
 
+    public static function getCapsule(): Manager
+    {
+        return self::$instance;
+    }
+
     public static function getConfig(): array
     {
         if ($_ENV['enable_db_rw_split']) {
