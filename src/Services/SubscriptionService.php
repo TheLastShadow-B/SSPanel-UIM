@@ -26,6 +26,11 @@ use const PHP_EOL;
 final class SubscriptionService
 {
     /**
+     * 自建引擎只处理的计费提供方（正向匹配，规避 NULL 三值逻辑）
+     */
+    public const SELF_MANAGED = ['manual', 'balance'];
+
+    /**
      * 计算订阅结束日期
      */
     public static function calculateEndDate(Carbon $startDate, string $billingCycle): Carbon
@@ -60,6 +65,7 @@ final class SubscriptionService
         $orders = (new Order())->where('status', 'pending_activation')
             ->where('product_type', 'subscription')
             ->whereNull('subscription_id')
+            ->whereIn('billing_provider', self::SELF_MANAGED)
             ->orderBy('id')
             ->get();
 
@@ -99,6 +105,7 @@ final class SubscriptionService
             $subscription->reset_day = (int) $today->format('d');
             $subscription->last_reset_date = $today->format('Y-m-d');
             $subscription->status = 'active';
+            $subscription->billing_provider = 'manual';
             $subscription->created_at = $today->format('Y-m-d H:i:s');
             $subscription->updated_at = $today->format('Y-m-d H:i:s');
             $subscription->save();
@@ -134,6 +141,7 @@ final class SubscriptionService
         $orders = (new Order())->where('status', 'pending_activation')
             ->where('product_type', 'subscription')
             ->whereNotNull('subscription_id')
+            ->whereIn('billing_provider', self::SELF_MANAGED)
             ->orderBy('id')
             ->get();
 
@@ -234,6 +242,7 @@ final class SubscriptionService
 
         $subscriptions = (new Subscription())->where('status', 'active')
             ->where('end_date', $targetDate)
+            ->whereIn('billing_provider', self::SELF_MANAGED)
             ->get();
 
         foreach ($subscriptions as $subscription) {
@@ -377,6 +386,7 @@ final class SubscriptionService
 
         $subscriptions = (new Subscription())->where('status', 'pending_renewal')
             ->where('end_date', $today)
+            ->whereIn('billing_provider', self::SELF_MANAGED)
             ->get();
 
         foreach ($subscriptions as $subscription) {

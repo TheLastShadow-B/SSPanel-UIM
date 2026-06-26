@@ -62,14 +62,18 @@ class TestDatabase
                 $table->integer('agent_level')->default(0);
                 $table->integer('class')->default(0);
                 $table->dateTime('class_expire')->nullable();
+                $table->tinyInteger('node_group')->default(0);
+                $table->bigInteger('node_speedlimit')->default(0);
+                $table->integer('node_iplimit')->default(0);
                 $table->integer('theme')->default(1);
                 $table->string('ga_token')->default('');
                 $table->tinyInteger('ga_enable')->default(0);
                 $table->string('telegram_id')->nullable();
                 $table->string('discord_id')->nullable();
                 $table->string('slack_id')->nullable();
-                $table->string('im_type')->default('');
+                $table->integer('im_type')->default(0);
                 $table->string('im_value')->default('');
+                $table->integer('contact_method')->default(1);
                 $table->string('stripe_customer_id', 64)->nullable();
                 $table->timestamps();
             });
@@ -201,6 +205,17 @@ class TestDatabase
             });
         }
 
+        if (!$schema->hasTable('email_queue')) {
+            $schema->create('email_queue', function (Blueprint $table) {
+                $table->increments('id');
+                $table->string('to_email');
+                $table->string('subject');
+                $table->string('template');
+                $table->text('array');
+                $table->integer('time');
+            });
+        }
+
         if (!$schema->hasTable('stripe_event')) {
             $schema->create('stripe_event', function (Blueprint $table) {
                 $table->bigIncrements('id');
@@ -216,7 +231,7 @@ class TestDatabase
         $capsule = DB::getCapsule();
         $schema = $capsule->schema();
         
-        $tables = ['stripe_event', 'invoice', 'order', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
+        $tables = ['stripe_event', 'email_queue', 'invoice', 'order', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
         
         foreach ($tables as $table) {
             if ($schema->hasTable($table)) {
