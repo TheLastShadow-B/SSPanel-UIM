@@ -406,13 +406,14 @@
                                                 <span>The lifespan of the issued invoice.(In seconds)</span>
                                             </div>
                                         </div>
-{*                                        <div class="form-group mb-3 row">*}
-{*                                            <label class="form-label col-3 col-form-label">Currency</label>*}
-{*                                            <div class="col">*}
-{*                                                <input id="cryptomus_currency" type="text" class="form-control"*}
-{*                                                       value="{$settings['cryptomus_currency']}">*}
-{*                                            </div>*}
-{*                                        </div>*}
+                                        <div class="form-group mb-3 row">
+                                            <label class="form-label col-3 col-form-label">Currency</label>
+                                            <div class="col">
+                                                <input id="cryptomus_currency" type="text" class="form-control"
+                                                       value="{$settings['cryptomus_currency']}">
+                                                <span>The fiat currency invoices are issued in (e.g. CNY, USD).</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

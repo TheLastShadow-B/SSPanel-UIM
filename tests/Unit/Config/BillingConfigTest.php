@@ -57,3 +57,15 @@ it('renders an input for every new billing key in the admin template', function 
         expect($tpl)->toContain('id="' . $item . '"');
     }
 });
+
+it('renders a live (uncommented) input for cryptomus_currency', function () {
+    // cryptomus_currency is a class='billing' config row, so the save loop
+    // always writes it. While its input stayed commented out, the save JS
+    // submitted $('#cryptomus_currency').val() === undefined and clobbered the
+    // stored value (and, on the NOT NULL value column, could abort the whole
+    // save). Smarty comments are {* ... *}; strip them so a commented-out
+    // input is NOT counted as present.
+    $tpl = file_get_contents(BASE_PATH . '/resources/views/tabler/admin/setting/billing.tpl');
+    $live = preg_replace('/\{\*.*?\*\}/s', '', $tpl);
+    expect($live)->toContain('id="cryptomus_currency"');
+});

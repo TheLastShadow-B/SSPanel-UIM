@@ -91,7 +91,12 @@ final class Config extends Model
 
     public static function set(string $item, mixed $value): bool
     {
-        $value = is_array($value) ? json_encode($value) : $value;
+        // A missing admin form field reaches here as null (Slim getParam
+        // default). The `value` column is NOT NULL in production, so writing
+        // null throws and the whole settings save aborts. Coerce null to ''
+        // — always valid for a NOT NULL varchar, and obtain() already reads
+        // an empty value back as '' for every type.
+        $value = is_array($value) ? json_encode($value) : ($value ?? '');
 
         try {
             (new Config())->where('item', $item)->update(['value' => $value]);

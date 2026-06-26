@@ -136,7 +136,10 @@ class TestDatabase
             $schema->create('config', function (Blueprint $table) {
                 $table->increments('id');
                 $table->string('item')->unique();
-                $table->text('value')->nullable();
+                // Mirror production: db/migrations/2024031700 makes `value`
+                // varchar(2048) NOT NULL DEFAULT ''. A nullable column here
+                // masks the NOT NULL write errors that bite in production.
+                $table->string('value', 2048)->default('');
                 $table->string('class')->default('');
                 $table->tinyInteger('is_public')->default(0);
                 $table->string('type')->default('string');
