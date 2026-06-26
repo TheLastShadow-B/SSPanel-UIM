@@ -658,6 +658,12 @@ final class SubscriptionService
             ->where('end_date', '<=', $today)
             ->where('auto_renew', 1)
             ->whereIn('billing_provider', self::SELF_MANAGED)
+            // D7 (宽限内不自动重试)/D8 (single failure email): a sub already IN its grace window
+            // (grace_until set to a future datetime by enterGrace) must NOT be re-selected on the
+            // daily run, or it re-runs the whole waterfall + re-sends the failure email every day.
+            // advanceRenewedPeriod clears grace_until=null on success; terminateLapsed owns
+            // grace_until < now. A freshly-due sub has grace_until=NULL, so missed-cron still works.
+            ->whereNull('grace_until')
             ->orderBy('id')
             ->get();
 

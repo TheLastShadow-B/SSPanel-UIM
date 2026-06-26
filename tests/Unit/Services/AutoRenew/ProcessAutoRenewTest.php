@@ -233,6 +233,39 @@ it('balance short but the card succeeds: renews to active, invoice paid_gateway'
     expect((new Order())->where('subscription_id', $sub->id)->first()->status)->toBe('activated');
 });
 
+it('does not auto-retry a subscription already in its grace window (no re-charge during grace)', function () {
+    // Already IN grace: end_date in the past, grace_until in the FUTURE, invoice still unpaid.
+    // D7 (宽限内不自动重试) + D8 (single failure email) require this sub be SKIPPED on the daily
+    // run — otherwise it re-runs the whole balance->card waterfall (re-charging the card and
+    // re-sending the failure email) every day until the grace window expires.
+    $past = Carbon::today()->subDays(2)->format('Y-m-d');
+    $graceUntil = Carbon::parse($past)->addDays(3)->format('Y-m-d H:i:s'); // still in the future
+
+    $user = makeUserWithMoney(10.0, class: 2, classExpire: $graceUntil);
+    $sub = makeSub($user, renewalPrice: 30.0, endDate: $past, status: 'pending_renewal', autoRenew: 1, graceUntil: $graceUntil);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+
+    // A stored card that WOULD succeed if the waterfall ran — this proves the grace guard,
+    // not the card. If the sub were (wrongly) re-selected, balance is short -> the card path
+    // would charge it.
+    $fake = fakeCardStripe('pm_card_1', 'succeeded');
+    StripeService::setInstance($fake);
+
+    ob_start();
+    SubscriptionService::processAutoRenew();
+    ob_get_clean();
+
+    // The grace guard excluded it from the selector: no charge attempted...
+    expect($fake->chargeCalls)->toHaveCount(0);
+    // ...no balance deducted...
+    expect((new User())->find($user->id)->money)->toBe(10.0);
+    // ...and status / grace_until / invoice all unchanged.
+    $freshSub = (new Subscription())->find($sub->id);
+    expect($freshSub->status)->toBe('pending_renewal');
+    expect($freshSub->grace_until)->toBe($graceUntil);
+    expect((new Invoice())->find($inv->id)->status)->toBe('unpaid');
+});
+
 it('balance short and the card is declined: enters grace, not downgraded', function () {
     $today = Carbon::today()->format('Y-m-d');
     $user = makeUserWithMoney(10.0, class: 2, classExpire: $today . ' 23:59:59');
