@@ -835,8 +835,10 @@ final class SubscriptionService
 
             $invoice = (new Invoice())->where('order_id', $order->id)->first();
 
-            // 宽限内已支付 → 跳过，留给正常激活链。
-            if ($invoice === null || $invoice->status !== 'unpaid') {
+            // 宽限内已“足额”支付 → 跳过，留给正常激活链（这些订阅已是 active，不在本选择器内）。
+            // unpaid 与 partially_paid 均视为仍欠费：partially_paid 也必须终止，否则部分付款即可
+            // 永久白嫖服务；按站点不退款政策，已付部分作废。
+            if ($invoice === null || ! in_array($invoice->status, ['unpaid', 'partially_paid'], true)) {
                 continue;
             }
 

@@ -112,6 +112,33 @@ it('terminateLapsed terminates a lapsed sub: voids order+invoice, expires sub, d
     expect($queued->template)->toBe('subscription_expired.tpl');
 });
 
+it('terminateLapsed terminates a lapsed sub whose renewal invoice is only partially paid', function () {
+    // A partially_paid invoice is still OWED. If terminateLapsed skipped it (status !== 'unpaid'),
+    // the sub would keep service forever on a partial payment. Per the no-refund policy the partial
+    // amount is forfeited and the sub is terminated like an unpaid one.
+    $user = makeUserWithMoney(0.0, class: 3);
+    $gracePast = Carbon::now()->subDay()->format('Y-m-d H:i:s');
+    $sub = makeSub($user, status: 'pending_renewal', autoRenew: 1, graceUntil: $gracePast);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+    $order = (new Order())->where('subscription_id', $sub->id)->first();
+    $inv->status = 'partially_paid';
+    $inv->save();
+
+    ob_start();
+    SubscriptionService::terminateLapsed();
+    ob_get_clean();
+
+    expect((new Subscription())->find($sub->id)->status)->toBe('expired');
+
+    $freshUser = (new User())->find($user->id);
+    expect((int) $freshUser->class)->toBe(0);
+    expect((int) $freshUser->transfer_enable)->toBe(0);
+
+    // Order + invoice voided so the lapsed invoice can no longer be paid.
+    expect((new Invoice())->find($inv->id)->status)->toBe('cancelled');
+    expect((new Order())->find($order->id)->status)->toBe('cancelled');
+});
+
 it('terminateLapsed skips when the invoice was paid within the grace window', function () {
     $user = makeUserWithMoney(0.0, class: 3);
     $gracePast = Carbon::now()->subDay()->format('Y-m-d H:i:s');
