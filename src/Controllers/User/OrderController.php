@@ -392,6 +392,12 @@ final class OrderController extends BaseController
         $orderContent['billing_cycle_selected'] = $billingCycle;
         $orderContent['name'] = $product->name;
 
+        // 是否走 Stripe 自动续费（仅在主开关开启时生效，否则回退到人工/余额路径）
+        $autoRenewProvider = $this->antiXss->xss_clean($request->getParam('auto_renew_provider'));
+        $isStripe = $autoRenewProvider === 'stripe'
+            && (bool) \App\Models\Config::obtain('stripe_auto_billing_enabled');
+        $billingProvider = $isStripe ? 'stripe' : 'manual';
+
         // 创建订单
         $order = new Order();
         $order->user_id = $user->id;
@@ -403,6 +409,7 @@ final class OrderController extends BaseController
         $order->coupon = $couponCode;
         $order->price = $buyPrice;
         $order->status = $buyPrice === 0.0 ? 'pending_activation' : 'pending_payment';
+        $order->billing_provider = $billingProvider;
         $order->create_time = time();
         $order->update_time = time();
         $order->save();
@@ -435,6 +442,7 @@ final class OrderController extends BaseController
         $invoice->content = json_encode($invoiceContent);
         $invoice->price = $buyPrice;
         $invoice->status = $buyPrice === 0.0 ? 'paid_gateway' : 'unpaid';
+        $invoice->billing_provider = $billingProvider;
         $invoice->create_time = time();
         $invoice->update_time = time();
         $invoice->pay_time = 0;
@@ -450,6 +458,28 @@ final class OrderController extends BaseController
 
         if ($couponService !== null) {
             $couponService->incrementUseCount();
+        }
+
+        if ($isStripe) {
+            // 解析（创建/复用）周期对应的 recurring Price，币种换算在创建时锁定。
+            $resolved = \App\Services\Stripe\PriceResolver::resolve($product, $billingCycle);
+
+            // 不传 payment_method_types（动态支付方式）；mode 在 StripeService 内固定为 subscription。
+            $session = \App\Services\Stripe\StripeService::getInstance()->createSubscriptionCheckout(
+                $user,
+                $resolved['price_id'],
+                [
+                    'sspanel_user_id' => (string) $user->id,
+                    'product_id' => (string) $product->id,
+                    'billing_cycle' => $billingCycle,
+                    'order_id' => (string) $order->id,
+                    'invoice_id' => (string) $invoice->id,
+                ],
+                $_ENV['baseUrl'] . '/user/invoice/' . $invoice->id . '/view?checkout=success',
+                $_ENV['baseUrl'] . '/user/invoice/' . $invoice->id . '/view?canceled=1',
+            );
+
+            return $response->withHeader('HX-Redirect', $session->url);
         }
 
         return $response->withHeader('HX-Redirect', '/user/invoice/' . $invoice->id . '/view');

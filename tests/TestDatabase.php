@@ -171,6 +171,22 @@ class TestDatabase
             });
         }
 
+        if (!$schema->hasTable('product')) {
+            $schema->create('product', function (Blueprint $table) {
+                $table->increments('id');
+                $table->string('type');
+                $table->string('name');
+                $table->decimal('price', 12, 2)->default(0);
+                $table->text('content');
+                $table->text('limit');
+                $table->integer('status')->default(1);
+                $table->integer('create_time')->default(0);
+                $table->integer('update_time')->default(0);
+                $table->integer('sale_count')->default(0);
+                $table->integer('stock')->default(0);
+            });
+        }
+
         if (!$schema->hasTable('order')) {
             $schema->create('order', function (Blueprint $table) {
                 $table->increments('id');
@@ -244,7 +260,7 @@ class TestDatabase
         $capsule = DB::getCapsule();
         $schema = $capsule->schema();
         
-        $tables = ['stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
+        $tables = ['stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'product', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
         
         foreach ($tables as $table) {
             if ($schema->hasTable($table)) {
