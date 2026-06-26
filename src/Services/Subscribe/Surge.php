@@ -342,12 +342,11 @@ final class Surge extends Base
      */
     private function buildProxyGroups(array $regions): array
     {
-        $lines = [];
-
         // Regional groups — empty region falls back to DIRECT so Surge never references an empty group.
+        $region_lines = [];
         foreach (['HK', 'JP', 'US', 'TW'] as $region) {
             $members = $regions[$region] === [] ? ['DIRECT'] : $regions[$region];
-            $lines[] = $region . ' = select, ' . implode(', ', $members);
+            $region_lines[] = $region . ' = select, ' . implode(', ', $members);
         }
 
         // Global — dynamic membership, only includes regions with at least one real node.
@@ -360,13 +359,6 @@ final class Surge extends Base
         if ($global_members === []) {
             $global_members = ['DIRECT'];
         }
-        $lines[] = 'Global = select, ' . implode(', ', $global_members);
-
-        // Default Routing — top-level toggle.
-        $lines[] = 'Default Routing = select, Global, DIRECT, REJECT';
-
-        // Apple & MS — user may override to direct.
-        $lines[] = 'Apple & MS = select, Default Routing, Global, DIRECT';
 
         // AI Services — US + JP only, with empty-side fallback.
         $ai_members = [];
@@ -379,6 +371,17 @@ final class Surge extends Base
         if ($ai_members === []) {
             $ai_members = ['DIRECT'];
         }
+
+        // Emit order: Default Routing first, Global second, then regional groups,
+        // Apple & MS, and AI Services. Surge resolves references across the whole
+        // section, so citing Global / regions defined further down is fine.
+        $lines = [];
+        $lines[] = 'Default Routing = select, Global, DIRECT, REJECT';
+        $lines[] = 'Global = select, ' . implode(', ', $global_members);
+        foreach ($region_lines as $region_line) {
+            $lines[] = $region_line;
+        }
+        $lines[] = 'Apple & MS = select, Default Routing, Global, DIRECT';
         $lines[] = 'AI Services = select, ' . implode(', ', $ai_members);
 
         return $lines;
