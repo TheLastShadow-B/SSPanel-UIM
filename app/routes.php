@@ -88,6 +88,13 @@ return static function (Slim\App $app): void {
         $group->post('/giftcard', App\Controllers\User\MoneyController::class . ':applyGiftCard');
         // 订阅管理
         $group->get('/subscription', App\Controllers\User\SubscriptionController::class . ':index');
+        // 支付方式（保存信用卡，供自动续费卡片回退使用）
+        $group->get('/payment-method', App\Controllers\User\PaymentMethodController::class . ':index');
+        $group->post(
+            '/payment-method/setup-intent',
+            App\Controllers\User\PaymentMethodController::class . ':createSetupIntent'
+        );
+        $group->post('/payment-method/detach', App\Controllers\User\PaymentMethodController::class . ':detach');
         // 产品页面
         $group->get('/product', App\Controllers\User\ProductController::class . ':index');
         // 订单页面

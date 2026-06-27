@@ -8,7 +8,9 @@ use App\Models\Config;
 use App\Models\User;
 use Stripe\Checkout\Session;
 use Stripe\Collection;
+use Stripe\Exception\ApiErrorException;
 use Stripe\PaymentIntent;
+use Stripe\PaymentMethod;
 use Stripe\SetupIntent;
 use Stripe\StripeClient;
 use Stripe\Subscription;
@@ -172,6 +174,30 @@ class StripeService
         $this->client()->customers->update($customerId, [
             'invoice_settings' => ['default_payment_method' => $paymentMethodId],
         ]);
+    }
+
+    /**
+     * Retrieve a payment method (for its brand/last4 card summary), or null when
+     * Stripe can't resolve it — so the payment-method page degrades gracefully
+     * instead of 500ing on a transient API hiccup.
+     */
+    public function retrievePaymentMethod(string $paymentMethodId): ?PaymentMethod
+    {
+        try {
+            return $this->client()->paymentMethods->retrieve($paymentMethodId);
+        } catch (ApiErrorException) {
+            return null;
+        }
+    }
+
+    /**
+     * Detach a payment method from its customer. Detaching the customer's default
+     * payment method also clears it from invoice_settings.default_payment_method
+     * on Stripe's side, so the renewal engine's card fallback finds no card.
+     */
+    public function detachPaymentMethod(string $paymentMethodId): void
+    {
+        $this->client()->paymentMethods->detach($paymentMethodId);
     }
 
     public function cancelAtPeriodEnd(string $subscriptionId): void
