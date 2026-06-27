@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Config;
 use App\Models\EmailQueue;
 use App\Models\Invoice;
 use App\Models\Order;
@@ -13,7 +14,16 @@ use Tests\TestDatabase;
 
 require_once __DIR__ . '/AutoRenewHelpers.php';
 
-beforeEach(fn () => TestDatabase::init());
+beforeEach(function () {
+    TestDatabase::init();
+
+    // Master switch ON: expireSubscription then leaves auto_renew=1 subs to the
+    // waterfall (its OFF-switch widening is covered by MasterSwitchGateTest).
+    Config::query()->updateOrInsert(
+        ['item' => 'stripe_auto_billing_enabled'],
+        ['value' => '1', 'class' => 'billing', 'type' => 'bool']
+    );
+});
 afterEach(fn () => TestDatabase::dropTables());
 
 /*

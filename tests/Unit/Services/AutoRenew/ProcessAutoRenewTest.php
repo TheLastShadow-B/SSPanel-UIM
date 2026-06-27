@@ -31,6 +31,12 @@ beforeEach(function () {
     TestDatabase::init();
     ensureUserMoneyLogTable();
 
+    // Master switch ON so the engine actually runs (it now no-ops when this is OFF;
+    // the gate itself is covered by MasterSwitchGateTest).
+    Config::query()->updateOrInsert(
+        ['item' => 'stripe_auto_billing_enabled'],
+        ['value' => '1', 'class' => 'billing', 'type' => 'bool']
+    );
     Config::query()->updateOrInsert(
         ['item' => 'stripe_currency'],
         ['value' => 'USD', 'class' => 'billing', 'type' => 'string']
