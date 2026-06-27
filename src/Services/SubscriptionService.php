@@ -739,6 +739,14 @@ final class SubscriptionService
      */
     public static function processAutoRenew(): void
     {
+        // 主开关守卫（B5）：管理员关闭 stripe_auto_billing_enabled 时整条引擎熔断——
+        // 不扣余额、不走存档卡、不进宽限，干净地一键停机。到期的 auto_renew=1 订阅改由
+        // expireSubscription 在主开关关闭时一并自然过期兜底，不会被卡死（见该方法）。
+        if (! (bool) Config::obtain('stripe_auto_billing_enabled')) {
+            echo Tools::toDateTime(time()) . ' 自动续费主开关已关闭，跳过自动续费处理' . PHP_EOL;
+            return;
+        }
+
         $today = Carbon::today()->format('Y-m-d');
 
         $subscriptions = (new Subscription())
@@ -821,18 +829,27 @@ final class SubscriptionService
     /**
      * 自然过期处理（每日执行）。
      *
-     * 仅处理用户已取消自动续费(auto_renew=0)、已到期(end_date <= today，'<=' 兼容漏跑当日)的
-     * pending_renewal 订阅；auto_renew=1 的到期订阅交由 processAutoRenew / 宽限期 / terminateLapsed 处理。
+     * 处理已到期(end_date <= today，'<=' 兼容漏跑当日)的自管 pending_renewal 订阅：
+     *   - 主开关 ON：仅处理用户已取消自动续费(auto_renew=0)的订阅；auto_renew=1 的到期订阅交由
+     *     processAutoRenew / 宽限期 / terminateLapsed 处理。
+     *   - 主开关 OFF（B5）：processAutoRenew 已熔断，故 auto_renew=1 的到期订阅若不在此兜底会被
+     *     永久卡死。此时放开 auto_renew 过滤，连同 auto_renew=1 一并自然过期（用户回退到手动续费
+     *     或自然失效），避免管理员关闭功能后遗留一批悬空订阅。
      */
     public static function expireSubscription(): void
     {
         $today = Carbon::today()->format('Y-m-d');
 
-        $subscriptions = (new Subscription())->where('status', 'pending_renewal')
+        $query = (new Subscription())->where('status', 'pending_renewal')
             ->where('end_date', '<=', $today)
-            ->where('auto_renew', 0)
-            ->whereIn('billing_provider', self::SELF_MANAGED)
-            ->get();
+            ->whereIn('billing_provider', self::SELF_MANAGED);
+
+        // 主开关 ON 时只过期 auto_renew=0；OFF 时不加 auto_renew 过滤，auto_renew=1 也一并过期。
+        if ((bool) Config::obtain('stripe_auto_billing_enabled')) {
+            $query->where('auto_renew', 0);
+        }
+
+        $subscriptions = $query->get();
 
         foreach ($subscriptions as $subscription) {
             // 检查续费订单是否仍未支付
