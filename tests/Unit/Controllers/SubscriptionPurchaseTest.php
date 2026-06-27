@@ -244,7 +244,10 @@ it('settles a subscription purchase from balance, then activation creates a manu
     expect((float) $log->amount)->toBe(-10.0);
 
     // The existing 5-min activation chain creates the Subscription.
+    // (Buffer the cron's progress echoes: the suite is strict about test output.)
+    ob_start();
     SubscriptionService::processNewSubscriptionActivation();
+    ob_get_clean();
 
     $sub = (new Subscription())->where('user_id', $user->id)->first();
     expect($sub)->not->toBeNull();
