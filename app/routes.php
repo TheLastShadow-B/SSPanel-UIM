@@ -88,6 +88,8 @@ return static function (Slim\App $app): void {
         $group->post('/giftcard', App\Controllers\User\MoneyController::class . ':applyGiftCard');
         // 订阅管理
         $group->get('/subscription', App\Controllers\User\SubscriptionController::class . ':index');
+        $group->post('/subscription/cancel', App\Controllers\User\SubscriptionController::class . ':cancelAutoRenew');
+        $group->post('/subscription/enable', App\Controllers\User\SubscriptionController::class . ':enableAutoRenew');
         // 支付方式（保存信用卡，供自动续费卡片回退使用）
         $group->get('/payment-method', App\Controllers\User\PaymentMethodController::class . ':index');
         $group->post(

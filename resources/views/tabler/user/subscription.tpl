@@ -105,8 +105,44 @@
                                             <td class="text-secondary">续费价格</td>
                                             <td>{$subscription->renewal_price} 元</td>
                                         </tr>
+                                        <tr>
+                                            <td class="text-secondary">自动续费</td>
+                                            <td>
+                                                {if $subscription->auto_renew}
+                                                    <span class="badge bg-success-lt">
+                                                        <i class="ti ti-refresh icon me-1"></i>
+                                                        已开启
+                                                    </span>
+                                                {else}
+                                                    <span class="badge bg-secondary-lt">
+                                                        <i class="ti ti-refresh-off icon me-1"></i>
+                                                        已关闭
+                                                    </span>
+                                                {/if}
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
+                            </div>
+                            <div class="card-footer">
+                                <div id="auto-renew-error" class="text-danger mb-2" style="display:none;"></div>
+                                {if $subscription->auto_renew}
+                                    <button id="auto-renew-toggle" type="button"
+                                            class="btn btn-outline-danger"
+                                            data-action="/user/subscription/cancel">
+                                        <i class="icon ti ti-x"></i>
+                                        取消自动续费
+                                    </button>
+                                    <span class="text-secondary ms-2">取消后订阅将在当前周期结束后过期，不再自动扣费。</span>
+                                {else}
+                                    <button id="auto-renew-toggle" type="button"
+                                            class="btn btn-primary"
+                                            data-action="/user/subscription/enable">
+                                        <i class="icon ti ti-refresh"></i>
+                                        开启自动续费
+                                    </button>
+                                    <span class="text-secondary ms-2">开启后订阅到期时将自动从余额或已存信用卡续费扣款。</span>
+                                {/if}
                             </div>
                         </div>
                     {/if}
@@ -114,5 +150,46 @@
             </div>
         </div>
     </div>
+
+    {literal}
+    <script>
+    (function () {
+        const btn = document.getElementById('auto-renew-toggle');
+        if (!btn) { return; }
+        const errBox = document.getElementById('auto-renew-error');
+
+        // POST to the server-derived endpoint (cancel/enable); the controller
+        // acts only on the authenticated user's own subscription — no id is sent.
+        btn.addEventListener('click', async function () {
+            btn.disabled = true;
+            if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+            try {
+                const resp = await fetch(btn.dataset.action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}'
+                });
+                const data = await resp.json();
+                if (data.ret === 1) {
+                    // Refresh so the server re-renders the new auto-renew status.
+                    window.location.reload();
+                } else {
+                    if (errBox) {
+                        errBox.textContent = data.msg || '操作失败，请稍后再试。';
+                        errBox.style.display = 'block';
+                    }
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                if (errBox) {
+                    errBox.textContent = '网络错误，请稍后再试。';
+                    errBox.style.display = 'block';
+                }
+                btn.disabled = false;
+            }
+        });
+    })();
+    </script>
+    {/literal}
 
     {include file='user/footer.tpl'}
