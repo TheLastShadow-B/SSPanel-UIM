@@ -146,6 +146,39 @@ it('still settles a genuinely unpaid invoice from balance (guard does not over-b
     expect((new Invoice())->find($invoice->id)->status)->toBe('paid_balance');
 });
 
+it('aborts and deducts nothing when the invoice flips to processing under the deduction lock (race seam)', function () {
+    // P1 double-charge race: a request reads the invoice as 'unpaid' (passes the top guard), but a
+    // concurrent off-session card charge (chargeRenewalToCard) claims it 'unpaid' -> 'processing'
+    // BEFORE this request deducts. Settling from the stale in-memory read would charge the renewal
+    // twice. The fix re-reads the invoice under lockForUpdate INSIDE the deduction transaction and
+    // re-checks payability there; if it is no longer payable it must abort and move no money.
+    //
+    // We model the concurrent claim deterministically with a beforeExecuting hook that flips the row
+    // to 'processing' exactly when the locked re-read (SELECT ... FOR UPDATE) is about to run — i.e.
+    // strictly between the initial unlocked read and the in-lock deduction.
+    $user = payGuardUser(100.0);
+    $invoice = payGuardInvoice($user, 'unpaid', 30.0);
+
+    $flipped = false;
+    DB::getCapsule()->getConnection()->beforeExecuting(
+        function ($query, $bindings, $connection) use (&$flipped, $invoice) {
+            if (! $flipped && stripos($query, 'for update') !== false && stripos($query, 'invoice') !== false) {
+                $flipped = true;
+                $connection->update('update `invoice` set `status` = ? where `id` = ?', ['processing', $invoice->id]);
+            }
+        }
+    );
+
+    $response = payGuardCall($user, $invoice->id);
+
+    $body = json_decode((string) $response->getBody(), true);
+    expect($body['ret'])->toBe(0);
+
+    // Nothing deducted; the invoice is left 'processing' for the card path to settle or release.
+    expect((float) (new User())->find($user->id)->money)->toBe(100.0);
+    expect((new Invoice())->find($invoice->id)->status)->toBe('processing');
+});
+
 it('accepts completing a partially_paid invoice from balance (still payable, not over-blocked)', function () {
     // A partially_paid invoice is still payable: view.tpl renders an active 余额支付
     // button for it, and Gateway/Base + Cron::processPendingOrder both treat it as
