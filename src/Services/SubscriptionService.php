@@ -110,6 +110,9 @@ final class SubscriptionService
             $subscription->last_reset_date = $today->format('Y-m-d');
             $subscription->status = 'active';
             $subscription->billing_provider = 'manual';
+            // 自动续费默认开启（opt-out）：新激活的订阅一律 auto_renew=1，由自建引擎在到期时
+            // 按「余额优先 → 存档卡 → 宽限」续费，用户可在订阅页主动取消。
+            $subscription->auto_renew = 1;
             $subscription->created_at = $today->format('Y-m-d H:i:s');
             $subscription->updated_at = $today->format('Y-m-d H:i:s');
             $subscription->save();
