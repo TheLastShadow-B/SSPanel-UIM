@@ -172,7 +172,15 @@ final class Stripe extends Base
         $object = $event->data->object;
 
         if ($event->type === 'payment_intent.succeeded' && $object->status === 'succeeded') {
-            $this->postPayment($object->metadata->trade_no);
+            $tradeNo = $object->metadata->trade_no ?? null;
+
+            // Off-session self-managed renewal PaymentIntents (SubscriptionService::chargeRenewalToCard)
+            // carry only metadata.invoice_id — no trade_no — and are already settled inline by the
+            // auto-renew cron. There is no Paylist to advance, so a missing/empty trade_no is a handled
+            // no-op: calling postPayment(null) would TypeError -> 500 -> Stripe retry loop.
+            if ($tradeNo !== null && $tradeNo !== '') {
+                $this->postPayment($tradeNo);
+            }
 
             return $response->withStatus(204);
         }
