@@ -518,9 +518,14 @@ final class SubscriptionService
      * 不再要求 product_content 携带 bandwidth）→ 认领 → CNY renewal_price 经 Exchange 换成
      * stripe_currency 转最小单位、带幂等键扣款。PI status==='succeeded' → 在一个事务内对账单加锁、
      * 复核仍为 processing 后标 paid_gateway、记 subscription.stripe_amount/stripe_currency、并原子收尾
-     * （订单置 activated + 推进周期，见 finalizeRenewal），返回 true。任何失败（卡被拒、Stripe API、FX 抛
-     * GuzzleException/RedisException、PI 非 succeeded）一律：把账单从 processing 回滚为 unpaid（宽限内
-     * 用户仍可自行支付）后返回 false，捕获 \Throwable 绝不抛出，以便上层据此进入宽限期。
+     * （订单置 activated + 推进周期，见 finalizeRenewal），返回 true。失败一律返回 false（捕获 \Throwable
+     * 绝不抛出，以便上层据此进入宽限期），但 processing 认领是否回滚分两类（修复「扣款成功却被回滚」）：
+     *   - 确定性失败（已知未扣款）→ 把账单从 processing 回滚为 unpaid，宽限内用户仍可自行支付：
+     *     ① 在 chargeOffSession 之前抛出的任何异常（FX 抛 GuzzleException/RedisException、取卡失败）；
+     *     ② Stripe 明确拒付（CardException）；③ PI 返回非 succeeded（如 requires_action）。
+     *   - 模糊失败（扣款可能已成功）→ 绝不回滚，保留 processing：ApiConnectionException 或 chargeOffSession
+     *     处/之后抛出的其它 ApiErrorException/\Throwable，扣款可能已在幂等键 renew_inv_{id} 下成功落地，
+     *     留给 stale-processing 重认领路径稍后以同一幂等键重试（Stripe 去重为单笔），避免「已扣款却进宽限」。
      */
     public static function chargeRenewalToCard(Subscription $sub, Invoice $invoice): bool
     {
@@ -532,6 +537,7 @@ final class SubscriptionService
 
         $stripe = StripeService::getInstance();
         $claimed = false;
+        $chargeAttempted = false;
 
         try {
             $customerId = $stripe->ensureCustomer($user);
@@ -587,6 +593,12 @@ final class SubscriptionService
             $fxAmount = Exchange::getInstance()->exchange((float) $sub->renewal_price, 'CNY', $currency);
             $amountMinor = PriceResolver::toMinorUnits((float) $fxAmount, $currency);
 
+            // From here on a charge has been ATTEMPTED: a failure thrown at/after this point may have
+            // left a SUCCEEDED PaymentIntent on Stripe's side (idempotency key renew_inv_{id}), so the
+            // catch must NOT blindly revert the claim. Anything thrown BEFORE here (FX/Redis/Guzzle,
+            // customer/payment-method lookup) cannot have charged, so reverting there is safe.
+            $chargeAttempted = true;
+
             $paymentIntent = $stripe->chargeOffSession(
                 $customerId,
                 $paymentMethodId,
@@ -630,10 +642,18 @@ final class SubscriptionService
 
             return true;
         } catch (\Throwable $e) {
-            // ANY failure (card declined, Stripe API, FX/Redis/Guzzle) -> no charge applied from the
-            // caller's standpoint -> false, so the waterfall falls through to grace. Release our
-            // claim (processing -> unpaid) first so the renewal stays payable during the grace window.
-            if ($claimed) {
+            // Release the claim (processing -> unpaid) ONLY when we KNOW no charge stands, so the
+            // renewal stays payable as the waterfall falls through to grace. That is true in exactly
+            // two cases:
+            //   1. the failure happened BEFORE the charge was attempted (FX/Redis/Guzzle, customer or
+            //      payment-method lookup) — no PaymentIntent was ever created; or
+            //   2. Stripe DEFINITIVELY declined the card (CardException) — the charge did not go through.
+            // For an AMBIGUOUS post-attempt failure — an ApiConnectionException, or any other
+            // ApiErrorException/\Throwable thrown at/after chargeOffSession — the charge MAY have
+            // succeeded under the renew_inv_{id} idempotency key, so we must NOT revert: leaving the
+            // invoice 'processing' lets the stale-processing reclaim path retry later under the SAME
+            // key (Stripe dedupes to a single charge) instead of entering grace on a charged renewal.
+            if ($claimed && (! $chargeAttempted || $e instanceof \Stripe\Exception\CardException)) {
                 self::releaseRenewalClaim((int) $invoice->id);
             }
 

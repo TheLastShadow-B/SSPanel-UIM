@@ -387,3 +387,53 @@ it('does NOT reclaim a FRESH processing invoice (another worker owns the in-flig
     expect((new Invoice())->find($inv->id)->status)->toBe('processing');
     expect((new Subscription())->find($sub->id)->stripe_amount)->toBeNull();
 });
+
+it('does NOT revert the claim on an AMBIGUOUS ApiConnectionException (charge may have succeeded)', function () {
+    // A connection drop thrown FROM chargeOffSession may mean the PaymentIntent create actually
+    // SUCCEEDED under the renew_inv_{id} idempotency key. Reverting processing -> unpaid here would
+    // let processAutoRenew enter grace on a charged renewal (charged-but-unpaid, no service). The
+    // claim must STAY 'processing' so the stale-processing reclaim path retries later under the SAME
+    // idempotency key (Stripe dedupes to a single real charge).
+    $user = makeUserWithMoney(0.0);
+    $sub = makeSub($user, renewalPrice: 30.0);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+
+    $apiConn = \Stripe\Exception\ApiConnectionException::factory('Could not connect to Stripe.');
+    StripeService::setInstance(fakeCardStripe('pm_card_1', $apiConn));
+
+    ob_start();
+    $result = SubscriptionService::chargeRenewalToCard($sub, $inv);
+    ob_get_clean();
+
+    expect($result)->toBeFalse();
+    // NOT reverted — left processing for the stale-reclaim retry (the whole point of this fix).
+    expect((new Invoice())->find($inv->id)->status)->toBe('processing');
+    expect((new Subscription())->find($sub->id)->stripe_amount)->toBeNull();
+});
+
+it('DOES revert the claim to unpaid on a DEFINITIVE CardException decline (no charge stands)', function () {
+    // A CardException is Stripe DEFINITIVELY declining: no charge stands, so revert processing ->
+    // unpaid and fall through to grace with the renewal still payable by the user.
+    $user = makeUserWithMoney(0.0);
+    $sub = makeSub($user, renewalPrice: 30.0);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+
+    $declined = \Stripe\Exception\CardException::factory(
+        'Your card was declined.',
+        402,
+        null,
+        null,
+        null,
+        'card_declined',
+        'card_declined'
+    );
+    StripeService::setInstance(fakeCardStripe('pm_card_1', $declined));
+
+    ob_start();
+    $result = SubscriptionService::chargeRenewalToCard($sub, $inv);
+    ob_get_clean();
+
+    expect($result)->toBeFalse();
+    expect((new Invoice())->find($inv->id)->status)->toBe('unpaid');
+    expect((new Subscription())->find($sub->id)->stripe_amount)->toBeNull();
+});
