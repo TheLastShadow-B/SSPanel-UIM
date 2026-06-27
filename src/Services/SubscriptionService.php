@@ -693,7 +693,8 @@ final class SubscriptionService
      *
      * 先把状态落库：grace_until = end_date + grace_days（默认 3，'Y-m-d H:i:s'）、订阅置
      * pending_renewal、用户 class_expire 延到 grace_until 保活——状态变更绝不被发信影响。
-     * 状态保存后再尝试发送续费失败邮件，模板缺失/渠道异常一律被 try/catch 吞掉。
+     * 状态保存后再尝试发送续费失败邮件（正文附上本订阅未支付续费账单的支付链接，找不到账单时
+     * 优雅省略），模板缺失/渠道异常一律被 try/catch 吞掉。
      */
     public static function enterGrace(Subscription $sub, User $user): void
     {
@@ -715,11 +716,38 @@ final class SubscriptionService
         $user->class_expire = $graceUntil;
         $user->save();
 
+        // 查找本订阅当前未支付的续费账单，给邮件正文附上支付链接，引导用户在宽限期内完成续费。
+        // 纯只读查询，绝不影响上面已落库的宽限状态；订单/账单缺失时优雅省略链接。
+        $payUrl = null;
+        $renewalOrder = (new Order())
+            ->where('subscription_id', $sub->id)
+            ->where('product_type', 'subscription')
+            ->whereNotIn('status', ['cancelled', 'expired', 'activated'])
+            ->orderByDesc('id')
+            ->first();
+
+        if ($renewalOrder !== null) {
+            $unpaidInvoice = (new Invoice())
+                ->where('order_id', $renewalOrder->id)
+                ->where('status', 'unpaid')
+                ->first();
+
+            if ($unpaidInvoice !== null) {
+                $payUrl = $_ENV['baseUrl'] . '/user/invoice/' . $unpaidInvoice->id . '/view';
+            }
+        }
+
+        $msg = '你好，本次自动续费扣款未能成功。为避免服务中断，已为你延长 ' . $graceDays
+            . ' 天宽限期，服务将持续至 ' . $graceUntil . '。';
+        $msg .= $payUrl !== null
+            ? '请在宽限期内 <a href="' . $payUrl . '">完成续费支付</a>，逾期订阅将到期失效。'
+            : '请在宽限期内登录账户完成续费支付，逾期订阅将到期失效。';
+
         try {
             Notification::notifyUser(
                 $user,
                 $_ENV['appName'] . '-订阅续费失败',
-                '你好，本次自动续费未能成功，请在 ' . $graceDays . ' 天内完成支付，否则订阅将到期失效。',
+                $msg,
                 'subscription_renewal_failed.tpl'
             );
         } catch (GuzzleException|ClientExceptionInterface|TelegramSDKException $e) {
