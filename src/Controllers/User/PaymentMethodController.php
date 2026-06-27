@@ -29,11 +29,14 @@ final class PaymentMethodController extends BaseController
     public function index(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $stripe = StripeService::getInstance();
-        $customerId = $stripe->ensureCustomer($this->user);
 
         $card = null;
 
         try {
+            // ensureCustomer may hit the Stripe API to CREATE a customer for a
+            // user lacking stripe_customer_id; keep it INSIDE the try so a
+            // failure degrades to "no saved card" rather than a 500.
+            $customerId = $stripe->ensureCustomer($this->user);
             $paymentMethodId = $stripe->getDefaultPaymentMethod($customerId);
 
             if ($paymentMethodId !== null) {
@@ -62,9 +65,12 @@ final class PaymentMethodController extends BaseController
     public function createSetupIntent(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $stripe = StripeService::getInstance();
-        $customerId = $stripe->ensureCustomer($this->user);
 
         try {
+            // ensureCustomer may hit the Stripe API to CREATE a customer for a
+            // user lacking stripe_customer_id; keep it INSIDE the try so an
+            // ApiErrorException returns handled JSON instead of an uncaught 500.
+            $customerId = $stripe->ensureCustomer($this->user);
             $setupIntent = $stripe->createSetupIntent($customerId, [
                 'sspanel_user_id' => (string) $this->user->id,
             ]);
@@ -84,9 +90,11 @@ final class PaymentMethodController extends BaseController
     public function detach(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $stripe = StripeService::getInstance();
-        $customerId = $stripe->ensureCustomer($this->user);
 
         try {
+            // ensureCustomer may hit the Stripe API to CREATE a customer; keep it
+            // INSIDE the try so a failure returns handled JSON instead of a 500.
+            $customerId = $stripe->ensureCustomer($this->user);
             // Server-derived: only ever THIS user's current default PM, never a
             // client-supplied id.
             $paymentMethodId = $stripe->getDefaultPaymentMethod($customerId);

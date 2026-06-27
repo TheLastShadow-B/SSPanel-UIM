@@ -200,6 +200,29 @@ it('createSetupIntent ignores any client-supplied customer/SetupIntent id (S5)',
     expect($fake->setupIntentCalls[0]['customerId'])->toBe('cus_real');
 });
 
+it('createSetupIntent returns handled ret:0 JSON when ensureCustomer fails (no uncaught 500)', function () {
+    seedPublishableKey('pk_test_fail');
+    // No stored customer id: ensureCustomer would hit the Stripe API to CREATE a
+    // customer — the failure mode P2 hardens against.
+    $user = makePmUser(null);
+    $GLOBALS['user'] = $user;
+
+    // Stub whose ensureCustomer raises a Stripe ApiErrorException (customer
+    // creation failure). The controller must catch it and degrade to handled
+    // JSON, never let it bubble into an uncaught 500.
+    StripeService::setInstance(new class (new StripeClient(['api_key' => 'sk_test_pm'])) extends StripeService {
+        public function ensureCustomer(User $user): string
+        {
+            throw new \Stripe\Exception\ApiConnectionException('Stripe unreachable');
+        }
+    });
+
+    $response = (new PaymentMethodController())->createSetupIntent(pmRequest([]), pmResponse(), []);
+
+    $json = json_decode((string) $response->getBody(), true);
+    expect($json['ret'])->toBe(0);
+});
+
 it('detach clears only the caller\'s current default PM (server-derived, never client-supplied)', function () {
     $user = makePmUser('cus_detach');
     $GLOBALS['user'] = $user;
