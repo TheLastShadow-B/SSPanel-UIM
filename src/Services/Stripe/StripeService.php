@@ -6,7 +6,6 @@ namespace App\Services\Stripe;
 
 use App\Models\Config;
 use App\Models\User;
-use Stripe\Collection;
 use Stripe\Exception\ApiErrorException;
 use Stripe\PaymentIntent;
 use Stripe\PaymentMethod;
@@ -107,19 +106,6 @@ class StripeService
         ]);
     }
 
-    public function setDefaultPaymentMethod(string $customerId, string $subscriptionId, string $paymentMethodId): void
-    {
-        $this->client()->paymentMethods->attach($paymentMethodId, ['customer' => $customerId]);
-
-        $this->client()->customers->update($customerId, [
-            'invoice_settings' => ['default_payment_method' => $paymentMethodId],
-        ]);
-
-        $this->client()->subscriptions->update($subscriptionId, [
-            'default_payment_method' => $paymentMethodId,
-        ]);
-    }
-
     /**
      * Customer's stored default payment method (invoice_settings.default_payment_method),
      * or null when none is set. The field may come back as a bare id string or an
@@ -138,8 +124,9 @@ class StripeService
     }
 
     /**
-     * Attach a payment method and set it as the customer's default. Unlike
-     * setDefaultPaymentMethod(), this does NOT touch any subscription.
+     * Attach a payment method and set it as the customer's default off-session
+     * payment method (used by the renewal engine's card fallback and the
+     * card-binding page). Does not touch any Stripe subscription.
      */
     public function setCustomerDefaultPaymentMethod(string $customerId, string $paymentMethodId): void
     {
@@ -172,10 +159,5 @@ class StripeService
     public function detachPaymentMethod(string $paymentMethodId): void
     {
         $this->client()->paymentMethods->detach($paymentMethodId);
-    }
-
-    public function listInvoices(string $customerId): Collection
-    {
-        return $this->client()->invoices->all(['customer' => $customerId]);
     }
 }
