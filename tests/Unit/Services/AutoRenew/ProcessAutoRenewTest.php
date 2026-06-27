@@ -287,3 +287,89 @@ it('balance short and the card is declined: enters grace, not downgraded', funct
     expect((new Invoice())->find($inv->id)->status)->toBe('unpaid');
     expect((int) (new User())->find($user->id)->class)->toBe(2);
 });
+
+it('feeds a partially_paid renewal invoice into the waterfall: both legs decline, enters grace', function () {
+    // Selector fix (D): a renewal invoice the user part-paid from balance is 'partially_paid', not
+    // 'unpaid'. The old selector only matched 'unpaid', so the sub never ran the waterfall, never
+    // entered grace and stayed stuck. It must now be selected; both legs require 'unpaid'
+    // (payRenewalFromBalance and chargeRenewalToCard's claim), so both decline -> enterGrace (and
+    // terminateLapsed already terminates partially_paid renewals once the grace window lapses).
+    $today = Carbon::today()->format('Y-m-d');
+    $user = makeUserWithMoney(10.0, class: 2, classExpire: $today . ' 23:59:59');
+    $sub = makeSub($user, renewalPrice: 30.0, endDate: $today, status: 'pending_renewal', autoRenew: 1);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+    $inv->status = 'partially_paid';
+    $inv->save();
+
+    // A stored card that WOULD succeed if the waterfall (wrongly) charged it — proves the
+    // partially_paid invoice is not chargeable and the path falls through to grace, not a charge.
+    $fake = fakeCardStripe('pm_card_1', 'succeeded');
+    StripeService::setInstance($fake);
+
+    ob_start();
+    SubscriptionService::processAutoRenew();
+    ob_get_clean();
+
+    $expectedGrace = Carbon::parse($today)->addDays(3)->format('Y-m-d H:i:s');
+    $freshSub = (new Subscription())->find($sub->id);
+    expect($freshSub->status)->toBe('pending_renewal');
+    expect($freshSub->grace_until)->toBe($expectedGrace);
+    // No leg settled it: no card charge, balance untouched, invoice still partially_paid.
+    expect($fake->chargeCalls)->toHaveCount(0);
+    expect((new User())->find($user->id)->money)->toBe(10.0);
+    expect((new Invoice())->find($inv->id)->status)->toBe('partially_paid');
+});
+
+it('reclaims a STALE processing renewal invoice (crashed mid-claim) and charges it', function () {
+    // Selector fix (D) + claim recovery: a prior off-session attempt claimed the invoice
+    // (unpaid -> processing) then crashed before settle/revert, leaving a STALE lease. The selector
+    // must re-feed it so chargeRenewalToCard reclaims and charges under the same idempotency key.
+    $today = Carbon::today()->format('Y-m-d');
+    $user = makeUserWithMoney(0.0, class: 2);
+    $sub = makeSub($user, renewalPrice: 30.0, endDate: $today, status: 'pending_renewal', autoRenew: 1);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+    $inv->status = 'processing';
+    $inv->update_time = time() - 3600; // stale (> 600s)
+    $inv->save();
+
+    $fake = fakeCardStripe('pm_card_1', 'succeeded');
+    StripeService::setInstance($fake);
+
+    ob_start();
+    SubscriptionService::processAutoRenew();
+    ob_get_clean();
+
+    // Selected + reclaimed + charged once under the renewal idempotency key.
+    expect($fake->chargeCalls)->toHaveCount(1);
+    expect($fake->chargeCalls[0]['idempotencyKey'])->toBe('renew_inv_' . $inv->id);
+    $freshSub = (new Subscription())->find($sub->id);
+    expect($freshSub->status)->toBe('active');
+    expect($freshSub->end_date)->toBe(expectedRenewEnd($today));
+    expect((new Invoice())->find($inv->id)->status)->toBe('paid_gateway');
+});
+
+it('does NOT select a FRESH processing renewal invoice (another worker owns the in-flight charge)', function () {
+    // Selector fix (D): a freshly claimed 'processing' invoice (recent update_time) belongs to a
+    // concurrent worker mid-charge. It must be EXCLUDED: no second charge, no grace, untouched.
+    $today = Carbon::today()->format('Y-m-d');
+    $user = makeUserWithMoney(50.0, class: 2);
+    $sub = makeSub($user, renewalPrice: 30.0, endDate: $today, status: 'pending_renewal', autoRenew: 1);
+    $inv = makeUnpaidRenewalInvoice($user, $sub, 30.0);
+    $inv->status = 'processing';
+    $inv->update_time = time(); // fresh (< 600s)
+    $inv->save();
+
+    $fake = fakeCardStripe('pm_card_1', 'succeeded');
+    StripeService::setInstance($fake);
+
+    ob_start();
+    SubscriptionService::processAutoRenew();
+    ob_get_clean();
+
+    expect($fake->chargeCalls)->toHaveCount(0);
+    expect((new User())->find($user->id)->money)->toBe(50.0);
+    $freshSub = (new Subscription())->find($sub->id);
+    expect($freshSub->status)->toBe('pending_renewal');
+    expect($freshSub->grace_until)->toBeNull();
+    expect((new Invoice())->find($inv->id)->status)->toBe('processing');
+});

@@ -728,7 +728,8 @@ final class SubscriptionService
      * 自动续费瀑布主流程（每日执行）。
      *
      * 选取自管(SELF_MANAGED)、auto_renew=1、已到期(end_date <= today，'<=' 兼容漏跑当日)、
-     * 状态为 active/pending_renewal 且存在 unpaid 续费账单的订阅；对每个依次尝试：
+     * 状态为 active/pending_renewal 且存在「可处理」续费账单(unpaid / partially_paid / 陈旧 processing，
+     * 排除新鲜 processing)的订阅；对每个依次尝试：
      *   1) 余额扣款成功 → 结算并原子推进周期
      *   2) 否则存档卡扣款成功 → 结算并原子推进周期
      *   3) 都失败 → 进入宽限期
@@ -774,10 +775,21 @@ final class SubscriptionService
                     continue;
                 }
 
-                // 订单对应的 unpaid 续费账单
+                // 订单对应的「可处理」续费账单：unpaid（正常瀑布）/ partially_paid（部分付款后两条腿都
+                // 要求 unpaid 故必失败 → 进宽限 → terminateLapsed 终止）/ 陈旧 processing（上一次认领后
+                // 在 settle 前崩溃，update_time 已超过 RENEWAL_CLAIM_STALE_SECONDS → chargeRenewalToCard
+                // 重认领并以同一幂等键重扣）。但要 EXCLUDE 新鲜 processing（另一并发 worker 正在扣款，归其所有）。
+                $staleBefore = time() - self::RENEWAL_CLAIM_STALE_SECONDS;
+
                 $invoice = (new Invoice())
                     ->where('order_id', $order->id)
-                    ->where('status', 'unpaid')
+                    ->where(static function ($query) use ($staleBefore): void {
+                        $query->whereIn('status', ['unpaid', 'partially_paid'])
+                            ->orWhere(static function ($sub) use ($staleBefore): void {
+                                $sub->where('status', 'processing')
+                                    ->where('update_time', '<', $staleBefore);
+                            });
+                    })
                     ->first();
 
                 if ($invoice === null) {
