@@ -56,9 +56,11 @@ final class WebhookHandler
             case 'customer.subscription.deleted':
                 $this->handleSubscriptionDeleted($event);
                 break;
+            case 'setup_intent.succeeded':
+                $this->handleSetupIntentSucceeded($event);
+                break;
             case 'customer.subscription.updated':
             case 'checkout.session.async_payment_failed':
-            case 'setup_intent.succeeded':
             default:
                 // Handled in later tasks / no-op for unknown types.
                 break;
@@ -428,6 +430,39 @@ final class WebhookHandler
         $subscription->save();
 
         $this->revokeAccessIfNoOtherActiveSubscription($user, (int) $subscription->id);
+    }
+
+    /**
+     * setup_intent.succeeded: a user saved a card via the self-service payment
+     * method page (an off_session SetupIntent). Bind that card as the customer's
+     * DEFAULT payment method so the renewal engine's card fallback
+     * (SubscriptionService::chargeRenewalToCard -> getDefaultPaymentMethod) can
+     * charge it off-session later. The webhook — NOT the client confirmSetup —
+     * is the source of truth for setting the default.
+     *
+     * S5: never trust client-supplied ids. The local user is resolved ONLY from
+     * the server-stored stripe_customer_id on the event. No-op if the event is
+     * missing the customer / payment method, or the customer maps to no local
+     * user. setCustomerDefaultPaymentMethod re-attaches the PM, which is a Stripe
+     * no-op for the already-attached SetupIntent card (idempotent on redelivery).
+     */
+    private function handleSetupIntentSucceeded(Event $event): void
+    {
+        $setupIntent = $event->data->object;
+        $customerId = $setupIntent->customer ?? null;
+        $paymentMethodId = $setupIntent->payment_method ?? null;
+
+        if ($customerId === null || $paymentMethodId === null) {
+            return;
+        }
+
+        $user = (new User())->where('stripe_customer_id', $customerId)->first();
+
+        if ($user === null) {
+            return;
+        }
+
+        StripeService::getInstance()->setCustomerDefaultPaymentMethod($customerId, $paymentMethodId);
     }
 
     private function revokeAccessIfNoOtherActiveSubscription(User $user, int $subscriptionId): void
