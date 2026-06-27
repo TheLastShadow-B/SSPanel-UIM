@@ -6,14 +6,12 @@ namespace App\Services\Stripe;
 
 use App\Models\Config;
 use App\Models\User;
-use Stripe\Checkout\Session;
 use Stripe\Collection;
 use Stripe\Exception\ApiErrorException;
 use Stripe\PaymentIntent;
 use Stripe\PaymentMethod;
 use Stripe\SetupIntent;
 use Stripe\StripeClient;
-use Stripe\Subscription;
 
 /**
  * Injectable wrapper around \Stripe\StripeClient.
@@ -72,30 +70,6 @@ class StripeService
         $user->save();
 
         return $customer->id;
-    }
-
-    public function createSubscriptionCheckout(
-        User $user,
-        string $priceId,
-        array $metadata,
-        string $successUrl,
-        string $cancelUrl
-    ): Session {
-        $customerId = $this->ensureCustomer($user);
-
-        // NOTE: deliberately NOT passing payment_method_types (dynamic payment methods).
-        return $this->client()->checkout->sessions->create([
-            'mode' => 'subscription',
-            'customer' => $customerId,
-            'line_items' => [
-                ['price' => $priceId, 'quantity' => 1],
-            ],
-            'subscription_data' => [
-                'metadata' => $metadata,
-            ],
-            'success_url' => $successUrl,
-            'cancel_url' => $cancelUrl,
-        ]);
     }
 
     public function createSetupIntent(string $customerId, array $metadata = []): SetupIntent
@@ -198,48 +172,6 @@ class StripeService
     public function detachPaymentMethod(string $paymentMethodId): void
     {
         $this->client()->paymentMethods->detach($paymentMethodId);
-    }
-
-    public function cancelAtPeriodEnd(string $subscriptionId): void
-    {
-        $this->client()->subscriptions->update($subscriptionId, [
-            'cancel_at_period_end' => true,
-        ]);
-    }
-
-    public function updateSubscriptionPrice(
-        string $subscriptionId,
-        string $newPriceId,
-        string $prorationBehavior
-    ): Subscription {
-        $subscription = $this->client()->subscriptions->retrieve($subscriptionId, []);
-        $itemId = $subscription->items->data[0]->id;
-
-        return $this->client()->subscriptions->update($subscriptionId, [
-            'items' => [
-                ['id' => $itemId, 'price' => $newPriceId],
-            ],
-            'proration_behavior' => $prorationBehavior,
-        ]);
-    }
-
-    public function createAlignedSubscription(
-        string $customerId,
-        string $priceId,
-        int $anchorTs,
-        string $defaultPaymentMethod,
-        array $metadata
-    ): Subscription {
-        return $this->client()->subscriptions->create([
-            'customer' => $customerId,
-            'items' => [
-                ['price' => $priceId],
-            ],
-            'billing_cycle_anchor' => $anchorTs,
-            'proration_behavior' => 'none',
-            'default_payment_method' => $defaultPaymentMethod,
-            'metadata' => $metadata,
-        ]);
     }
 
     public function listInvoices(string $customerId): Collection
