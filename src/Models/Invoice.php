@@ -37,6 +37,7 @@ final class Invoice extends Model
     {
         return match ($this->status) {
             'unpaid' => '未支付',
+            'processing' => '处理中',
             'paid_gateway' => '已支付（支付网关）',
             'paid_balance' => '已支付（账户余额）',
             'paid_admin' => '已支付（管理员）',

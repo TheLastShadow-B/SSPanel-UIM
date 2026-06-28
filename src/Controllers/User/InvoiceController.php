@@ -8,14 +8,17 @@ use App\Controllers\BaseController;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Paylist;
+use App\Models\User;
 use App\Models\UserMoneyLog;
 use App\Services\Coupon;
+use App\Services\DB;
 use App\Services\Payment;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function in_array;
 use function json_decode;
 use function json_encode;
 use function time;
@@ -95,6 +98,17 @@ final class InvoiceController extends BaseController
             ]);
         }
 
+        // 仅“可支付”状态可走余额支付：unpaid 与 partially_paid（部分支付后用余额补齐余款，
+        // view.tpl 为其渲染有效的余额支付按钮，Gateway/Base 与 Cron::processPendingOrder 也都
+        // 视其为仍待支付）。其余状态（作废/已过期/已支付，含被 terminateLapsed 取消的失效续费
+        // 账单）一律拒绝、绝不扣减余额——cancelled 仍被挡住，这正是“失效账单不可再支付”的强制点。
+        if (! in_array($invoice->status, ['unpaid', 'partially_paid'], true)) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '该账单当前状态不支持余额支付',
+            ]);
+        }
+
         $user = $this->user;
 
         if ($user->is_shadow_banned) {
@@ -124,48 +138,76 @@ final class InvoiceController extends BaseController
             }
         }
 
-        // 组合支付
-        if ($user->money > 0) {
-            $money_before = $user->money;
+        // 组合支付：把扣款落在一笔行锁事务里——锁内对账单 lockForUpdate 复读并复查仍「可支付」
+        // (unpaid/partially_paid) 后才扣款。修复 P1 双扣竞态：并发的存档卡自动续费 chargeRenewalToCard
+        // 会先用行锁把账单 unpaid -> processing「认领」；若本请求在顶部无锁读时还看到 unpaid、却在加锁
+        // 复查时账单已被认领(processing)或已结算，必须一分钱都不扣、直接报错返回(deduct nothing)。
+        // 镜像 SubscriptionService::payRenewalFromBalance 的锁模式。
+        $outcome = DB::transaction(function () use ($invoice): string {
+            $locked = (new Invoice())->where('id', $invoice->id)->lockForUpdate()->first();
 
-            if ($user->money >= $invoice->price) {
-                $paid = $invoice->price;
-                $invoice->status = 'paid_balance';
+            // 锁内复查：账单必须仍可支付，否则不扣款（已被认领为 processing/已结算/已作废）。
+            if ($locked === null || ! in_array($locked->status, ['unpaid', 'partially_paid'], true)) {
+                return 'not_payable';
+            }
+
+            $user = (new User())->where('id', $locked->user_id)->lockForUpdate()->first();
+
+            if ($user === null || (float) $user->money <= 0) {
+                return 'insufficient';
+            }
+
+            $money_before = (float) $user->money;
+
+            if ((float) $user->money >= (float) $locked->price) {
+                $paid = (float) $locked->price;
+                $locked->status = 'paid_balance';
             } else {
-                $paid = $user->money;
-                $invoice->status = 'partially_paid';
-                $invoice->price -= $paid;
-                $invoice_content = json_decode($invoice->content);
+                $paid = (float) $user->money;
+                $locked->status = 'partially_paid';
+                $locked->price -= $paid;
+                $invoice_content = json_decode($locked->content);
                 $invoice_content[] = [
                     'content_id' => count($invoice_content),
                     'name' => '余额部分支付',
                     'price' => '-' . $paid,
                 ];
-                $invoice->content = json_encode($invoice_content);
+                $locked->content = json_encode($invoice_content);
             }
 
             $user->money -= $paid;
             $user->save();
 
             (new UserMoneyLog())->add(
-                $user->id,
+                (int) $user->id,
                 $money_before,
                 (float) $user->money,
                 -$paid,
-                '支付账单 #' . $invoice->id
+                '支付账单 #' . $locked->id
             );
 
-            $invoice->update_time = time();
-            $invoice->pay_time = time();
-            $invoice->save();
-        } else {
+            $locked->update_time = time();
+            $locked->pay_time = time();
+            $locked->save();
+
+            return $locked->status === 'paid_balance' ? 'paid_full' : 'partial';
+        });
+
+        if ($outcome === 'not_payable') {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '该账单当前状态不支持余额支付',
+            ]);
+        }
+
+        if ($outcome === 'insufficient') {
             return $response->withJson([
                 'ret' => 0,
                 'msg' => '余额不足',
             ]);
         }
 
-        if ($invoice->status === 'paid_balance') {
+        if ($outcome === 'paid_full') {
             return $response->withHeader('HX-Redirect', '/user/invoice');
         }
 

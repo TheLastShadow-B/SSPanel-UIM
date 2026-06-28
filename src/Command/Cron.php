@@ -86,8 +86,10 @@ EOL;
             $jobs->resetTodayBandwidth();
 
             // Subscription daily jobs
-            SubscriptionService::expireSubscription();
             SubscriptionService::generateRenewalOrder();
+            SubscriptionService::processAutoRenew();
+            SubscriptionService::expireSubscription();
+            SubscriptionService::terminateLapsed();
             SubscriptionService::sendSecondRenewalNotification();
             SubscriptionService::resetSubscriptionBandwidth();
 

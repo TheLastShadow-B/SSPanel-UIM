@@ -64,4 +64,46 @@ final class SubscriptionController extends BaseController
                 ->fetch('user/subscription.tpl')
         );
     }
+
+    /**
+     * 用户取消自动续费（opt-out）。仅作用于调用者本人 active/pending_renewal 的订阅，
+     * 绝不接收请求传入的订阅 id。取消后订阅会跑完当前周期再由 expireSubscription 自然过期。
+     */
+    public function cancelAutoRenew(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        return $this->setAutoRenew($response, 0, '已取消自动续费，当前订阅周期结束后将不再续费');
+    }
+
+    /**
+     * 用户重新开启自动续费。仅作用于调用者本人 active/pending_renewal 的订阅。
+     */
+    public function enableAutoRenew(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        return $this->setAutoRenew($response, 1, '已开启自动续费');
+    }
+
+    /**
+     * 将调用者本人当前订阅的 auto_renew 置为给定值。无可操作订阅时优雅返回 ret:0。
+     */
+    private function setAutoRenew(Response $response, int $autoRenew, string $okMsg): ResponseInterface
+    {
+        $subscription = (new Subscription())->where('user_id', $this->user->id)
+            ->whereIn('status', ['active', 'pending_renewal'])
+            ->first();
+
+        if ($subscription === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '未找到可操作的订阅',
+            ]);
+        }
+
+        $subscription->auto_renew = $autoRenew;
+        $subscription->save();
+
+        return $response->withJson([
+            'ret' => 1,
+            'msg' => $okMsg,
+        ]);
+    }
 }

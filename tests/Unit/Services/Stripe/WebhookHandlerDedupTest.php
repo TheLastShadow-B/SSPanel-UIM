@@ -6,6 +6,14 @@ use App\Models\StripeEvent;
 use App\Services\Stripe\WebhookHandler;
 use Tests\TestDatabase;
 
+/*
+ * ---------------------------------------------------------------------------
+ * WebhookHandler dispatch framework: idempotency (stripe_event dedup) + routing
+ * of live setup_intent.succeeded and legacy native-subscription compatibility
+ * handlers.
+ * ---------------------------------------------------------------------------
+ */
+
 beforeEach(function () {
     TestDatabase::init();
 });
@@ -17,8 +25,8 @@ afterEach(function () {
 it('records the event id once and dedups a replay', function () {
     $event = \Stripe\Event::constructFrom([
         'id' => 'evt_dedup_1',
-        'type' => 'customer.subscription.updated',
-        'data' => ['object' => ['id' => 'sub_x', 'customer' => 'cus_x']],
+        'type' => 'some.dedup.event',
+        'data' => ['object' => ['id' => 'obj_x']],
     ]);
 
     $handler = new WebhookHandler();
@@ -43,24 +51,21 @@ it('records the event type for an unknown event without throwing', function () {
 
 it('routes known event types without throwing and records each once', function () {
     $types = [
-        'checkout.session.completed',
         'invoice.paid',
         'invoice.payment_failed',
         'invoice.payment_action_required',
         'customer.subscription.deleted',
-        'customer.subscription.updated',
         'setup_intent.succeeded',
     ];
 
     $handler = new WebhookHandler();
 
     foreach ($types as $i => $type) {
-        $event = \Stripe\Event::constructFrom([
+        $handler->handle(\Stripe\Event::constructFrom([
             'id' => 'evt_route_' . $i,
             'type' => $type,
             'data' => ['object' => ['id' => 'obj_' . $i]],
-        ]);
-        $handler->handle($event);
+        ]));
     }
 
     expect((new StripeEvent())->count())->toBe(count($types));
