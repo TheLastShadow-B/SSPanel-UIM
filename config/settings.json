@@ -99,6 +99,42 @@
         "mark": "Stripe maximum recharge amount"
     },
     {
+        "item": "stripe_publishable_key",
+        "value": "",
+        "class": "billing",
+        "is_public": 1,
+        "type": "string",
+        "default": "",
+        "mark": "Stripe Publishable Key"
+    },
+    {
+        "item": "stripe_auto_billing_enabled",
+        "value": "0",
+        "class": "billing",
+        "is_public": 0,
+        "type": "bool",
+        "default": "0",
+        "mark": "Stripe stored-card auto billing"
+    },
+    {
+        "item": "balance_auto_renew_enabled",
+        "value": "0",
+        "class": "billing",
+        "is_public": 0,
+        "type": "bool",
+        "default": "0",
+        "mark": "Balance auto renewal"
+    },
+    {
+        "item": "stripe_grace_days",
+        "value": "7",
+        "class": "billing",
+        "is_public": 0,
+        "type": "int",
+        "default": "7",
+        "mark": "Stripe auto billing grace days"
+    },
+    {
         "item": "stripe_card",
         "value": "0",
         "class": "billing",

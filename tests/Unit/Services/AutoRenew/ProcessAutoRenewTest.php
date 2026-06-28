@@ -31,10 +31,14 @@ beforeEach(function () {
     TestDatabase::init();
     ensureUserMoneyLogTable();
 
-    // Master switch ON so the engine actually runs (it now no-ops when this is OFF;
-    // the gate itself is covered by MasterSwitchGateTest).
+    // Both billing legs ON so this suite exercises the full balance -> card -> grace
+    // waterfall. Per-leg gates are covered by MasterSwitchGateTest.
     Config::query()->updateOrInsert(
         ['item' => 'stripe_auto_billing_enabled'],
+        ['value' => '1', 'class' => 'billing', 'type' => 'bool']
+    );
+    Config::query()->updateOrInsert(
+        ['item' => 'balance_auto_renew_enabled'],
         ['value' => '1', 'class' => 'billing', 'type' => 'bool']
     );
     Config::query()->updateOrInsert(

@@ -34,6 +34,21 @@ final class SubscriptionService
      */
     public const SELF_MANAGED = ['manual', 'balance'];
 
+    private static function balanceAutoRenewEnabled(): bool
+    {
+        return (bool) Config::obtain('balance_auto_renew_enabled');
+    }
+
+    private static function stripeAutoBillingEnabled(): bool
+    {
+        return (bool) Config::obtain('stripe_auto_billing_enabled');
+    }
+
+    private static function autoRenewEngineEnabled(): bool
+    {
+        return self::balanceAutoRenewEnabled() || self::stripeAutoBillingEnabled();
+    }
+
     /**
      * 计算订阅结束日期
      */
@@ -761,8 +776,8 @@ final class SubscriptionService
      * 选取自管(SELF_MANAGED)、auto_renew=1、已到期(end_date <= today，'<=' 兼容漏跑当日)、
      * 状态为 active/pending_renewal 且存在「可处理」续费账单(unpaid / partially_paid / 陈旧 processing，
      * 排除新鲜 processing)的订阅；对每个依次尝试：
-     *   1) 余额扣款成功 → 结算并原子推进周期
-     *   2) 否则存档卡扣款成功 → 结算并原子推进周期
+     *   1) 若余额自动续费开启，尝试余额扣款成功 → 结算并原子推进周期
+     *   2) 若 Stripe 自动扣费开启，尝试存档卡扣款成功 → 结算并原子推进周期
      *   3) 都失败 → 进入宽限期
      * 扣款方法在“结算的同一事务内”把续费订单置 activated 并 advanceRenewedPeriod 推进
      * （见 finalizeRenewal），因此本方法成功分支无需再动订单/周期。每个订阅各自包裹 try/catch：
@@ -770,11 +785,13 @@ final class SubscriptionService
      */
     public static function processAutoRenew(): void
     {
-        // 主开关守卫（B5）：管理员关闭 stripe_auto_billing_enabled 时整条引擎熔断——
-        // 不扣余额、不走存档卡、不进宽限，干净地一键停机。到期的 auto_renew=1 订阅改由
-        // expireSubscription 在主开关关闭时一并自然过期兜底，不会被卡死（见该方法）。
-        if (! (bool) Config::obtain('stripe_auto_billing_enabled')) {
-            echo Tools::toDateTime(time()) . ' 自动续费主开关已关闭，跳过自动续费处理' . PHP_EOL;
+        $balanceEnabled = self::balanceAutoRenewEnabled();
+        $stripeEnabled = self::stripeAutoBillingEnabled();
+
+        // 两条扣款腿都关闭时整条自动续费引擎熔断：不扣余额、不走存档卡、不进宽限。
+        // 到期的 auto_renew=1 订阅改由 expireSubscription 一并自然过期兜底，不会被卡死。
+        if (! $balanceEnabled && ! $stripeEnabled) {
+            echo Tools::toDateTime(time()) . ' 自动续费扣款方式均已关闭，跳过自动续费处理' . PHP_EOL;
             return;
         }
 
@@ -835,10 +852,19 @@ final class SubscriptionService
                     continue;
                 }
 
-                // 瀑布：余额优先，不足再走存档卡。两者均在结算事务内原子完成
-                // 订单 activated + 推进周期（exactly-once），此处无需再处理。
-                if (self::payRenewalFromBalance($subscription, $invoice)
-                    || self::chargeRenewalToCard($subscription, $invoice)) {
+                // 瀑布：按管理员开关决定可用扣款腿。余额优先，不足再走存档卡。两者均在
+                // 结算事务内原子完成订单 activated + 推进周期（exactly-once）。
+                $renewed = false;
+
+                if ($balanceEnabled) {
+                    $renewed = self::payRenewalFromBalance($subscription, $invoice);
+                }
+
+                if (! $renewed && $stripeEnabled) {
+                    $renewed = self::chargeRenewalToCard($subscription, $invoice);
+                }
+
+                if ($renewed) {
                     echo "订阅 #{$subscription->id} 自动续费成功" . PHP_EOL;
                     continue;
                 }
@@ -861,11 +887,11 @@ final class SubscriptionService
      * 自然过期处理（每日执行）。
      *
      * 处理已到期(end_date <= today，'<=' 兼容漏跑当日)的自管 pending_renewal 订阅：
-     *   - 主开关 ON：仅处理用户已取消自动续费(auto_renew=0)的订阅；auto_renew=1 的到期订阅交由
+     *   - 任一扣款腿开启：仅处理用户已取消自动续费(auto_renew=0)的订阅；auto_renew=1 的到期订阅交由
      *     processAutoRenew / 宽限期 / terminateLapsed 处理。
-     *   - 主开关 OFF（B5）：processAutoRenew 已熔断，故 auto_renew=1 的到期订阅若不在此兜底会被
-     *     永久卡死。此时放开 auto_renew 过滤，连同 auto_renew=1 一并自然过期（用户回退到手动续费
-     *     或自然失效），避免管理员关闭功能后遗留一批悬空订阅。
+     *   - 两条扣款腿都关闭：processAutoRenew 已熔断，故 auto_renew=1 的到期订阅若不在此兜底会被
+     *     永久卡死。此时放开 auto_renew 过滤，连同 auto_renew=1 一并自然过期，避免管理员关闭功能后
+     *     遗留一批悬空订阅。
      */
     public static function expireSubscription(): void
     {
@@ -875,8 +901,8 @@ final class SubscriptionService
             ->where('end_date', '<=', $today)
             ->whereIn('billing_provider', self::SELF_MANAGED);
 
-        // 主开关 ON 时只过期 auto_renew=0；OFF 时不加 auto_renew 过滤，auto_renew=1 也一并过期。
-        if ((bool) Config::obtain('stripe_auto_billing_enabled')) {
+        // 任一扣款腿开启时只过期 auto_renew=0；全部关闭时不加 auto_renew 过滤。
+        if (self::autoRenewEngineEnabled()) {
             $query->where('auto_renew', 0);
         }
 
