@@ -9,9 +9,8 @@ use Tests\TestDatabase;
 /*
  * ---------------------------------------------------------------------------
  * WebhookHandler dispatch framework: idempotency (stripe_event dedup) + routing
- * of the live setup_intent.succeeded handler. The native-subscription event
- * routing (checkout.session.*, invoice.*, customer.subscription.*) was removed
- * with its handlers, so those types are now safe default no-ops.
+ * of live setup_intent.succeeded and legacy native-subscription compatibility
+ * handlers.
  * ---------------------------------------------------------------------------
  */
 
@@ -50,14 +49,24 @@ it('records the event type for an unknown event without throwing', function () {
         ->toBe('some.unhandled.event');
 });
 
-it('routes the live setup_intent.succeeded type without throwing and records it once', function () {
-    $event = \Stripe\Event::constructFrom([
-        'id' => 'evt_route_setup_intent',
-        'type' => 'setup_intent.succeeded',
-        'data' => ['object' => ['id' => 'seti_route']],
-    ]);
+it('routes known event types without throwing and records each once', function () {
+    $types = [
+        'invoice.paid',
+        'invoice.payment_failed',
+        'invoice.payment_action_required',
+        'customer.subscription.deleted',
+        'setup_intent.succeeded',
+    ];
 
-    (new WebhookHandler())->handle($event);
+    $handler = new WebhookHandler();
 
-    expect((new StripeEvent())->where('event_id', 'evt_route_setup_intent')->count())->toBe(1);
+    foreach ($types as $i => $type) {
+        $handler->handle(\Stripe\Event::constructFrom([
+            'id' => 'evt_route_' . $i,
+            'type' => $type,
+            'data' => ['object' => ['id' => 'obj_' . $i]],
+        ]));
+    }
+
+    expect((new StripeEvent())->count())->toBe(count($types));
 });
