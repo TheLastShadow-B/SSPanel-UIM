@@ -123,6 +123,7 @@
                                     <div class="d-flex">
                                         <button class="btn btn-primary" type="button"
                                                 hx-post="/user/invoice/pay_balance" hx-swap="none"
+                                                hx-confirm="{if $user->money >= $invoice->price}确认使用余额支付本账单？将从账户余额中扣除 {$invoice->price} 元。{else}当前余额不足以全额支付，确认后将扣除全部余额 {$user->money} 元进行部分支付。{/if}"
                                                 hx-vals='js:{
                                                     invoice_id: {$invoice->id},
                                                 }'>
