@@ -39,11 +39,118 @@ final class Surge extends Base
 
     /**
      * Rule-set URLs for the Apple & MS group (Surge pulls these directly).
+     * Kept self-hosted: Loyalsoldier/surge-rules only ships CN-accessible Apple subsets,
+     * no full Apple/Microsoft lists.
      */
     private const APPLE_MS_RULE_SETS = [
         'DOMAIN-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_apple_cdn_set,Apple & MS,extended-matching',
         'RULE-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_apple_services,Apple & MS,extended-matching',
         'RULE-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_microsoft_services,Apple & MS,extended-matching',
+    ];
+
+    /**
+     * Loyalsoldier/surge-rules base URL (root files are DOMAIN-SET format), via jsDelivr mirror.
+     */
+    private const LOYALSOLDIER_BASE = 'https://fastly.jsdelivr.net/gh/Loyalsoldier/surge-rules@release/';
+
+    /**
+     * AI service rules — mirrors the AI Services block in the Clash profile (config/appprofile.php).
+     */
+    private const AI_RULES = [
+        'DOMAIN,ai-gateway.vercel.sh,AI Services',
+        'DOMAIN,api.github.com,AI Services',
+        'DOMAIN,apple-relay.apple.com,AI Services',
+        'DOMAIN,apple-relay.cloudflare.com,AI Services',
+        'DOMAIN,apple-relay.fastly-edge.com,AI Services',
+        'DOMAIN,cp4.cloudflare.com,AI Services',
+        'DOMAIN,gateway.ai.cloudflare.com,AI Services',
+        'DOMAIN,gateway.icloud.com,AI Services',
+        'DOMAIN,gspe1-ssl.ls.apple.com,AI Services',
+        'DOMAIN,guzzoni.apple.com,AI Services',
+        'DOMAIN-KEYWORD,openai,AI Services',
+        'DOMAIN-SUFFIX,ai.com,AI Services',
+        'DOMAIN-SUFFIX,anthropic.com,AI Services',
+        'DOMAIN-SUFFIX,cerebras.ai,AI Services',
+        'DOMAIN-SUFFIX,chat.com,AI Services',
+        'DOMAIN-SUFFIX,chatgpt.com,AI Services',
+        'DOMAIN-SUFFIX,claude.ai,AI Services',
+        'DOMAIN-SUFFIX,claude.com,AI Services',
+        'DOMAIN-SUFFIX,clipdrop.co,AI Services',
+        'DOMAIN-SUFFIX,dify.ai,AI Services',
+        'DOMAIN-SUFFIX,grok.com,AI Services',
+        'DOMAIN-SUFFIX,groq.com,AI Services',
+        'DOMAIN-SUFFIX,jasper.ai,AI Services',
+        'DOMAIN-SUFFIX,meta.ai,AI Services',
+        'DOMAIN-SUFFIX,oaistatic.com,AI Services',
+        'DOMAIN-SUFFIX,oaiusercontent.com,AI Services',
+        'DOMAIN-SUFFIX,openart.ai,AI Services',
+        'DOMAIN-SUFFIX,perplexity.ai,AI Services',
+        'DOMAIN-SUFFIX,poe.com,AI Services',
+        'DOMAIN-SUFFIX,smoot.apple.com,AI Services',
+        'DOMAIN-SUFFIX,sora.com,AI Services',
+        'DOMAIN-SUFFIX,x.ai,AI Services',
+    ];
+
+    /**
+     * Securities broker rules — mirrors GEOSITE,futu/itiger/ibkr in the Clash profile.
+     * Surge has no geosite support, so the domains are inlined from
+     * v2fly/domain-list-community (data/futu, data/itiger, data/ibkr).
+     */
+    private const SECURITIES_RULES = [
+        // futu
+        'DOMAIN-SUFFIX,futu.cn,Securities',
+        'DOMAIN-SUFFIX,futu.link,Securities',
+        'DOMAIN-SUFFIX,futu5.com,Securities',
+        'DOMAIN-SUFFIX,futuau.com,Securities',
+        'DOMAIN-SUFFIX,futuesop.com,Securities',
+        'DOMAIN-SUFFIX,futufin.com,Securities',
+        'DOMAIN-SUFFIX,futuhk.com,Securities',
+        'DOMAIN-SUFFIX,futuhk1.com,Securities',
+        'DOMAIN-SUFFIX,futuhk2.com,Securities',
+        'DOMAIN-SUFFIX,futuhkapp.com,Securities',
+        'DOMAIN-SUFFIX,futuhn.com,Securities',
+        'DOMAIN-SUFFIX,futuholdings.com,Securities',
+        'DOMAIN-SUFFIX,futuniuniu.com,Securities',
+        'DOMAIN-SUFFIX,futunn.com,Securities',
+        'DOMAIN-SUFFIX,futuoa.com,Securities',
+        'DOMAIN-SUFFIX,futusg.com,Securities',
+        'DOMAIN-SUFFIX,futustatic.com,Securities',
+        'DOMAIN-SUFFIX,fututrade.com,Securities',
+        'DOMAIN-SUFFIX,moomoo.com,Securities',
+        'DOMAIN-SUFFIX,moomooequity.com,Securities',
+        'DOMAIN-SUFFIX,moomootrustee.com,Securities',
+        // itiger
+        'DOMAIN-SUFFIX,itiger.com,Securities',
+        'DOMAIN-SUFFIX,itigergrowth.com,Securities',
+        'DOMAIN-SUFFIX,itigergrowtha.com,Securities',
+        'DOMAIN-SUFFIX,itigerup.com,Securities',
+        'DOMAIN-SUFFIX,laohu8.com,Securities',
+        'DOMAIN-SUFFIX,skytigris.cn,Securities',
+        'DOMAIN-SUFFIX,tigerbbs.cn,Securities',
+        'DOMAIN-SUFFIX,tigerbbs.com,Securities',
+        'DOMAIN-SUFFIX,xiaohu8.com,Securities',
+        // ibkr
+        'DOMAIN-SUFFIX,ibkr.ca,Securities',
+        'DOMAIN-SUFFIX,ibkr.co.in,Securities',
+        'DOMAIN-SUFFIX,ibkr.co.uk,Securities',
+        'DOMAIN-SUFFIX,ibkr.com,Securities',
+        'DOMAIN-SUFFIX,ibkr.com.au,Securities',
+        'DOMAIN-SUFFIX,ibkr.com.hk,Securities',
+        'DOMAIN-SUFFIX,ibkr.com.sg,Securities',
+        'DOMAIN-SUFFIX,ibkr.eu,Securities',
+        'DOMAIN-SUFFIX,ibkr.ie,Securities',
+        'DOMAIN-SUFFIX,ibkrguides.com,Securities',
+        'DOMAIN-SUFFIX,ibllc.com,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.ca,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.co.in,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.co.jp,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.co.uk,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.com,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.com.au,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.com.hk,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.com.sg,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.eu,Securities',
+        'DOMAIN-SUFFIX,interactivebrokers.ie,Securities',
     ];
 
     public function getContent($user): string
@@ -246,6 +353,7 @@ final class Surge extends Base
             $node_raw->server,
             (string) $port,
             'username=' . $user->uuid,
+            'vmess-aead=true',
         ];
 
         if ($network === 'ws') {
@@ -268,9 +376,7 @@ final class Surge extends Base
             $parts[] = 'skip-cert-verify=' . ($allow_insecure ? 'true' : 'false');
         }
 
-        $udp = (bool) ($custom['udp'] ?? true);
-        $parts[] = 'udp-relay=' . ($udp ? 'true' : 'false');
-
+        // Surge vmess does not support UDP relay — do not emit udp-relay here.
         return implode(', ', $parts);
     }
 
@@ -384,8 +490,10 @@ final class Surge extends Base
         }
 
         // Emit order: Default Routing first, Global second, then regional groups,
-        // Apple & MS, and AI Services. Surge resolves references across the whole
-        // section, so citing Global / regions defined further down is fine.
+        // Apple & MS, AI Services, and Securities. Surge resolves references across
+        // the whole section, so citing Global / regions defined further down is fine.
+        // Regional groups are always emitted (empty regions fall back to DIRECT),
+        // so Securities can safely reference them.
         $lines = [];
         $lines[] = 'Default Routing = select, Global, DIRECT, REJECT';
         $lines[] = 'Global = select, ' . implode(', ', $global_members);
@@ -394,26 +502,50 @@ final class Surge extends Base
         }
         $lines[] = 'Apple & MS = select, Default Routing, Global, DIRECT';
         $lines[] = 'AI Services = select, ' . implode(', ', $ai_members);
+        $lines[] = 'Securities = select, Default Routing, HK, US, JP, TW, DIRECT';
 
         return $lines;
     }
 
     /**
-     * Build [Rule] lines. Uses Surge-native RULE-SET / DOMAIN-SET remote subscriptions.
+     * Build [Rule] lines. Mirrors the rule order of the Clash profile (config/appprofile.php),
+     * with GEOSITE categories mapped to Loyalsoldier/surge-rules domain sets or inlined domains.
      *
      * @return list<string>
      */
     private function buildRules(): array
     {
-        $lines = self::APPLE_MS_RULE_SETS;
+        return [
+            // LAN & system traffic (mirrors the local/arpa/private DIRECT rules).
+            'RULE-SET,SYSTEM,DIRECT',
+            'RULE-SET,LAN,DIRECT',
 
-        // AI Services RULE-SET URL is pending user confirmation — placeholder comment.
-        $lines[] = '# AI Services RULE-SET URL pending — routes AI traffic via AI Services group when added';
+            // Ad blocking (mirrors RULE-SET,ad-reject).
+            'DOMAIN-SET,' . self::LOYALSOLDIER_BASE . 'reject.txt,REJECT',
 
-        $lines[] = 'GEOIP,CN,DIRECT,no-resolve';
-        $lines[] = 'FINAL,Default Routing,dns-failed';
+            // AI services (mirrors the inline AI block; must precede the Apple sets so
+            // gateway.icloud.com etc. hit AI Services first).
+            ...self::AI_RULES,
 
-        return $lines;
+            'DOMAIN-SUFFIX,wifiman.com,Default Routing',
+
+            // google.txt only holds Google domains reachable from mainland China; the rest
+            // of Google falls through to FINAL, which is also Default Routing — combined
+            // effect matches GEOSITE,google,Default Proxy in the Clash profile.
+            'DOMAIN-SET,' . self::LOYALSOLDIER_BASE . 'google.txt,Default Routing',
+
+            // Apple & Microsoft (self-hosted full lists; see APPLE_MS_RULE_SETS).
+            ...self::APPLE_MS_RULE_SETS,
+
+            // Securities brokers (mirrors GEOSITE,futu/itiger/ibkr).
+            ...self::SECURITIES_RULES,
+
+            // CN domains direct (mirrors GEOSITE,cn), then GEOIP bottom safety net for
+            // CN domains missing from direct.txt.
+            'DOMAIN-SET,' . self::LOYALSOLDIER_BASE . 'direct.txt,DIRECT',
+            'GEOIP,CN,DIRECT',
+            'FINAL,Default Routing,dns-failed',
+        ];
     }
 
     /**
@@ -431,7 +563,7 @@ final class Surge extends Base
             'hijack-dns = 8.8.8.8:53, 8.8.4.4:53',
 
             // Domains that must resolve to real IPs (gaming / STUN / captive portal).
-            'always-real-ip = *.lan, *.local, *.msftncsi.com, *.msftconnecttest.com, *.srv.nintendo.net, *.stun.playstation.net, *.xboxlive.com, *.battle.net, *.battlenet.com, *.battlenet.com.cn, *.blzstatic.cn, stun.cloudflare.com, stun.miwifi.com, turn.cloudflare.com, xbox.*.microsoft.com',
+            'always-real-ip = *.lan, *.local, *.msftncsi.com, *.msftconnecttest.com, *.srv.nintendo.net, *.stun.playstation.net, *.xboxlive.com, *.battle.net, *.battlenet.com, *.battlenet.com.cn, *.blzstatic.cn, stun.cloudflare.com, stun.miwifi.com, turn.cloudflare.com, xbox.*.microsoft.com, time.*.com, ntp.*.com, *.pool.ntp.org, *.ntp.org.cn, *.time.edu.cn, time1.cloud.tencent.com',
 
             // System-level bypass (Surge does not see this traffic).
             'skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10, 169.254.0.0/16, 224.0.0.0/4, localhost, *.local',
@@ -451,7 +583,6 @@ final class Surge extends Base
 
             // iOS Surge 5 specific.
             'compatibility-mode = 5',
-            'hybrid = true',
 
             // Misc.
             'allow-wifi-access = false',

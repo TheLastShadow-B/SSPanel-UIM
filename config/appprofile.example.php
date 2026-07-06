@@ -191,6 +191,18 @@ $_ENV['Clash_Group_Config'] = [
             ],
         ],
         [
+            'name' => 'Securities',
+            'type' => 'select',
+            'proxies' => [
+                'Default Proxy',
+                'HK',
+                'US',
+                'JP',
+                'TW',
+                'DIRECT',
+            ],
+        ],
+        [
             'name' => 'Final Match',
             'type' => 'select',
             'proxies' => [
@@ -256,6 +268,9 @@ $_ENV['Clash_Group_Config'] = [
         'GEOSITE,microsoft,Microsoft & Apple',
         'GEOSITE,category-entertainment,Stream',
         'GEOSITE,category-game-platforms-download,Steam Download',
+        'GEOSITE,futu,Securities',
+        'GEOSITE,itiger,Securities',
+        'GEOSITE,ibkr,Securities',
         'GEOSITE,cn,DIRECT',
         'GEOIP,CN,DIRECT',
         'MATCH,Final Match',
@@ -356,6 +371,18 @@ $_ENV['Stash_Group_Config'] = [
             ],
         ],
         [
+            'name' => 'Securities',
+            'type' => 'select',
+            'proxies' => [
+                'Default Proxy',
+                'HK',
+                'US',
+                'JP',
+                'TW',
+                'DIRECT',
+            ],
+        ],
+        [
             'name' => 'Final Match',
             'type' => 'select',
             'proxies' => [
@@ -426,6 +453,9 @@ $_ENV['Stash_Group_Config'] = [
         'GEOSITE,apple,Microsoft & Apple',
         'GEOSITE,microsoft,Microsoft & Apple',
         'GEOSITE,category-entertainment,Stream',
+        'GEOSITE,futu,Securities',
+        'GEOSITE,itiger,Securities',
+        'GEOSITE,ibkr,Securities',
         'GEOSITE,cn,DIRECT',
         'GEOIP,CN,DIRECT',
         'MATCH,Final Match',
