@@ -8,7 +8,6 @@ use App\Models\Link;
 use App\Models\Node;
 use App\Services\Subscribe\Clash;
 use App\Services\Subscribe\Json;
-use App\Services\Subscribe\SingBox;
 use App\Services\Subscribe\SIP002;
 use App\Services\Subscribe\SIP008;
 use App\Services\Subscribe\SS;
@@ -16,7 +15,6 @@ use App\Services\Subscribe\Stash;
 use App\Services\Subscribe\Surge;
 use App\Services\Subscribe\Trojan;
 use App\Services\Subscribe\V2Ray;
-use App\Services\Subscribe\V2RayJson;
 use App\Utils\Tools;
 use Illuminate\Support\Collection;
 
@@ -63,7 +61,7 @@ final class Subscribe
         return self::getClient($type)->getContent($user);
     }
 
-    public static function getClient(string $type): Json|SS|SIP002|V2Ray|Trojan|Clash|Stash|SIP008|SingBox|V2RayJson|Surge
+    public static function getClient(string $type): Json|SS|SIP002|V2Ray|Trojan|Clash|Stash|SIP008|Surge
     {
         return match ($type) {
             'ss' => new SS(),
@@ -73,8 +71,6 @@ final class Subscribe
             'clash' => new Clash(),
             'stash' => new Stash(),
             'sip008' => new SIP008(),
-            'singbox' => new SingBox(),
-            'v2rayjson' => new V2RayJson(),
             'surge' => new Surge(),
             default => new Json(),
         };

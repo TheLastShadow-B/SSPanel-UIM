@@ -23,7 +23,6 @@ final class Json extends Base
             'used_upload_traffic' => $user->u,
             'used_download_traffic' => $user->d,
             'sub_url' => [
-                'sing-box' => $sub_url . '/singbox',
                 'clash' => $sub_url . '/clash',
             ],
         ]);

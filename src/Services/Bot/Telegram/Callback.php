@@ -728,14 +728,6 @@ final class Callback
             ],
             [
                 [
-                    'text' => 'SingBox',
-                    'callback_data' => 'user.subscribe|singbox',
-                ],
-                [
-                    'text' => 'V2RayJson',
-                    'callback_data' => 'user.subscribe|v2rayjson',
-                ],
-                [
                     'text' => 'Shadowsocks',
                     'callback_data' => 'user.subscribe|ss',
                 ],
@@ -764,8 +756,7 @@ final class Callback
 
         if (! Config::obtain('enable_ss_sub')) {
             unset($keyboard[0][2]);
-            unset($keyboard[1][1]);
-            unset($keyboard[1][2]);
+            unset($keyboard[1][0]);
         }
 
         if (! Config::obtain('enable_v2_sub')) {
@@ -814,10 +805,6 @@ final class Callback
                     '<code>' . $UniversalSub_Url . '/json</code>' . PHP_EOL . PHP_EOL,
                 'clash' => 'Clash 通用订阅地址：' . PHP_EOL . PHP_EOL .
                     '<code>' . $UniversalSub_Url . '/clash</code>' . PHP_EOL . PHP_EOL,
-                'singbox' => 'SingBox 通用订阅地址：' . PHP_EOL . PHP_EOL .
-                    '<code>' . $UniversalSub_Url . '/singbox</code>' . PHP_EOL . PHP_EOL,
-                'v2rayjson' => 'V2RayJson 通用订阅地址：' . PHP_EOL . PHP_EOL .
-                    '<code>' . $UniversalSub_Url . '/v2rayjson</code>' . PHP_EOL . PHP_EOL,
                 'sip008' => 'SIP008 通用订阅地址：' . PHP_EOL . PHP_EOL .
                     '<code>' . $UniversalSub_Url . '/sip008</code>' . PHP_EOL . PHP_EOL,
                 'ss' => 'Shadowsocks 客户端订阅地址：' . PHP_EOL . PHP_EOL .
