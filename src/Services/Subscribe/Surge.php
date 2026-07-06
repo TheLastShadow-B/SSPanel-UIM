@@ -41,9 +41,9 @@ final class Surge extends Base
      * Rule-set URLs for the Apple & MS group (Surge pulls these directly).
      */
     private const APPLE_MS_RULE_SETS = [
-        'DOMAIN-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_apple_cdn_set,Apple & MS,extended-matching',
-        'RULE-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_apple_services,Apple & MS,extended-matching',
-        'RULE-SET,https://rule.sets.zero.ac.cn/9d5d81968c7b4b7ee09dab52051c37d7deb4e10a7015eb8e4140c820bee025f6/surge_microsoft_services,Apple & MS,extended-matching',
+        'DOMAIN-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_apple_cdn_set,Apple & MS,extended-matching',
+        'RULE-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_apple_services,Apple & MS,extended-matching',
+        'RULE-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_microsoft_services,Apple & MS,extended-matching',
     ];
 
     public function getContent($user): string
@@ -165,6 +165,9 @@ final class Surge extends Base
             }
         }
 
+        $udp = (bool) ($custom['udp'] ?? true);
+        $parts[] = 'udp-relay=' . ($udp ? 'true' : 'false');
+
         return implode(', ', $parts);
     }
 
@@ -184,6 +187,7 @@ final class Surge extends Base
         $port = $custom['offset_port_user'] ?? $custom['offset_port_node'] ?? 443;
         $server_key = $custom['server_key'] ?? '';
         $password = $server_key === '' ? $user_pk : $server_key . ':' . $user_pk;
+        $udp = (bool) ($custom['udp'] ?? true);
 
         return implode(', ', [
             'ss',
@@ -191,6 +195,7 @@ final class Surge extends Base
             (string) $port,
             'encrypt-method=' . $method,
             'password=' . $password,
+            'udp-relay=' . ($udp ? 'true' : 'false'),
         ]);
     }
 
@@ -263,6 +268,9 @@ final class Surge extends Base
             $parts[] = 'skip-cert-verify=' . ($allow_insecure ? 'true' : 'false');
         }
 
+        $udp = (bool) ($custom['udp'] ?? true);
+        $parts[] = 'udp-relay=' . ($udp ? 'true' : 'false');
+
         return implode(', ', $parts);
     }
 
@@ -306,6 +314,9 @@ final class Surge extends Base
                 $parts[] = 'ws-headers=Host:' . $ws_opts['headers']['Host'];
             }
         }
+
+        $udp = (bool) ($custom['udp'] ?? true);
+        $parts[] = 'udp-relay=' . ($udp ? 'true' : 'false');
 
         return implode(', ', $parts);
     }
@@ -414,13 +425,35 @@ final class Surge extends Base
     private function buildGeneral(): array
     {
         return [
+            // DNS
             'dns-server = system, 223.5.5.5, 119.29.29.29',
-            'skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, localhost, *.local',
+            'encrypted-dns-server = https://doh.pub/dns-query',
+            'hijack-dns = 8.8.8.8:53, 8.8.4.4:53',
+
+            // Domains that must resolve to real IPs (gaming / STUN / captive portal).
+            'always-real-ip = *.lan, *.local, *.msftncsi.com, *.msftconnecttest.com, *.srv.nintendo.net, *.stun.playstation.net, *.xboxlive.com, *.battle.net, *.battlenet.com, *.battlenet.com.cn, *.blzstatic.cn, stun.cloudflare.com, stun.miwifi.com, turn.cloudflare.com, xbox.*.microsoft.com',
+
+            // System-level bypass (Surge does not see this traffic).
+            'skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10, 169.254.0.0/16, 224.0.0.0/4, localhost, *.local',
             'exclude-simple-hostnames = true',
+
+            // Connectivity tests.
             'internet-test-url = http://www.apple.com/library/test/success.html',
-            'proxy-test-url = http://www.apple.com/library/test/success.html',
+            'proxy-test-url = http://cp.cloudflare.com/generate_204',
+            'proxy-test-udp = apple.com@172.64.36.1',
             'test-timeout = 5',
-            'ipv6 = false',
+
+            // Network features.
+            'udp-priority = true',
+            'ipv6 = true',
+            'ipv6-vif = auto',
+            'auto-suspend = false',
+
+            // iOS Surge 5 specific.
+            'compatibility-mode = 5',
+            'hybrid = true',
+
+            // Misc.
             'allow-wifi-access = false',
             'loglevel = notify',
         ];
