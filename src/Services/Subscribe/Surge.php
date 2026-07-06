@@ -6,16 +6,24 @@ namespace App\Services\Subscribe;
 
 use App\Services\Subscribe;
 use App\Utils\Tools;
+use function array_key_exists;
+use function array_keys;
+use function explode;
 use function implode;
 use function in_array;
+use function is_array;
 use function json_decode;
 use function mb_strpos;
+use function str_starts_with;
+use function substr;
+use function trim;
 
 final class Surge extends Base
 {
     /**
      * Surge 5 supported Shadowsocks ciphers.
      * Nodes with methods outside this list are skipped to prevent Surge rejecting the whole config.
+     * This is a Surge capability constraint, not routing policy, so it stays in code.
      */
     private const SS_CIPHER_WHITELIST = [
         'aes-128-gcm',
@@ -27,24 +35,9 @@ final class Surge extends Base
     ];
 
     /**
-     * Region keyword priority order — first match wins when a node name hits multiple regions.
-     * Each entry: region code => array of case-sensitive keywords.
+     * Default region order used when a group cites the 'REGIONS' placeholder without an explicit list.
      */
-    private const REGION_KEYWORDS = [
-        'HK' => ['HK', '香港', '🇭🇰'],
-        'JP' => ['JP', '日本', '🇯🇵'],
-        'US' => ['US', '美国', '🇺🇸'],
-        'TW' => ['TW', '台湾', '🇹🇼'],
-    ];
-
-    /**
-     * Rule-set URLs for the Apple & MS group (Surge pulls these directly).
-     */
-    private const APPLE_MS_RULE_SETS = [
-        'DOMAIN-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_apple_cdn_set,Apple & MS,extended-matching',
-        'RULE-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_apple_services,Apple & MS,extended-matching',
-        'RULE-SET,https://nmslcf2.pages.dev/Rules/Clash/surge_microsoft_services,Apple & MS,extended-matching',
-    ];
+    private const DEFAULT_REGION_ORDER = ['HK', 'US', 'JP', 'TW'];
 
     public function getContent($user): string
     {
@@ -246,6 +239,7 @@ final class Surge extends Base
             $node_raw->server,
             (string) $port,
             'username=' . $user->uuid,
+            'vmess-aead=true',
         ];
 
         if ($network === 'ws') {
@@ -268,9 +262,7 @@ final class Surge extends Base
             $parts[] = 'skip-cert-verify=' . ($allow_insecure ? 'true' : 'false');
         }
 
-        $udp = (bool) ($custom['udp'] ?? true);
-        $parts[] = 'udp-relay=' . ($udp ? 'true' : 'false');
-
+        // Surge vmess does not support UDP relay — do not emit udp-relay here.
         return implode(', ', $parts);
     }
 
@@ -322,17 +314,23 @@ final class Surge extends Base
     }
 
     /**
-     * Classify node names into regional buckets. Priority: HK > JP > US > TW, first-match-wins.
+     * Classify node names into regional buckets, keyed and prioritised by the
+     * $_ENV['Surge_Region_Keywords'] template map (first-match-wins).
      *
      * @param list<string> $names
      * @return array<string, list<string>>
      */
     private function classifyNodesByRegion(array $names): array
     {
-        $regions = ['HK' => [], 'JP' => [], 'US' => [], 'TW' => []];
+        $keyword_map = $_ENV['Surge_Region_Keywords'] ?? [];
+
+        $regions = [];
+        foreach (array_keys($keyword_map) as $region) {
+            $regions[$region] = [];
+        }
 
         foreach ($names as $name) {
-            foreach (self::REGION_KEYWORDS as $region => $keywords) {
+            foreach ($keyword_map as $region => $keywords) {
                 foreach ($keywords as $keyword) {
                     if (mb_strpos($name, $keyword, 0, 'UTF-8') !== false) {
                         $regions[$region][] = $name;
@@ -346,116 +344,98 @@ final class Surge extends Base
     }
 
     /**
-     * Build [Proxy Group] lines with region grouping, priority fallbacks, and empty-group handling.
+     * Build [Proxy Group] lines from the $_ENV['Surge_Group_Config'] template.
+     * Member placeholders (REGION:X, REGIONS, REGIONS:a,b) are expanded from the
+     * user's classified nodes; empty groups fall back to DIRECT so Surge never
+     * references an empty group.
      *
      * @param array<string, list<string>> $regions
      * @return list<string>
      */
     private function buildProxyGroups(array $regions): array
     {
-        // Regional groups — empty region falls back to DIRECT so Surge never references an empty group.
-        $region_lines = [];
-        foreach (['HK', 'JP', 'US', 'TW'] as $region) {
-            $members = $regions[$region] === [] ? ['DIRECT'] : $regions[$region];
-            $region_lines[] = $region . ' = select, ' . implode(', ', $members);
-        }
+        $group_config = $_ENV['Surge_Group_Config'] ?? [];
 
-        // Global — dynamic membership, only includes regions with at least one real node.
-        $global_members = [];
-        foreach (['HK', 'US', 'JP', 'TW'] as $region) {
-            if ($regions[$region] !== []) {
-                $global_members[] = $region;
-            }
-        }
-        if ($global_members === []) {
-            $global_members = ['DIRECT'];
-        }
-
-        // AI Services — US + JP only, with empty-side fallback.
-        $ai_members = [];
-        if ($regions['US'] !== []) {
-            $ai_members[] = 'US';
-        }
-        if ($regions['JP'] !== []) {
-            $ai_members[] = 'JP';
-        }
-        if ($ai_members === []) {
-            $ai_members = ['DIRECT'];
-        }
-
-        // Emit order: Default Routing first, Global second, then regional groups,
-        // Apple & MS, and AI Services. Surge resolves references across the whole
-        // section, so citing Global / regions defined further down is fine.
         $lines = [];
-        $lines[] = 'Default Routing = select, Global, DIRECT, REJECT';
-        $lines[] = 'Global = select, ' . implode(', ', $global_members);
-        foreach ($region_lines as $region_line) {
-            $lines[] = $region_line;
+        foreach ($group_config as $group) {
+            $name = $group['name'] ?? null;
+            if ($name === null) {
+                continue;
+            }
+            $type = $group['type'] ?? 'select';
+            $members = $this->expandGroupMembers($group['proxies'] ?? [], $regions);
+            if ($members === []) {
+                $members = ['DIRECT'];
+            }
+            $lines[] = $name . ' = ' . $type . ', ' . implode(', ', $members);
         }
-        $lines[] = 'Apple & MS = select, Default Routing, Global, DIRECT';
-        $lines[] = 'AI Services = select, ' . implode(', ', $ai_members);
 
         return $lines;
     }
 
     /**
-     * Build [Rule] lines. Uses Surge-native RULE-SET / DOMAIN-SET remote subscriptions.
+     * Expand region placeholders in a group's member list:
+     *   'REGION:HK'     -> node names classified as HK, or ['DIRECT'] if none
+     *   'REGIONS'       -> region names that have nodes, in DEFAULT_REGION_ORDER
+     *   'REGIONS:US,JP' -> region names that have nodes, limited to/ordered by the list
+     * Any other member is passed through verbatim.
+     *
+     * @param list<string> $members
+     * @param array<string, list<string>> $regions
+     * @return list<string>
+     */
+    private function expandGroupMembers(array $members, array $regions): array
+    {
+        $out = [];
+
+        foreach ($members as $member) {
+            if ($member === 'REGIONS' || str_starts_with($member, 'REGIONS:')) {
+                $order = $member === 'REGIONS'
+                    ? self::DEFAULT_REGION_ORDER
+                    : explode(',', substr($member, 8));
+                $with_nodes = [];
+                foreach ($order as $region) {
+                    $region = trim($region);
+                    if (($regions[$region] ?? []) !== []) {
+                        $with_nodes[] = $region;
+                    }
+                }
+                foreach (($with_nodes === [] ? ['DIRECT'] : $with_nodes) as $entry) {
+                    $out[] = $entry;
+                }
+            } elseif (str_starts_with($member, 'REGION:')) {
+                $region = substr($member, 7);
+                $nodes = array_key_exists($region, $regions) && $regions[$region] !== []
+                    ? $regions[$region]
+                    : ['DIRECT'];
+                foreach ($nodes as $entry) {
+                    $out[] = $entry;
+                }
+            } else {
+                $out[] = $member;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * [Rule] lines, sourced verbatim from the $_ENV['Surge_Rules'] template.
      *
      * @return list<string>
      */
     private function buildRules(): array
     {
-        $lines = self::APPLE_MS_RULE_SETS;
-
-        // AI Services RULE-SET URL is pending user confirmation — placeholder comment.
-        $lines[] = '# AI Services RULE-SET URL pending — routes AI traffic via AI Services group when added';
-
-        $lines[] = 'GEOIP,CN,DIRECT,no-resolve';
-        $lines[] = 'FINAL,Default Routing,dns-failed';
-
-        return $lines;
+        return $_ENV['Surge_Rules'] ?? [];
     }
 
     /**
-     * Minimal [General] defaults. Extracted into its own method so admin-side customization
-     * (e.g., reading $_ENV['Surge_Config']) can be added later without touching other sections.
+     * [General] lines, sourced verbatim from the $_ENV['Surge_General'] template.
      *
      * @return list<string>
      */
     private function buildGeneral(): array
     {
-        return [
-            // DNS
-            'dns-server = system, 223.5.5.5, 119.29.29.29',
-            'encrypted-dns-server = https://doh.pub/dns-query',
-            'hijack-dns = 8.8.8.8:53, 8.8.4.4:53',
-
-            // Domains that must resolve to real IPs (gaming / STUN / captive portal).
-            'always-real-ip = *.lan, *.local, *.msftncsi.com, *.msftconnecttest.com, *.srv.nintendo.net, *.stun.playstation.net, *.xboxlive.com, *.battle.net, *.battlenet.com, *.battlenet.com.cn, *.blzstatic.cn, stun.cloudflare.com, stun.miwifi.com, turn.cloudflare.com, xbox.*.microsoft.com',
-
-            // System-level bypass (Surge does not see this traffic).
-            'skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10, 169.254.0.0/16, 224.0.0.0/4, localhost, *.local',
-            'exclude-simple-hostnames = true',
-
-            // Connectivity tests.
-            'internet-test-url = http://www.apple.com/library/test/success.html',
-            'proxy-test-url = http://cp.cloudflare.com/generate_204',
-            'proxy-test-udp = apple.com@172.64.36.1',
-            'test-timeout = 5',
-
-            // Network features.
-            'udp-priority = true',
-            'ipv6 = true',
-            'ipv6-vif = auto',
-            'auto-suspend = false',
-
-            // iOS Surge 5 specific.
-            'compatibility-mode = 5',
-            'hybrid = true',
-
-            // Misc.
-            'allow-wifi-access = false',
-            'loglevel = notify',
-        ];
+        return $_ENV['Surge_General'] ?? [];
     }
 }
