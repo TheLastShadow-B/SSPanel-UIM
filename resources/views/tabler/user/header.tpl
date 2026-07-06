@@ -216,6 +216,14 @@
                                             <i class="ti ti-file-dollar"></i>&nbsp;
                                             账单
                                         </a>
+                                        <a class="dropdown-item" href="/user/subscription">
+                                            <i class="ti ti-refresh"></i>&nbsp;
+                                            我的订阅
+                                        </a>
+                                        <a class="dropdown-item" href="/user/payment-method">
+                                            <i class="ti ti-credit-card"></i>&nbsp;
+                                            支付方式
+                                        </a>
                                         <a class="dropdown-item" href="/user/money">
                                             <i class="ti ti-home-dollar"></i>&nbsp;
                                             余额

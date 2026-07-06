@@ -76,7 +76,7 @@ it('does not reset bandwidth for stripe subscriptions', function () {
     SubscriptionService::resetSubscriptionBandwidth();
     ob_get_clean();
 
-    // stripe 腿由 invoice.paid webhook 重置（P1.6），每日 cron 必须跳过 → u 不变
+    // resetSubscriptionBandwidth 只处理 SELF_MANAGED(manual/balance)；billing_provider='stripe' 被跳过 → u 不变
     expect((int) (new User())->find($user->id)->u)->toBe(100);
 });
 

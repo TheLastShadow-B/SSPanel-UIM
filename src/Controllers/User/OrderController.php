@@ -8,7 +8,10 @@ use App\Controllers\BaseController;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\User;
+use App\Models\UserMoneyLog;
 use App\Services\Coupon;
+use App\Services\DB;
 use App\Utils\Cookie;
 use App\Utils\Tools;
 use Exception;
@@ -392,13 +395,8 @@ final class OrderController extends BaseController
         $orderContent['billing_cycle_selected'] = $billingCycle;
         $orderContent['name'] = $product->name;
 
-        // 是否走 Stripe 自动续费（仅在主开关开启时生效，否则回退到人工/余额路径）
-        $autoRenewProvider = $this->antiXss->xss_clean($request->getParam('auto_renew_provider'));
-        $isStripe = $autoRenewProvider === 'stripe'
-            && (bool) \App\Models\Config::obtain('stripe_auto_billing_enabled');
-        $billingProvider = $isStripe ? 'stripe' : 'manual';
-
-        // 创建订单
+        // 创建订单。所有自建订阅一律 billing_provider='manual'：续费由自建引擎按
+        // 「余额优先 → 存档卡 → 宽限」处理，不再存在 Stripe 订阅式 checkout 分支。
         $order = new Order();
         $order->user_id = $user->id;
         $order->product_id = $product->id;
@@ -409,7 +407,7 @@ final class OrderController extends BaseController
         $order->coupon = $couponCode;
         $order->price = $buyPrice;
         $order->status = $buyPrice === 0.0 ? 'pending_activation' : 'pending_payment';
-        $order->billing_provider = $billingProvider;
+        $order->billing_provider = 'manual';
         $order->create_time = time();
         $order->update_time = time();
         $order->save();
@@ -442,7 +440,7 @@ final class OrderController extends BaseController
         $invoice->content = json_encode($invoiceContent);
         $invoice->price = $buyPrice;
         $invoice->status = $buyPrice === 0.0 ? 'paid_gateway' : 'unpaid';
-        $invoice->billing_provider = $billingProvider;
+        $invoice->billing_provider = 'manual';
         $invoice->create_time = time();
         $invoice->update_time = time();
         $invoice->pay_time = 0;
@@ -460,27 +458,56 @@ final class OrderController extends BaseController
             $couponService->incrementUseCount();
         }
 
-        if ($isStripe) {
-            // 解析（创建/复用）周期对应的 recurring Price，币种换算在创建时锁定。
-            // Stripe 价格必须使用本地最终应付价，避免优惠券订单被 Stripe 按原价扣款。
-            $resolved = \App\Services\Stripe\PriceResolver::resolve($product, $billingCycle, $buyPrice);
+        // 余额优先：购买价 > 0、余额足额且优惠码允许余额支付时，立即用站内余额结算该订阅账单。
+        // 在行锁事务内复读并复查（镜像 InvoiceController::payBalance /
+        // SubscriptionService::payRenewalFromBalance）：账单仍为 unpaid 且余额仍足额才扣款、写
+        // UserMoneyLog、置账单 paid_balance + pay_time，并把订单置 pending_activation，交由每 5 分钟的
+        // processNewSubscriptionActivation 创建订阅。余额不足则保持账单 unpaid、订单 pending_payment，
+        // 用户走常规账单支付流程（与改动前一致）。
+        if ($buyPrice > 0
+            && (float) $user->money >= (float) $buyPrice
+            && Coupon::checkBalancePayAllowed($couponCode)
+        ) {
+            DB::transaction(static function () use ($invoice, $order): void {
+                $lockedInvoice = (new Invoice())->where('id', $invoice->id)->lockForUpdate()->first();
 
-            // 不传 payment_method_types（动态支付方式）；mode 在 StripeService 内固定为 subscription。
-            $session = \App\Services\Stripe\StripeService::getInstance()->createSubscriptionCheckout(
-                $user,
-                $resolved['price_id'],
-                [
-                    'sspanel_user_id' => (string) $user->id,
-                    'product_id' => (string) $product->id,
-                    'billing_cycle' => $billingCycle,
-                    'order_id' => (string) $order->id,
-                    'invoice_id' => (string) $invoice->id,
-                ],
-                $_ENV['baseUrl'] . '/user/invoice/' . $invoice->id . '/view?checkout=success',
-                $_ENV['baseUrl'] . '/user/invoice/' . $invoice->id . '/view?canceled=1',
-            );
+                if ($lockedInvoice === null || $lockedInvoice->status !== 'unpaid') {
+                    return;
+                }
 
-            return $response->withHeader('HX-Redirect', $session->url);
+                $lockedUser = (new User())->where('id', $lockedInvoice->user_id)->lockForUpdate()->first();
+
+                if ($lockedUser === null || (float) $lockedUser->money < (float) $lockedInvoice->price) {
+                    return;
+                }
+
+                $moneyBefore = (float) $lockedUser->money;
+                $moneyAfter = $moneyBefore - (float) $lockedInvoice->price;
+
+                $lockedUser->money = $moneyAfter;
+                $lockedUser->save();
+
+                (new UserMoneyLog())->add(
+                    (int) $lockedUser->id,
+                    $moneyBefore,
+                    $moneyAfter,
+                    -(float) $lockedInvoice->price,
+                    '订阅购买扣款 账单 #' . $lockedInvoice->id
+                );
+
+                $lockedInvoice->status = 'paid_balance';
+                $lockedInvoice->pay_time = time();
+                $lockedInvoice->update_time = time();
+                $lockedInvoice->save();
+
+                $lockedOrder = (new Order())->where('id', $order->id)->lockForUpdate()->first();
+
+                if ($lockedOrder !== null) {
+                    $lockedOrder->status = 'pending_activation';
+                    $lockedOrder->update_time = time();
+                    $lockedOrder->save();
+                }
+            });
         }
 
         return $response->withHeader('HX-Redirect', '/user/invoice/' . $invoice->id . '/view');

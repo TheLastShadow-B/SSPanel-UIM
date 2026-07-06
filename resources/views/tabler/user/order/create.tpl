@@ -185,6 +185,9 @@
                                             </label>
                                         {/if}
                                     </div>
+                                    <div class="text-secondary small mt-3">
+                                        购买后默认开启自动续费——到期自动续费，优先扣账户余额，余额不足时扣已绑定的银行卡；可随时在『我的订阅』取消。
+                                    </div>
                                 {/if}
                             </div>
                         </div>

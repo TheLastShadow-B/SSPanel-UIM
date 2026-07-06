@@ -6,11 +6,11 @@ namespace App\Services\Stripe;
 
 use App\Models\Config;
 use App\Models\User;
-use Stripe\Checkout\Session;
-use Stripe\Collection;
+use Stripe\Exception\ApiErrorException;
+use Stripe\PaymentIntent;
+use Stripe\PaymentMethod;
 use Stripe\SetupIntent;
 use Stripe\StripeClient;
-use Stripe\Subscription;
 
 /**
  * Injectable wrapper around \Stripe\StripeClient.
@@ -71,30 +71,6 @@ class StripeService
         return $customer->id;
     }
 
-    public function createSubscriptionCheckout(
-        User $user,
-        string $priceId,
-        array $metadata,
-        string $successUrl,
-        string $cancelUrl
-    ): Session {
-        $customerId = $this->ensureCustomer($user);
-
-        // NOTE: deliberately NOT passing payment_method_types (dynamic payment methods).
-        return $this->client()->checkout->sessions->create([
-            'mode' => 'subscription',
-            'customer' => $customerId,
-            'line_items' => [
-                ['price' => $priceId, 'quantity' => 1],
-            ],
-            'subscription_data' => [
-                'metadata' => $metadata,
-            ],
-            'success_url' => $successUrl,
-            'cancel_url' => $cancelUrl,
-        ]);
-    }
-
     public function createSetupIntent(string $customerId, array $metadata = []): SetupIntent
     {
         return $this->client()->setupIntents->create([
@@ -104,63 +80,84 @@ class StripeService
         ]);
     }
 
-    public function setDefaultPaymentMethod(string $customerId, string $subscriptionId, string $paymentMethodId): void
+    /**
+     * Off-session one-time charge against a stored card.
+     *
+     * NOTE: deliberately NOT passing payment_method_types (dynamic payment methods).
+     */
+    public function chargeOffSession(
+        string $customerId,
+        string $paymentMethodId,
+        int $amountMinor,
+        string $currency,
+        string $idempotencyKey,
+        array $metadata = []
+    ): PaymentIntent {
+        return $this->client()->paymentIntents->create([
+            'amount' => $amountMinor,
+            'currency' => $currency,
+            'customer' => $customerId,
+            'payment_method' => $paymentMethodId,
+            'off_session' => true,
+            'confirm' => true,
+            'metadata' => $metadata,
+        ], [
+            'idempotency_key' => $idempotencyKey,
+        ]);
+    }
+
+    /**
+     * Customer's stored default payment method (invoice_settings.default_payment_method),
+     * or null when none is set. The field may come back as a bare id string or an
+     * expanded object, so resolve both forms.
+     */
+    public function getDefaultPaymentMethod(string $customerId): ?string
+    {
+        $customer = $this->client()->customers->retrieve($customerId, []);
+
+        $pm = $customer->invoice_settings->default_payment_method ?? null;
+        if ($pm === null) {
+            return null;
+        }
+
+        return is_string($pm) ? $pm : ($pm->id ?? null);
+    }
+
+    /**
+     * Attach a payment method and set it as the customer's default off-session
+     * payment method (used by the renewal engine's card fallback and the
+     * card-binding page). Does not touch any Stripe subscription.
+     */
+    public function setCustomerDefaultPaymentMethod(string $customerId, string $paymentMethodId): void
     {
         $this->client()->paymentMethods->attach($paymentMethodId, ['customer' => $customerId]);
 
         $this->client()->customers->update($customerId, [
             'invoice_settings' => ['default_payment_method' => $paymentMethodId],
         ]);
-
-        $this->client()->subscriptions->update($subscriptionId, [
-            'default_payment_method' => $paymentMethodId,
-        ]);
     }
 
-    public function cancelAtPeriodEnd(string $subscriptionId): void
+    /**
+     * Retrieve a payment method (for its brand/last4 card summary), or null when
+     * Stripe can't resolve it — so the payment-method page degrades gracefully
+     * instead of 500ing on a transient API hiccup.
+     */
+    public function retrievePaymentMethod(string $paymentMethodId): ?PaymentMethod
     {
-        $this->client()->subscriptions->update($subscriptionId, [
-            'cancel_at_period_end' => true,
-        ]);
+        try {
+            return $this->client()->paymentMethods->retrieve($paymentMethodId);
+        } catch (ApiErrorException) {
+            return null;
+        }
     }
 
-    public function updateSubscriptionPrice(
-        string $subscriptionId,
-        string $newPriceId,
-        string $prorationBehavior
-    ): Subscription {
-        $subscription = $this->client()->subscriptions->retrieve($subscriptionId, []);
-        $itemId = $subscription->items->data[0]->id;
-
-        return $this->client()->subscriptions->update($subscriptionId, [
-            'items' => [
-                ['id' => $itemId, 'price' => $newPriceId],
-            ],
-            'proration_behavior' => $prorationBehavior,
-        ]);
-    }
-
-    public function createAlignedSubscription(
-        string $customerId,
-        string $priceId,
-        int $anchorTs,
-        string $defaultPaymentMethod,
-        array $metadata
-    ): Subscription {
-        return $this->client()->subscriptions->create([
-            'customer' => $customerId,
-            'items' => [
-                ['price' => $priceId],
-            ],
-            'billing_cycle_anchor' => $anchorTs,
-            'proration_behavior' => 'none',
-            'default_payment_method' => $defaultPaymentMethod,
-            'metadata' => $metadata,
-        ]);
-    }
-
-    public function listInvoices(string $customerId): Collection
+    /**
+     * Detach a payment method from its customer. Detaching the customer's default
+     * payment method also clears it from invoice_settings.default_payment_method
+     * on Stripe's side, so the renewal engine's card fallback finds no card.
+     */
+    public function detachPaymentMethod(string $paymentMethodId): void
     {
-        return $this->client()->invoices->all(['customer' => $customerId]);
+        $this->client()->paymentMethods->detach($paymentMethodId);
     }
 }

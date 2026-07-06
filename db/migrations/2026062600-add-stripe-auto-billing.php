@@ -50,7 +50,7 @@ return new class() implements MigrationInterface {
         // seed config (class='billing'); publishable key is public (goes to frontend)
         $pdo->exec("INSERT INTO config (item, value, class, is_public, type, `default`, mark) VALUES
             ('stripe_publishable_key', '', 'billing', 1, 'string', '', 'Stripe Publishable Key (前端用)'),
-            ('stripe_auto_billing_enabled', '0', 'billing', 0, 'bool', '0', 'Stripe 自动续费主开关'),
+            ('stripe_auto_billing_enabled', '0', 'billing', 0, 'bool', '0', 'Stripe 存卡自动扣费开关'),
             ('balance_auto_renew_enabled', '0', 'billing', 0, 'bool', '0', '余额自动续费开关'),
             ('stripe_grace_days', '7', 'billing', 0, 'int', '7', 'Stripe 扣款失败后的宽限天数')");
 

@@ -433,8 +433,14 @@ final class Cron
                 echo "已标记订单 #{$order->id} 为等待激活。\n";
                 continue;
             }
-            // 取消超时未支付的订单和关联账单，跳过账单已经部分支付的订单
-            if ($order->create_time + 86400 < time() && $invoice->status !== 'partially_paid') {
+            // 取消超时未支付的订单和关联账单，跳过账单已经部分支付的订单。
+            // 订阅续费订单（subscription_id 非空）豁免此 24h 超时：generateRenewalOrder 会在到期前
+            // 最多 subscription_renewal_days 天就生成续费账单，必须保留到续费日交由 processAutoRenew
+            // 结算，否则会被提前取消导致订阅卡死（auto_renew=1，被 expireSubscription 排除，永不进入宽限）。
+            if ($order->create_time + 86400 < time()
+                && $invoice->status !== 'partially_paid'
+                && empty($order->subscription_id)
+            ) {
                 $order->status = 'cancelled';
                 $order->update_time = time();
                 $order->save();

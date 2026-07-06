@@ -196,7 +196,7 @@
                                             </div>
                                         </div>
                                         <div class="form-group mb-3 row">
-                                            <label class="form-label col-3 col-form-label">自动续费（订阅）</label>
+                                            <label class="form-label col-3 col-form-label">Stripe 存卡自动扣费</label>
                                             <div class="col">
                                                 <select id="stripe_auto_billing_enabled" class="col form-select">
                                                     <option value="0">停用</option>
