@@ -462,9 +462,9 @@ final class OrderController extends BaseController
         // 余额优先：购买价 > 0、余额足额且优惠码允许余额支付时，立即用站内余额结算该订阅账单。
         // 在行锁事务内复读并复查（镜像 InvoiceController::payBalance /
         // SubscriptionService::payRenewalFromBalance）：账单仍为 unpaid 且余额仍足额才扣款、写
-        // UserMoneyLog、置账单 paid_balance + pay_time，并把订单置 pending_activation，交由每 5 分钟的
-        // processNewSubscriptionActivation 创建订阅。余额不足则保持账单 unpaid、订单 pending_payment，
-        // 用户走常规账单支付流程（与改动前一致）。
+        // UserMoneyLog、置账单 paid_balance + pay_time，并把订单置 pending_activation，settle 后本请求内
+        // 由 OrderActivation::tryActivateQuietly 即时激活，5 分钟 cron 仍兜底。余额不足则保持账单
+        // unpaid、订单 pending_payment，用户走常规账单支付流程（与改动前一致）。
         if ($buyPrice > 0
             && (float) $user->money >= (float) $buyPrice
             && Coupon::checkBalancePayAllowed($couponCode)
@@ -513,7 +513,7 @@ final class OrderController extends BaseController
 
         // 已结清订单(余额结算成功 / 0 元免费单)即时激活;网关待支付订单此调用是
         // 无害 no-op(账单未付,tryActivate 返回 false),cron 仍兜底一切。
-        OrderActivation::tryActivate((int) $order->id);
+        OrderActivation::tryActivateQuietly((int) $order->id);
 
         return $response->withHeader('HX-Redirect', '/user/invoice/' . $invoice->id . '/view');
     }

@@ -10,6 +10,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Models\UserMoneyLog;
 use Carbon\Carbon;
+use Throwable;
 use function in_array;
 use function json_decode;
 use function time;
@@ -68,6 +69,19 @@ final class OrderActivation
         });
     }
 
+    /**
+     * tryActivate 的 web 安全版:吞掉一切激活异常。支付已入账的请求绝不能因激活
+     * 失败而 500(事务已回滚,订单留在 cron 可处理状态,体验退回「等 cron」)。
+     */
+    public static function tryActivateQuietly(int $orderId): bool
+    {
+        try {
+            return self::tryActivate($orderId);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
     private static function activateTopup(Order $order): bool
     {
         $user = (new User())->where('id', $order->user_id)->lockForUpdate()->first();
@@ -112,9 +126,12 @@ final class OrderActivation
             return false;
         }
 
+        // 行锁当前读:普通一致性读在 REPEATABLE READ 下用的是事务快照,两笔并发结算
+        // 可能互相看不见对方刚提交的订阅,给同一用户开出两个 active 订阅。
         $existing = (new Subscription())
             ->where('user_id', $user->id)
             ->whereIn('status', ['active', 'pending_renewal'])
+            ->lockForUpdate()
             ->first();
 
         if ($existing !== null) {
