@@ -138,3 +138,38 @@ it('keeps the cron loop working through delegation', function () {
     expect((new Order())->find($order->id)->status)->toBe('activated');
     expect((new Subscription())->where('user_id', $user->id)->count())->toBe(1);
 });
+
+it('returns false without throwing when billing_cycle_selected is missing, leaving the order for manual review', function () {
+    $user = makeUserWithMoney(0.0);
+
+    $order = new Order();
+    $order->user_id = $user->id;
+    $order->product_id = 1;
+    $order->product_type = 'subscription';
+    $order->product_name = 'Pro';
+    $order->product_content = json_encode(['class' => 1, 'bandwidth' => 100]);
+    $order->subscription_id = null;
+    $order->coupon = '';
+    $order->price = 10.0;
+    $order->status = 'pending_activation';
+    $order->billing_provider = 'manual';
+    $order->create_time = time();
+    $order->update_time = time();
+    $order->save();
+
+    $invoice = new Invoice();
+    $invoice->type = 'product';
+    $invoice->user_id = $user->id;
+    $invoice->order_id = $order->id;
+    $invoice->content = json_encode([['content_id' => 0, 'name' => 'Pro', 'price' => 10.0]]);
+    $invoice->price = 10.0;
+    $invoice->status = 'paid_balance';
+    $invoice->create_time = time();
+    $invoice->update_time = time();
+    $invoice->save();
+
+    expect(OrderActivation::tryActivate((int) $order->id))->toBeFalse();
+
+    expect((new Order())->find($order->id)->status)->toBe('pending_activation');
+    expect((new Subscription())->where('user_id', $user->id)->count())->toBe(0);
+});

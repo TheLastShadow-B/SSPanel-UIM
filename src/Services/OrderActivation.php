@@ -122,7 +122,20 @@ final class OrderActivation
         }
 
         $content = json_decode($order->product_content);
-        $billingCycle = $content->billing_cycle_selected;
+
+        if (! is_object($content)) {
+            return false;
+        }
+
+        $billingCycle = $content->billing_cycle_selected ?? null;
+
+        // 内容缺失/非法计费周期:不激活也不抛异常 —— 抛出会让网关回调 500 进入重试风暴
+        // (账单此刻已标记已付),cron 走同一入口也会同样崩溃。返回 false 让订单留在
+        // pending_activation,cron 日志每轮可见「本轮未激活」,交由人工修数据。
+        if (! in_array($billingCycle, ['month', 'quarter', 'year'], true)) {
+            return false;
+        }
+
         $today = Carbon::today();
         $endDate = SubscriptionService::calculateEndDate($today, $billingCycle);
 

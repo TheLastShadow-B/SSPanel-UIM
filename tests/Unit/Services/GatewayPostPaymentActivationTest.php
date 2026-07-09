@@ -159,3 +159,17 @@ it('stays safe on duplicate webhook delivery', function () {
     expect((float) (new User())->find($user->id)->money)->toBe(10.0);
     expect((new Order())->find($order->id)->status)->toBe('activated');
 });
+
+it('settles the invoice without throwing when billing_cycle_selected is malformed, leaving the order pending_activation', function () {
+    $user = makeUserWithMoney(0.0);
+    [$order, $invoice, $tradeno] = postPaymentMakePending($user, 'subscription', [
+        'class' => 1,
+        'bandwidth' => 100,
+    ], 10.0);
+
+    postPaymentTestGateway()->postPayment($tradeno);
+
+    expect((new Invoice())->find($invoice->id)->status)->toBe('paid_gateway');
+    expect((new Order())->find($order->id)->status)->toBe('pending_activation');
+    expect((new Subscription())->where('user_id', $user->id)->count())->toBe(0);
+});

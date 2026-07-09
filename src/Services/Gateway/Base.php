@@ -15,6 +15,7 @@ use App\Utils\Tools;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use Throwable;
 use voku\helper\AntiXSS;
 use function get_called_class;
 use function in_array;
@@ -92,8 +93,15 @@ abstract class Base
 
         // 回调即时激活:账单已结清则同步激活订单(幂等,5 分钟 cron 仍兜底)。
         // 网关重复投递安全:tryActivate 行锁 + 状态复查,只成功一次。
+        // 任何激活异常都不得让回调 500(账单已结清,网关会无限重试同一笔),
+        // 事务已回滚,订单留在 cron 可处理状态 —— 镜像 Stripe::notify 对空 trade_no
+        // 的 no-op 防御(TypeError -> 500 -> retry loop)。
         if ($invoice !== null && $invoice->order_id !== null) {
-            OrderActivation::tryActivate((int) $invoice->order_id);
+            try {
+                OrderActivation::tryActivate((int) $invoice->order_id);
+            } catch (Throwable) {
+                // 静默降级:支付已入账,激活交由 cron/人工兜底
+            }
         }
     }
 
