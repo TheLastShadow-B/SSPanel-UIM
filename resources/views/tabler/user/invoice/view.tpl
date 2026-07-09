@@ -94,6 +94,14 @@
                 </div>
                 {if $invoice->status === 'unpaid' || $invoice->status === 'partially_paid'}
                 <div class="col-sm-12 col-md-6 col-lg-3">
+                    {if isset($smarty.get.paid)}
+                    <div class="alert alert-info" role="alert">
+                        <div class="d-flex align-items-center">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <div>支付确认中,通常数秒内生效,页面将自动刷新…</div>
+                        </div>
+                    </div>
+                    {/if}
                     <div class="card">
                         <ul class="nav nav-tabs nav-fill" data-bs-toggle="tabs">
                             {if $invoice->type !== 'topup'}
@@ -153,5 +161,38 @@
             </div>
         </div>
     </div>
+
+    {if $invoice->status === 'unpaid' || $invoice->status === 'partially_paid'}
+    <script>
+        window.invoiceStatusUrl = '/user/invoice/{$invoice->id}/status';
+    </script>
+    {literal}
+    <script>
+        // 支付落账轮询:账单脱离待支付状态即整页刷新(网关回调通常数秒内到达)。
+        // 上限 200 次(约 10 分钟)后停止,避免挂机页面空转。
+        (function () {
+            var polls = 0;
+            var timer = setInterval(function () {
+                polls += 1;
+                if (polls > 200) {
+                    clearInterval(timer);
+                    return;
+                }
+                fetch(window.invoiceStatusUrl, { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.ret === 1
+                            && data.invoice_status !== 'unpaid'
+                            && data.invoice_status !== 'partially_paid') {
+                            clearInterval(timer);
+                            window.location.reload();
+                        }
+                    })
+                    .catch(function () {});
+            }, 3000);
+        })();
+    </script>
+    {/literal}
+    {/if}
 
     {include file='user/footer.tpl'}
