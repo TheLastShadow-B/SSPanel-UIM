@@ -164,7 +164,7 @@ final class SubscriptionService
     }
 
     /**
-     * 处理续费订阅激活（每5分钟执行）
+     * 处理续费订阅激活(每5分钟兜底;支付路径已即时调用 OrderActivation)
      */
     public static function processRenewalActivation(): void
     {
@@ -176,29 +176,11 @@ final class SubscriptionService
             ->get();
 
         foreach ($orders as $order) {
-            $subscription = (new Subscription())->find($order->subscription_id);
-
-            if ($subscription === null) {
-                echo "续费订单 #{$order->id} 关联订阅不存在，已跳过" . PHP_EOL;
-                continue;
+            if (OrderActivation::tryActivate((int) $order->id)) {
+                echo "续费订单 #{$order->id} 已激活,订阅 #{$order->subscription_id} 已续期" . PHP_EOL;
+            } else {
+                echo "续费订单 #{$order->id} 本轮未激活(关联订阅或用户不存在)" . PHP_EOL;
             }
-
-            $user = (new User())->find($order->user_id);
-
-            if ($user === null) {
-                echo "续费订单 #{$order->id} 用户不存在，已跳过" . PHP_EOL;
-                continue;
-            }
-
-            // 推进周期、对齐 class_expire 并按套餐重置流量（与自动续费共用 DRY）
-            self::advanceRenewedPeriod($subscription, $user);
-
-            // 更新订单状态
-            $order->status = 'activated';
-            $order->update_time = time();
-            $order->save();
-
-            echo "续费订单 #{$order->id} 已激活，订阅 #{$subscription->id} 已续期" . PHP_EOL;
         }
 
         echo Tools::toDateTime(time()) . ' 续费订阅激活处理完成' . PHP_EOL;

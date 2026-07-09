@@ -61,6 +61,8 @@ final class OrderActivation
                 $order->product_type === 'topup' => self::activateTopup($order),
                 $order->product_type === 'subscription' && $order->subscription_id === null
                     => self::activateNewSubscription($order),
+                $order->product_type === 'subscription' && $order->subscription_id !== null
+                    => self::activateRenewal($order),
                 default => false,
             };
         });
@@ -144,6 +146,37 @@ final class OrderActivation
         $subscription->save();
 
         SubscriptionService::grantMembershipFromContent($user, $content, $endDate->format('Y-m-d') . ' 23:59:59');
+
+        $order->status = 'activated';
+        $order->update_time = time();
+        $order->save();
+
+        return true;
+    }
+
+    /**
+     * 续费订单激活:推进订阅周期(newStart = end_date + 1 天,提前付款不吃亏)。
+     * 流量重置归 resetSubscriptionBandwidth 在 reset_day 负责,此处绝不重置。
+     */
+    private static function activateRenewal(Order $order): bool
+    {
+        if (! in_array($order->billing_provider, SubscriptionService::SELF_MANAGED, true)) {
+            return false;
+        }
+
+        $subscription = (new Subscription())->find($order->subscription_id);
+
+        if ($subscription === null) {
+            return false;
+        }
+
+        $user = (new User())->where('id', $order->user_id)->lockForUpdate()->first();
+
+        if ($user === null) {
+            return false;
+        }
+
+        SubscriptionService::advanceRenewedPeriod($subscription, $user);
 
         $order->status = 'activated';
         $order->update_time = time();
