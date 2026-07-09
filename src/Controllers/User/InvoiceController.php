@@ -86,6 +86,29 @@ final class InvoiceController extends BaseController
         );
     }
 
+    /**
+     * 账单页轮询端点:返回账单与关联订单的当前状态。
+     * 支付落账(网关回调异步到达)后前端据此自动刷新页面。
+     */
+    public function status(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        $id = $this->antiXss->xss_clean($args['id']);
+
+        $invoice = (new Invoice())->where('user_id', $this->user->id)->where('id', $id)->first();
+
+        if ($invoice === null) {
+            return $response->withJson(['ret' => 0]);
+        }
+
+        $order = $invoice->order_id === null ? null : (new Order())->find($invoice->order_id);
+
+        return $response->withJson([
+            'ret' => 1,
+            'invoice_status' => $invoice->status,
+            'order_status' => $order?->status,
+        ]);
+    }
+
     public function payBalance(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $invoice_id = $this->antiXss->xss_clean($request->getParam('invoice_id'));
