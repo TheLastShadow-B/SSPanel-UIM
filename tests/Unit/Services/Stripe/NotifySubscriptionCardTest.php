@@ -15,6 +15,8 @@ use Slim\Http\Factory\DecoratedServerRequestFactory;
 use Stripe\StripeClient;
 use Tests\TestDatabase;
 
+require_once __DIR__ . '/../AutoRenew/AutoRenewHelpers.php';
+
 /*
  * ---------------------------------------------------------------------------
  * Task B1 — payment_intent.succeeded (trade_no settle path): after a FIRST-
@@ -38,6 +40,7 @@ const NOTIFY_CARD_SECRET = 'whsec_test_notify_card_secret';
 beforeEach(function () {
     require BASE_PATH . '/config/.config.test.php';
     TestDatabase::init();
+    ensureUserMoneyLogTable();
 
     Config::query()->updateOrInsert(
         ['item' => 'stripe_endpoint_secret'],
@@ -46,6 +49,7 @@ beforeEach(function () {
 });
 
 afterEach(function () {
+    dropUserMoneyLogTable();
     TestDatabase::dropTables();
     StripeService::setInstance(new StripeService(new StripeClient(['api_key' => 'sk_test_x'])));
 });
@@ -118,7 +122,19 @@ function notifyCardSettleRows(int $userId, string $productType, string $tradeNo)
     $order->product_id = 1;
     $order->product_type = $productType;
     $order->product_name = 'Pro';
-    $order->product_content = json_encode(['class' => 1, 'bandwidth' => 100]);
+    $order->product_content = json_encode(
+        $productType === 'topup'
+            ? ['amount' => 30.0]
+            : [
+                'class' => 1,
+                'bandwidth' => 100,
+                'billing_cycle_selected' => 'month',
+                'name' => 'Pro',
+                'node_group' => 1,
+                'speed_limit' => 0,
+                'ip_limit' => 0,
+            ]
+    );
     $order->coupon = '';
     $order->price = 30.0;
     $order->status = 'pending_payment';

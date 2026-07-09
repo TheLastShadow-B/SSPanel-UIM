@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Paylist;
 use App\Models\User;
 use App\Models\UserMoneyLog;
+use App\Services\OrderActivation;
 use App\Services\Reward;
 use App\Utils\Tools;
 use Psr\Http\Message\ResponseInterface;
@@ -87,6 +88,12 @@ abstract class Base
 
         if ($user !== null && $user->ref_by > 0 && Config::obtain('invite_mode') === 'reward') {
             Reward::issuePaybackReward($user->id, $user->ref_by, $invoice?->price, $paylist?->invoice_id);
+        }
+
+        // 回调即时激活:账单已结清则同步激活订单(幂等,5 分钟 cron 仍兜底)。
+        // 网关重复投递安全:tryActivate 行锁 + 状态复查,只成功一次。
+        if ($invoice !== null && $invoice->order_id !== null) {
+            OrderActivation::tryActivate((int) $invoice->order_id);
         }
     }
 
