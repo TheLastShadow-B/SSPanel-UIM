@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\UserMoneyLog;
 use App\Services\Coupon;
 use App\Services\DB;
+use App\Services\OrderActivation;
 use App\Utils\Cookie;
 use App\Utils\Tools;
 use Exception;
@@ -509,6 +510,10 @@ final class OrderController extends BaseController
                 }
             });
         }
+
+        // 已结清订单(余额结算成功 / 0 元免费单)即时激活;网关待支付订单此调用是
+        // 无害 no-op(账单未付,tryActivate 返回 false),cron 仍兜底一切。
+        OrderActivation::tryActivate((int) $order->id);
 
         return $response->withHeader('HX-Redirect', '/user/invoice/' . $invoice->id . '/view');
     }

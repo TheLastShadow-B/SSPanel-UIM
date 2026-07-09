@@ -24,12 +24,11 @@ use Tests\TestDatabase;
  * Task B2 — first-purchase balance-first + auto_renew default.
  *
  * subscription() now settles a paid subscription order from the user's站内余额
- * the moment it is created (when the balance covers the price), flips the order
- * to pending_activation, and lets the existing 5-min activation chain
- * (SubscriptionService::processNewSubscriptionActivation) create the Subscription
- * — now with auto_renew=1 (opt-out). The legacy auto_renew_provider /
- * billing_provider='stripe' checkout branch is gone: every self-managed
- * subscription is billing_provider='manual'.
+ * the moment it is created (when the balance covers the price), and
+ * activates instantly via OrderActivation (cron remains the fallback),
+ * creating the Subscription — now with auto_renew=1 (opt-out). The legacy
+ * auto_renew_provider / billing_provider='stripe' checkout branch is gone:
+ * every self-managed subscription is billing_provider='manual'.
  *
  * DB-backed against the real MariaDB sspanel_test (mirrors
  * SubscriptionCheckoutModeTest / InvoicePayBalanceGuardTest). No network: the
@@ -233,7 +232,7 @@ it('settles a subscription purchase from balance, then activation creates a manu
     expect($invoice->status)->toBe('paid_balance');
     expect((int) $invoice->pay_time)->toBeGreaterThan(0);
     expect($invoice->billing_provider)->toBe('manual');
-    expect($order->status)->toBe('pending_activation');
+    expect($order->status)->toBe('activated');
     expect($order->billing_provider)->toBe('manual');
 
     // UserMoneyLog records the -10 deduction.
@@ -243,24 +242,25 @@ it('settles a subscription purchase from balance, then activation creates a manu
     expect((float) $log->after)->toBe(40.0);
     expect((float) $log->amount)->toBe(-10.0);
 
-    // The existing 5-min activation chain creates the Subscription.
-    // (Buffer the cron's progress echoes: the suite is strict about test output.)
-    ob_start();
-    SubscriptionService::processNewSubscriptionActivation();
-    ob_get_clean();
-
+    // 订阅已在购买请求内即时创建(不再等 5 分钟 cron)。
     $sub = (new Subscription())->where('user_id', $user->id)->first();
     expect($sub)->not->toBeNull();
     expect($sub->billing_provider)->toBe('manual');
     expect((int) $sub->auto_renew)->toBe(1);
     expect($sub->status)->toBe('active');
 
-    // Membership granted from product_content (class 1, 100 GB).
+    // 会员权益同步发放(class 1, 100 GB)。
     $fresh = (new User())->find($user->id);
     expect((int) $fresh->class)->toBe(1);
     expect((int) $fresh->transfer_enable)->toBe(100 * 1024 ** 3);
 
     expect((new Order())->find($order->id)->status)->toBe('activated');
+
+    // cron 兜底复跑必须幂等:不产生第二条订阅。
+    ob_start();
+    SubscriptionService::processNewSubscriptionActivation();
+    ob_get_clean();
+    expect((new Subscription())->where('user_id', $user->id)->count())->toBe(1);
 });
 
 it('leaves the invoice unpaid and the balance untouched when money is insufficient', function () {
@@ -308,10 +308,10 @@ it('settles when the balance exactly equals the price', function () {
 
     expect((float) (new User())->find($user->id)->money)->toBe(0.0);
     expect((new Invoice())->where('user_id', $user->id)->first()->status)->toBe('paid_balance');
-    expect((new Order())->where('user_id', $user->id)->first()->status)->toBe('pending_activation');
+    expect((new Order())->where('user_id', $user->id)->first()->status)->toBe('activated');
 });
 
-it('keeps the zero-price activation path: a free subscription needs no balance and is pending_activation', function () {
+it('keeps the zero-price path: a free subscription activates instantly', function () {
     $user = purchaseMakeBuyer(0.0);
     $product = purchaseMakeProduct(0.0);
 
@@ -327,7 +327,7 @@ it('keeps the zero-price activation path: a free subscription needs no balance a
     $order = (new Order())->where('user_id', $user->id)->first();
     $invoice = (new Invoice())->where('user_id', $user->id)->first();
 
-    expect($order->status)->toBe('pending_activation');
+    expect($order->status)->toBe('activated');
     expect($invoice->status)->toBe('paid_gateway');
     expect((float) (new User())->find($user->id)->money)->toBe(0.0);
     expect((new UserMoneyLog())->where('user_id', $user->id)->first())->toBeNull();
@@ -378,6 +378,6 @@ it('ignores auto_renew_provider=stripe even with the master switch ON: stays man
     expect($order->billing_provider)->toBe('manual');
     expect($invoice->billing_provider)->toBe('manual');
     expect($invoice->status)->toBe('paid_balance');
-    expect($order->status)->toBe('pending_activation');
+    expect($order->status)->toBe('activated');
     expect((float) (new User())->find($user->id)->money)->toBe(40.0);
 });

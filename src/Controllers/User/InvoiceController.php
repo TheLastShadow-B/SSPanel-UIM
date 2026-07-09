@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\UserMoneyLog;
 use App\Services\Coupon;
 use App\Services\DB;
+use App\Services\OrderActivation;
 use App\Services\Payment;
 use App\Utils\Tools;
 use Exception;
@@ -208,6 +209,11 @@ final class InvoiceController extends BaseController
         }
 
         if ($outcome === 'paid_full') {
+            // 余额全额支付成功:即时激活关联订单(幂等,cron 兜底)。
+            if ($invoice->order_id !== null) {
+                OrderActivation::tryActivate((int) $invoice->order_id);
+            }
+
             return $response->withHeader('HX-Redirect', '/user/invoice');
         }
 
