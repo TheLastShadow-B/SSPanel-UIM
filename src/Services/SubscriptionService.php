@@ -77,7 +77,7 @@ final class SubscriptionService
     }
 
     /**
-     * 处理新订阅激活（每5分钟执行）
+     * 处理新订阅激活(每5分钟兜底;支付路径已即时调用 OrderActivation)
      */
     public static function processNewSubscriptionActivation(): void
     {
@@ -89,58 +89,11 @@ final class SubscriptionService
             ->get();
 
         foreach ($orders as $order) {
-            $user = (new User())->find($order->user_id);
-
-            if ($user === null) {
-                echo "订阅订单 #{$order->id} 用户不存在，已跳过" . PHP_EOL;
-                continue;
+            if (OrderActivation::tryActivate((int) $order->id)) {
+                echo "订阅订单 #{$order->id} 已激活" . PHP_EOL;
+            } else {
+                echo "订阅订单 #{$order->id} 本轮未激活(用户不存在或已有活跃/待续费订阅)" . PHP_EOL;
             }
-
-            // 检查用户是否已有活跃或待续费的订阅
-            $existingSubscription = (new Subscription())
-                ->where('user_id', $user->id)
-                ->whereIn('status', ['active', 'pending_renewal'])
-                ->first();
-
-            if ($existingSubscription !== null) {
-                echo "用户 #{$user->id} 已有活跃/待续费订阅，跳过订单 #{$order->id}" . PHP_EOL;
-                continue;
-            }
-
-            $content = json_decode($order->product_content);
-            $billingCycle = $content->billing_cycle_selected;
-            $today = Carbon::today();
-            $endDate = self::calculateEndDate($today, $billingCycle);
-
-            // 创建订阅记录
-            $subscription = new Subscription();
-            $subscription->user_id = $user->id;
-            $subscription->product_id = $order->product_id;
-            $subscription->product_content = $order->product_content;
-            $subscription->billing_cycle = $billingCycle;
-            $subscription->renewal_price = $order->price;
-            $subscription->start_date = $today->format('Y-m-d');
-            $subscription->end_date = $endDate->format('Y-m-d');
-            $subscription->reset_day = (int) $today->format('d');
-            $subscription->last_reset_date = $today->format('Y-m-d');
-            $subscription->status = 'active';
-            $subscription->billing_provider = 'manual';
-            // 自动续费默认开启（opt-out）：新激活的订阅一律 auto_renew=1，由自建引擎在到期时
-            // 按「余额优先 → 存档卡 → 宽限」续费，用户可在订阅页主动取消。
-            $subscription->auto_renew = 1;
-            $subscription->created_at = $today->format('Y-m-d H:i:s');
-            $subscription->updated_at = $today->format('Y-m-d H:i:s');
-            $subscription->save();
-
-            // 更新用户信息
-            self::grantMembershipFromContent($user, $content, $endDate->format('Y-m-d') . ' 23:59:59');
-
-            // 更新订单状态
-            $order->status = 'activated';
-            $order->update_time = time();
-            $order->save();
-
-            echo "订阅订单 #{$order->id} 已激活，创建订阅 #{$subscription->id}" . PHP_EOL;
         }
 
         echo Tools::toDateTime(time()) . ' 新订阅激活处理完成' . PHP_EOL;

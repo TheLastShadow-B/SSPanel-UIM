@@ -6,8 +6,10 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\Order;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Models\UserMoneyLog;
+use Carbon\Carbon;
 use function in_array;
 use function json_decode;
 use function time;
@@ -57,6 +59,8 @@ final class OrderActivation
 
             return match (true) {
                 $order->product_type === 'topup' => self::activateTopup($order),
+                $order->product_type === 'subscription' && $order->subscription_id === null
+                    => self::activateNewSubscription($order),
                 default => false,
             };
         });
@@ -86,6 +90,64 @@ final class OrderActivation
             (float) $content->amount,
             "充值订单 #{$order->id}"
         );
+
+        return true;
+    }
+
+    /**
+     * 新购订阅激活:建 Subscription(auto_renew=1 opt-out)+ 发放会员权益。
+     * 已有 active/pending_renewal 订阅时不重复开通,留给 cron 在旧订阅结束后处理。
+     */
+    private static function activateNewSubscription(Order $order): bool
+    {
+        if (! in_array($order->billing_provider, SubscriptionService::SELF_MANAGED, true)) {
+            return false;
+        }
+
+        $user = (new User())->where('id', $order->user_id)->lockForUpdate()->first();
+
+        if ($user === null) {
+            return false;
+        }
+
+        $existing = (new Subscription())
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['active', 'pending_renewal'])
+            ->first();
+
+        if ($existing !== null) {
+            return false;
+        }
+
+        $content = json_decode($order->product_content);
+        $billingCycle = $content->billing_cycle_selected;
+        $today = Carbon::today();
+        $endDate = SubscriptionService::calculateEndDate($today, $billingCycle);
+
+        $subscription = new Subscription();
+        $subscription->user_id = $user->id;
+        $subscription->product_id = $order->product_id;
+        $subscription->product_content = $order->product_content;
+        $subscription->billing_cycle = $billingCycle;
+        $subscription->renewal_price = $order->price;
+        $subscription->start_date = $today->format('Y-m-d');
+        $subscription->end_date = $endDate->format('Y-m-d');
+        $subscription->reset_day = (int) $today->format('d');
+        $subscription->last_reset_date = $today->format('Y-m-d');
+        $subscription->status = 'active';
+        $subscription->billing_provider = 'manual';
+        // 自动续费默认开启(opt-out):由自建引擎在到期时按「余额优先 → 存档卡 → 宽限」
+        // 续费,用户可在订阅页主动取消。
+        $subscription->auto_renew = 1;
+        $subscription->created_at = $today->format('Y-m-d H:i:s');
+        $subscription->updated_at = $today->format('Y-m-d H:i:s');
+        $subscription->save();
+
+        SubscriptionService::grantMembershipFromContent($user, $content, $endDate->format('Y-m-d') . ' 23:59:59');
+
+        $order->status = 'activated';
+        $order->update_time = time();
+        $order->save();
 
         return true;
     }
