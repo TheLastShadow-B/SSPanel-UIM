@@ -17,7 +17,6 @@ use App\Models\Paylist;
 use App\Models\SubscribeLog;
 use App\Models\Subscription;
 use App\Models\User;
-use App\Models\UserMoneyLog;
 use App\Utils\Tools;
 use DateTime;
 use Exception;
@@ -385,30 +384,16 @@ final class Cron
      */
     public static function processTopupOrderActivation(): void
     {
-        // 获取等待激活的充值订单，允许同时处理多个充值订单
+        // 获取等待激活的充值订单,允许同时处理多个充值订单
         $orders = (new Order())->where('status', 'pending_activation')
             ->where('product_type', 'topup')
             ->orderBy('id')
             ->get();
 
         foreach ($orders as $order) {
-            $user_id = $order->user_id;
-            $user = (new User())->find($user_id);
-            $content = json_decode($order->product_content);
-            // 充值
-            $user->money += $content->amount;
-            $user->save();
-            $order->status = 'activated';
-            $order->update_time = time();
-            $order->save();
-            (new UserMoneyLog())->add(
-                $user_id,
-                $user->money - $content->amount,
-                $user->money,
-                $content->amount,
-                "充值订单 #{$order->id}"
-            );
-            echo "充值订单 #{$order->id} 已激活。\n";
+            if (OrderActivation::tryActivate((int) $order->id)) {
+                echo "充值订单 #{$order->id} 已激活。\n";
+            }
         }
 
         echo Tools::toDateTime(time()) . ' 充值订单激活处理完成' . PHP_EOL;
