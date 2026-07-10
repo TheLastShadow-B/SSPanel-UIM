@@ -1,28 +1,12 @@
-{include file='header.tpl'}
-
-<body style="background-color:#EEEEEE;">
-    <div style="text-align: center">
-        <div border="0" cellpadding="0" cellspacing="0" width="100%" style="padding-top:30px;table-layout:fixed;background-color:#EEEEEE;">
-            <div align="center" valign="top" style="padding-right:10px;padding-left:10px;">
-                <div border="0" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;max-width:600px;text-align:center;" width="100%">
-                    <div align="center" valign="top">
-                        <div border="0" cellpadding="0" cellspacing="0" width="100%">
-                            <div align="center" valign="middle" style="padding-top:60px;padding-bottom:60px;">
-                                <h2 class="bigTitle">
-                                    邮箱验证
-                                </h2>
-                            </div>
-                        </div>
-                        <div border="0" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF" width="100%">
-                            <div align="center" valign="top" style="padding-bottom:60px;padding-left:20px;padding-right:20px;">
-                                <p class="midText">
-                                    你请求的邮箱验证代码为:<b style="color:#505050">{$code}</b> <br>
-                                    本验证代码在 {$expire} 前有效。<br>
-                                    如果此验证码非你本人申请，请忽视此邮件。<br>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-{include file='footer.tpl'}
+{include file='components/header.tpl' preheader='你的邮箱验证码'}
+{include file='components/hero.tpl' hero_title='邮箱验证码'}
+<p style="margin:0 0 14px;font-size:17px;font-weight:700;color:#1f2937;">你好</p>
+<p style="margin:0 0 18px;">感谢注册 {$config['appName']},你的邮箱验证码是:</p>
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin:6px 0 14px;">
+    <tr>
+        <td align="center" style="background-color:#ecf3fb;border-radius:8px;padding:18px 12px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:28px;font-weight:700;letter-spacing:6px;color:#1a5db0;">{$code}</td>
+    </tr>
+</table>
+<p style="margin:0;font-size:13px;color:#667085;text-align:center;">验证码有效期至 {$expire},请勿泄露给他人。</p>
+<p style="margin:14px 0 0;font-size:13px;color:#667085;text-align:center;">如非本人操作,请忽略此邮件。</p>
+{include file='components/footer.tpl'}

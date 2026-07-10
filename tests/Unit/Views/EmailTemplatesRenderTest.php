@@ -76,3 +76,27 @@ it('renders test.tpl with only config available', function () {
     expect($html)->toContain('测试邮件')->toContain('邮件发送配置正确');
     emailAssertBalanced($html);
 });
+
+it('renders verify_code.tpl with big code block', function () {
+    $html = emailRender('verify_code.tpl', ['code' => 'ABC123', 'expire' => '2026-07-10 12:00:00']);
+
+    expect($html)->toContain('邮箱验证码')->toContain('ABC123')->toContain('2026-07-10 12:00:00')
+        ->toContain('如非本人操作,请忽略此邮件');
+    emailAssertBalanced($html);
+});
+
+it('renders password_reset.tpl with reset button', function () {
+    $html = emailRender('password_reset.tpl', ['resetUrl' => 'https://test.local/password/token/tok123']);
+
+    expect($html)->toContain('重置密码')->toContain('https://test.local/password/token/tok123')
+        ->toContain('你的密码不会被更改');
+    emailAssertBalanced($html);
+});
+
+it('renders new_user.tpl welcome mail', function () {
+    $html = emailRender('new_user.tpl', ['user' => emailStubUser(), 'reg_time' => '2026-07-10 08:00:00']);
+
+    expect($html)->toContain('欢迎加入')->toContain('stub@example.com')->toContain('2026-07-10 08:00:00')
+        ->toContain('/user');
+    emailAssertBalanced($html);
+});

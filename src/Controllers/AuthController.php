@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\Config;
+use App\Models\EmailQueue;
 use App\Models\InviteCode;
 use App\Models\LoginIp;
 use App\Models\User;
@@ -290,11 +291,29 @@ final class AuthController extends BaseController
 
             Auth::login($user->id, 3600);
             (new LoginIp())->collectLoginIP($_SERVER['REMOTE_ADDR'], 0, $user->id);
+            $this->sendWelcomeEmail($user);
 
             return $response->withHeader('HX-Redirect', $redir);
         }
 
         return ResponseHelper::error($response, '未知错误');
+    }
+
+    /**
+     * 注册成功(非管理员创建)后入队欢迎邮件。抽成独立方法,便于绕开
+     * registerHelper 完整用户落库链路做单测。
+     */
+    public function sendWelcomeEmail(User $user): void
+    {
+        (new EmailQueue())->add(
+            $user->email,
+            $_ENV['appName'] . '-欢迎加入',
+            'new_user.tpl',
+            [
+                'user' => $user,
+                'reg_time' => date('Y-m-d H:i:s'),
+            ]
+        );
     }
 
     /**

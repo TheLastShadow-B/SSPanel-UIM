@@ -1,29 +1,7 @@
-{include file='header.tpl'}
-
-<body style="background-color:#EEEEEE;">
-    <div style="text-align: center">
-        <div border="0" cellpadding="0" cellspacing="0" width="100%" style="padding-top:30px;table-layout:fixed;background-color:#EEEEEE;">
-            <div align="center" valign="top" style="padding-right:10px;padding-left:10px;">
-                <div border="0" cellpadding="0" cellspacing="0"
-                     style="background-color:#FFFFFF;max-width:600px;text-align: center" width="100%">
-                    <div align="center" valign="top">
-                        <div border="0" cellpadding="0" cellspacing="0" width="100%">
-                            <div align="center" valign="middle" style="padding-top:60px;padding-bottom:60px;">
-                                <h2 class="bigTitle">
-                                    密码重置
-                                </h2>
-                            </div>
-                        </div>
-                        <div border="0" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF" width="100%">
-                            <div align="center" valign="top" style="padding-bottom:60px;padding-left:20px;padding-right:20px;">
-                                <p class="midText">
-                                    你收到此邮件是因为你在 {$config['appName']} 系统申请了密码重置，如果非本人申请，请忽略此邮件。
-                                    <br><br>
-                                    <a href="{$resetUrl}" style="color:#505050" target="_blank">点击此链接重置密码</a>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-{include file='footer.tpl'}
+{include file='components/header.tpl' preheader='重置你的账户密码'}
+{include file='components/hero.tpl' hero_title='重置密码'}
+<p style="margin:0 0 14px;font-size:17px;font-weight:700;color:#1f2937;">你好</p>
+<p style="margin:0;">我们收到了你的密码重置请求,点击下方按钮设置新密码:</p>
+{include file='components/button.tpl' btn_text='重置密码' btn_url=$resetUrl}
+<p style="margin:14px 0 0;font-size:13px;line-height:20px;color:#667085;text-align:center;">链接在有效期内一次有效;如非本人操作,请忽略此邮件,你的密码不会被更改。</p>
+{include file='components/footer.tpl'}
