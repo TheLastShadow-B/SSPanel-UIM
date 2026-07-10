@@ -18,7 +18,7 @@ final class Notification
      * @throws TelegramSDKException
      * @throws ClientExceptionInterface
      */
-    public static function notifyAdmin($title = '', $msg = '', $template = 'warn.tpl'): void
+    public static function notifyAdmin($title = '', $msg = '', $template = 'warn.tpl', array $extra = []): void
     {
         $admins = (new User())->where('is_admin', 1)->get();
 
@@ -28,11 +28,11 @@ final class Notification
                     $admin->email,
                     $title,
                     $template,
-                    [
+                    array_merge($extra, [
                         'user' => $admin,
                         'title' => $title,
                         'text' => $msg,
-                    ]
+                    ])
                 );
             } else {
                 IM::send($admin->im_value, $msg, $admin->im_type);
@@ -45,18 +45,18 @@ final class Notification
      * @throws TelegramSDKException
      * @throws ClientExceptionInterface
      */
-    public static function notifyUser($user, $title = '', $msg = '', $template = 'warn.tpl'): void
+    public static function notifyUser($user, $title = '', $msg = '', $template = 'warn.tpl', array $extra = []): void
     {
         if ($user->contact_method === 1 || $user->im_type === 0) {
             (new EmailQueue())->add(
                 $user->email,
                 $title,
                 $template,
-                [
+                array_merge($extra, [
                     'user' => $user,
                     'title' => $title,
                     'text' => $msg,
-                ]
+                ])
             );
         } else {
             IM::send($user->im_value, $msg, $user->im_type);
@@ -67,7 +67,7 @@ final class Notification
      * @throws GuzzleException
      * @throws TelegramSDKException
      */
-    public static function notifyAllUser($title = '', $msg = '', $template = 'warn.tpl'): void
+    public static function notifyAllUser($title = '', $msg = '', $template = 'warn.tpl', array $extra = []): void
     {
         $users = User::all();
 
@@ -77,11 +77,11 @@ final class Notification
                     $user->email,
                     $title,
                     $template,
-                    [
+                    array_merge($extra, [
                         'user' => $user,
                         'title' => $title,
                         'text' => $msg,
-                    ]
+                    ])
                 );
             } else {
                 IM::send((int) $user->im_value, $msg, $user->im_type);

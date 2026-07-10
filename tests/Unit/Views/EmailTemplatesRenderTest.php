@@ -100,3 +100,109 @@ it('renders new_user.tpl welcome mail', function () {
         ->toContain('/user');
     emailAssertBalanced($html);
 });
+
+it('renders subscription_renewal.tpl with full structured fields', function () {
+    $html = emailRender('subscription_renewal.tpl', [
+        'user' => emailStubUser(),
+        'text' => '你好,你的订阅即将到期,系统已为你生成续费订单,请及时支付以避免服务中断。',
+        'plan_name' => '测试订阅 Pro',
+        'billing_cycle_text' => '月付',
+        'amount' => '10.00',
+        'end_date' => '2026-08-08',
+        'order_id' => 42,
+        'invoice_url' => 'https://test.local/user/invoice/9/view',
+    ]);
+
+    expect($html)->toContain('订阅续费提醒')->toContain('测试订阅 Pro')->toContain('月付')
+        ->toContain('10.00')->toContain('#42')
+        ->toContain('https://test.local/user/invoice/9/view')->toContain('立即支付');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_renewal.tpl gracefully without structured fields (legacy queue rows)', function () {
+    $html = emailRender('subscription_renewal.tpl', [
+        'user' => emailStubUser(),
+        'text' => '老队列正文',
+    ]);
+
+    expect($html)->toContain('订阅续费提醒')->toContain('老队列正文')->not->toContain('立即支付');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_reminder.tpl with full structured fields', function () {
+    $html = emailRender('subscription_reminder.tpl', [
+        'user' => emailStubUser(),
+        'text' => '你好,你的订阅续费订单仍未支付,请尽快完成支付以避免服务到期后中断。',
+        'plan_name' => '测试订阅 Pro',
+        'billing_cycle_text' => '月付',
+        'amount' => '10.00',
+        'end_date' => '2026-08-08',
+        'order_id' => 42,
+        'invoice_url' => 'https://test.local/user/invoice/9/view',
+    ]);
+
+    expect($html)->toContain('续费订单待支付')->toContain('测试订阅 Pro')->toContain('月付')
+        ->toContain('10.00')->toContain('#42')
+        ->toContain('https://test.local/user/invoice/9/view')->toContain('立即支付');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_reminder.tpl gracefully without structured fields (legacy queue rows)', function () {
+    $html = emailRender('subscription_reminder.tpl', [
+        'user' => emailStubUser(),
+        'text' => '老队列正文',
+    ]);
+
+    expect($html)->toContain('续费订单待支付')->toContain('老队列正文')->not->toContain('立即支付');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_renewal_failed.tpl with full structured fields', function () {
+    $html = emailRender('subscription_renewal_failed.tpl', [
+        'user' => emailStubUser(),
+        'text' => '你好,本次自动续费扣款未能成功。',
+        'plan_name' => '测试订阅 Pro',
+        'billing_cycle_text' => '月付',
+        'amount' => '10.00',
+        'grace_until' => '2026-08-11 23:59:59',
+        'invoice_url' => 'https://test.local/user/invoice/9/view',
+    ]);
+
+    expect($html)->toContain('订阅续费失败')->toContain('测试订阅 Pro')
+        ->toContain('10.00')->toContain('2026-08-11 23:59:59')
+        ->toContain('https://test.local/user/invoice/9/view')->toContain('前往支付');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_renewal_failed.tpl gracefully without structured fields (legacy queue rows)', function () {
+    $html = emailRender('subscription_renewal_failed.tpl', [
+        'user' => emailStubUser(),
+        'text' => '老队列正文',
+    ]);
+
+    expect($html)->toContain('订阅续费失败')->toContain('老队列正文')->not->toContain('前往支付');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_expired.tpl with full structured fields', function () {
+    $html = emailRender('subscription_expired.tpl', [
+        'user' => emailStubUser(),
+        'text' => '你好,你的订阅已过期,账户服务已被停止。',
+        'plan_name' => '测试订阅 Pro',
+        'end_date' => '2026-08-08',
+    ]);
+
+    expect($html)->toContain('订阅已过期')->toContain('测试订阅 Pro')->toContain('2026-08-08')
+        ->toContain('已过期')->toContain('重新订阅')->toContain('/user/product');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_expired.tpl gracefully without structured fields (legacy queue rows)', function () {
+    $html = emailRender('subscription_expired.tpl', [
+        'user' => emailStubUser(),
+        'text' => '老队列正文',
+    ]);
+
+    expect($html)->toContain('订阅已过期')->toContain('老队列正文')->toContain('重新订阅');
+    emailAssertBalanced($html);
+});

@@ -49,6 +49,17 @@ final class SubscriptionService
         return self::balanceAutoRenewEnabled() || self::stripeAutoBillingEnabled();
     }
 
+    /** 计费周期中文名(邮件展示用) */
+    private static function billingCycleText(string $cycle): string
+    {
+        return match ($cycle) {
+            'month' => '月付',
+            'quarter' => '季付',
+            'year' => '年付',
+            default => $cycle,
+        };
+    }
+
     /**
      * 计算订阅结束日期
      */
@@ -312,7 +323,15 @@ final class SubscriptionService
                     $user,
                     $_ENV['appName'] . '-订阅续费提醒',
                     '你好，你的订阅即将到期，系统已为你生成续费订单，请及时支付以避免服务中断。',
-                    'subscription_renewal.tpl'
+                    'subscription_renewal.tpl',
+                    [
+                        'plan_name' => $content->name ?? null,
+                        'billing_cycle_text' => self::billingCycleText($subscription->billing_cycle),
+                        'amount' => $subscription->renewal_price,
+                        'end_date' => $subscription->end_date,
+                        'order_id' => $order->id,
+                        'invoice_url' => $_ENV['baseUrl'] . '/user/invoice/' . $invoice->id . '/view',
+                    ]
                 );
             } catch (GuzzleException|ClientExceptionInterface|TelegramSDKException $e) {
                 echo $e->getMessage() . PHP_EOL;
@@ -362,12 +381,25 @@ final class SubscriptionService
                 continue;
             }
 
+            $content = json_decode($subscription->product_content);
+            $invoice = (new Invoice())->where('order_id', $unpaidOrder->id)->first();
+
             try {
                 Notification::notifyUser(
                     $user,
                     $_ENV['appName'] . '-订阅续费二次提醒',
                     '你好，你的订阅续费订单仍未支付，请尽快完成支付以避免服务到期后中断。',
-                    'subscription_reminder.tpl'
+                    'subscription_reminder.tpl',
+                    [
+                        'plan_name' => $content->name ?? null,
+                        'billing_cycle_text' => self::billingCycleText($subscription->billing_cycle),
+                        'amount' => $subscription->renewal_price,
+                        'end_date' => $subscription->end_date,
+                        'order_id' => $unpaidOrder->id,
+                        'invoice_url' => $invoice !== null
+                            ? $_ENV['baseUrl'] . '/user/invoice/' . $invoice->id . '/view'
+                            : null,
+                    ]
                 );
             } catch (GuzzleException|ClientExceptionInterface|TelegramSDKException $e) {
                 echo $e->getMessage() . PHP_EOL;
@@ -698,7 +730,14 @@ final class SubscriptionService
                 $user,
                 $_ENV['appName'] . '-订阅续费失败',
                 $msg,
-                'subscription_renewal_failed.tpl'
+                'subscription_renewal_failed.tpl',
+                [
+                    'plan_name' => json_decode($sub->product_content)->name ?? null,
+                    'billing_cycle_text' => self::billingCycleText($sub->billing_cycle),
+                    'amount' => $sub->renewal_price,
+                    'grace_until' => $graceUntil,
+                    'invoice_url' => $payUrl,
+                ]
             );
         } catch (GuzzleException|ClientExceptionInterface|TelegramSDKException $e) {
             echo $e->getMessage() . PHP_EOL;
@@ -885,7 +924,11 @@ final class SubscriptionService
                         $user,
                         $_ENV['appName'] . '-订阅已过期',
                         '你好，你的订阅已过期，账户服务已被停止。如需继续使用，请重新购买订阅。',
-                        'subscription_expired.tpl'
+                        'subscription_expired.tpl',
+                        [
+                            'plan_name' => json_decode($subscription->product_content)->name ?? null,
+                            'end_date' => $subscription->end_date,
+                        ]
                     );
                 } catch (GuzzleException|ClientExceptionInterface|TelegramSDKException $e) {
                     echo $e->getMessage() . PHP_EOL;
@@ -964,7 +1007,11 @@ final class SubscriptionService
                         $user,
                         $_ENV['appName'] . '-订阅已过期',
                         '你好，你的订阅已超过宽限期仍未完成续费，账户服务已被停止。如需继续使用，请重新购买订阅。',
-                        'subscription_expired.tpl'
+                        'subscription_expired.tpl',
+                        [
+                            'plan_name' => json_decode($subscription->product_content)->name ?? null,
+                            'end_date' => $subscription->end_date,
+                        ]
                     );
                 } catch (GuzzleException|ClientExceptionInterface|TelegramSDKException $e) {
                     echo $e->getMessage() . PHP_EOL;
