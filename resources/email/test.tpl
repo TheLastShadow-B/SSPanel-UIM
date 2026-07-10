@@ -1,26 +1,7 @@
-{include file='header.tpl'}
-
-<body style="background-color:#EEEEEE;">
-    <div style="text-align: center">
-        <div border="0" cellpadding="0" cellspacing="0" width="100%" style="padding-top:30px;table-layout:fixed;background-color:#EEEEEE;">
-            <div align="center" valign="top" style="padding-right:10px;padding-left:10px;">
-                <div border="0" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;max-width:600px;text-align:center;" width="100%">
-                    <div align="center" valign="top">
-                        <div border="0" cellpadding="0" cellspacing="0" width="100%">
-                            <div align="center" valign="middle" style="padding-top:60px;padding-bottom:60px">
-                                <h2 class="bigTitle">
-                                    邮件发送测试
-                                </h2>
-                            </div>
-                        </div>
-                        <div border="0" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF" width="100%">
-                            <div align="center" valign="top" style="padding-bottom:60px; padding-left:20px; padding-right:20px;">
-                                <p class="midText">
-                                    这是一封测试邮件。如果你能收到，说明邮件发送配置有效，可以正常工作。
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-{include file='footer.tpl'}
+{include file='components/header.tpl' preheader='邮件发送配置测试'}
+{include file='components/hero.tpl' hero_title='测试邮件'}
+<p style="margin:0 0 14px;font-size:17px;font-weight:700;color:#1f2937;">你好</p>
+<p style="margin:0;">如果你收到这封邮件,说明邮件发送配置正确。</p>
+{$rows = [['label' => '发送时间', 'value' => "{$smarty.now|date_format:'Y-m-d H:i:s'}"]]}
+{include file='components/card.tpl' card_rows=$rows}
+{include file='components/footer.tpl'}
