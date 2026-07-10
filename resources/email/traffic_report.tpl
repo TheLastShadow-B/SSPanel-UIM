@@ -12,7 +12,11 @@
 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin:4px 0 16px;">
     <tr>
         <td style="background-color:#e9ecef;border-radius:6px;height:10px;line-height:10px;font-size:0;">
-            <div style="width:{$used_pct}%;max-width:100%;height:10px;border-radius:6px;background-color:{if $used_pct >= 80}#c62828{else}#206bc4{/if};">&nbsp;</div>
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="{$used_pct}%" style="max-width:100%;">
+                <tr>
+                    <td bgcolor="{if $used_pct >= 80}#c62828{else}#206bc4{/if}" style="height:10px;line-height:10px;font-size:0;border-radius:6px;">&nbsp;</td>
+                </tr>
+            </table>
         </td>
     </tr>
     <tr>

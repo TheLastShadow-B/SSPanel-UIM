@@ -41,6 +41,7 @@ if (! function_exists('emailRender')) {
         expect(substr_count($html, '</body>'))->toBe(1);
         expect(substr_count($html, '<table'))->toBe(substr_count($html, '</table>'));
         expect(substr_count($html, '<tr'))->toBe(substr_count($html, '</tr>'));
+        expect(substr_count($html, '<div'))->toBe(substr_count($html, '</div'));
     }
 
     function emailStubUser(): object
@@ -126,6 +127,38 @@ it('renders subscription_renewal.tpl gracefully without structured fields (legac
     ]);
 
     expect($html)->toContain('订阅续费提醒')->toContain('老队列正文')->not->toContain('立即支付');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_renewal.tpl through the production email-queue json round-trip', function () {
+    // Mirrors the real dispatch path, not the array literal shorthand the other cases use:
+    // EmailQueue::add() (src/Models/EmailQueue.php:32) stores json_encode($array); Cron::
+    // processEmailQueue() (src/Services/Cron.php:238) reads it back with plain
+    // json_decode($email_queue['array']) — no $assoc = true — so Mail::genHtml() (src/Services/
+    // Mail.php:55 foreach) is actually handed nested stdClass objects, not arrays (e.g. $vars['user']
+    // arrives as stdClass, same as the hand-built stub, but every other nested value is also
+    // whatever json_decode(..., false) produces). We only cast the top level to array here because
+    // emailRender()'s helper signature is typed array $vars — the nested values are left exactly as
+    // json_decode(..., false) produced them, matching production.
+    $vars = [
+        'user' => emailStubUser(),
+        'text' => '你好,你的订阅即将到期,系统已为你生成续费订单,请及时支付以避免服务中断。',
+        'plan_name' => null,
+        'billing_cycle_text' => '月付',
+        'amount' => '10.00',
+        'end_date' => '2026-08-08',
+        'order_id' => 42,
+        'invoice_url' => null,
+    ];
+    $queueShapedVars = (array) json_decode(json_encode($vars));
+
+    $html = emailRender('subscription_renewal.tpl', $queueShapedVars);
+
+    expect($html)->toContain('订阅续费提醒')
+        ->toContain('测试用户') // $user->user_name renders off a stdClass, per the queue contract
+        ->toContain('10.00') // 续费金额 row still renders
+        ->not->toContain('立即支付') // invoice_url null → isset() false → no button
+        ->not->toContain('套餐'); // plan_name null → isset() false → no row
     emailAssertBalanced($html);
 });
 
@@ -219,7 +252,7 @@ it('renders traffic_report.tpl with usage bar', function () {
     ]);
 
     expect($html)->toContain('每日流量报告')->toContain('1.5GB')->toContain('30GB')
-        ->toContain('70GB')->toContain('100GB')->toContain('width:30%')->toContain('测试公告');
+        ->toContain('70GB')->toContain('100GB')->toContain('width="30%"')->toContain('测试公告');
     emailAssertBalanced($html);
 });
 
@@ -233,7 +266,7 @@ it('renders traffic_report.tpl without used_pct (legacy rows)', function () {
         'unused_traffic' => '1GB',
     ]);
 
-    expect($html)->toContain('每日流量报告')->not->toContain('width:%');
+    expect($html)->toContain('每日流量报告')->not->toContain('已使用');
     emailAssertBalanced($html);
 });
 
