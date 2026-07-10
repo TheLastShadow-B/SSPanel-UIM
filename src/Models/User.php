@@ -299,6 +299,9 @@ final class User extends Model
                     'enable_traffic' => $enable_traffic,
                     'used_traffic' => $used_traffic,
                     'unused_traffic' => $unused_traffic,
+                    'used_pct' => $this->transfer_enable > 0
+                        ? min(100, (int) round(($this->u + $this->d) * 100 / $this->transfer_enable))
+                        : null,
                 ]
             );
         } elseif ($this->daily_mail_enable === 2 && $this->im_value !== '') {

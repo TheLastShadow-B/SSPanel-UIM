@@ -206,3 +206,40 @@ it('renders subscription_expired.tpl gracefully without structured fields (legac
     expect($html)->toContain('订阅已过期')->toContain('老队列正文')->toContain('重新订阅');
     emailAssertBalanced($html);
 });
+
+it('renders traffic_report.tpl with usage bar', function () {
+    $html = emailRender('traffic_report.tpl', [
+        'user' => emailStubUser(),
+        'text' => '站点公告:<br>测试公告',
+        'lastday_traffic' => '1.5GB',
+        'enable_traffic' => '100GB',
+        'used_traffic' => '30GB',
+        'unused_traffic' => '70GB',
+        'used_pct' => 30,
+    ]);
+
+    expect($html)->toContain('每日流量报告')->toContain('1.5GB')->toContain('30GB')
+        ->toContain('70GB')->toContain('100GB')->toContain('width:30%')->toContain('测试公告');
+    emailAssertBalanced($html);
+});
+
+it('renders traffic_report.tpl without used_pct (legacy rows)', function () {
+    $html = emailRender('traffic_report.tpl', [
+        'user' => emailStubUser(),
+        'text' => '公告',
+        'lastday_traffic' => '1GB',
+        'enable_traffic' => '10GB',
+        'used_traffic' => '9GB',
+        'unused_traffic' => '1GB',
+    ]);
+
+    expect($html)->toContain('每日流量报告')->not->toContain('width:%');
+    emailAssertBalanced($html);
+});
+
+it('renders finance.tpl wrapping preformatted text', function () {
+    $html = emailRender('finance.tpl', ['title' => '财务日报', 'text' => '<table><tr><td>77.00</td></tr></table>']);
+
+    expect($html)->toContain('财务日报')->toContain('77.00');
+    emailAssertBalanced($html);
+});
