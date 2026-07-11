@@ -38,7 +38,17 @@ final class Detect
                 $_ENV['detect_gfw_url']
             );
 
-            $json_tcping = json_decode(file_get_contents($api_url), true);
+            // API 不可达/返回非法 JSON 时跳过本轮:strict_types 下 json_decode(false)
+            // 会抛 TypeError 崩掉整个 cron;误把失败当「被墙」则会批量误报并轰炸管理员邮箱。
+            $raw_tcping = @file_get_contents($api_url);
+            $json_tcping = $raw_tcping === false ? null : json_decode($raw_tcping, true);
+
+            if (! is_array($json_tcping) || ! isset($json_tcping['status'])) {
+                echo '节点 #' . $node->id . ' GFW 检测失败(API 不可达或响应非法),本轮跳过' . PHP_EOL;
+
+                continue;
+            }
+
             $result_tcping = $json_tcping['status'] === 'true';
 
             if ($result_tcping && ! $node->gfw_block) {
@@ -118,8 +128,9 @@ final class Detect
         $user_logs = [];
 
         foreach ($new_logs as $log) {
-            // 分类各个用户的记录数量
-            $user_logs[$log->user_id] = 0;
+            // 分类各个用户的记录数量。??= 只在首见该用户时初始化——此前无条件置 0
+            // 导致同批次内计数恒为 1,auto_detect_ban_number 阈值语义失效。
+            $user_logs[$log->user_id] ??= 0;
             $user_logs[$log->user_id]++;
             $log->status = 1;
             $log->save();
