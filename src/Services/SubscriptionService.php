@@ -49,8 +49,8 @@ final class SubscriptionService
         return self::balanceAutoRenewEnabled() || self::stripeAutoBillingEnabled();
     }
 
-    /** 计费周期中文名(邮件展示用) */
-    private static function billingCycleText(string $cycle): string
+    /** 计费周期中文名(邮件展示用;OrderActivation 的开通/续费通知也复用) */
+    public static function billingCycleText(string $cycle): string
     {
         return match ($cycle) {
             'month' => '月付',
@@ -58,6 +58,31 @@ final class SubscriptionService
             'year' => '年付',
             default => $cycle,
         };
+    }
+
+    /**
+     * 续费成功通知的邮件载荷(纯构造,无 I/O)。
+     * 共用方:processAutoRenew 的两条扣款腿、OrderActivation::activateRenewal
+     * (手动支付续费单)。调用方自行保证 $sub 的 end_date 已被推进到新周期。
+     *
+     * @return array{title: string, text: string, template: string, extra: array}
+     */
+    public static function renewalSuccessMailPayload(Subscription $sub, ?string $paymentMethodText): array
+    {
+        $content = json_decode((string) $sub->product_content);
+
+        return [
+            'title' => $_ENV['appName'] . '-订阅续费成功',
+            'text' => '你好，你的订阅已续费成功，服务将不间断延续。',
+            'template' => 'subscription_renewed.tpl',
+            'extra' => [
+                'plan_name' => is_object($content) ? ($content->name ?? null) : null,
+                'billing_cycle_text' => self::billingCycleText($sub->billing_cycle),
+                'amount' => $sub->renewal_price,
+                'end_date' => $sub->end_date,
+                'payment_method_text' => $paymentMethodText,
+            ],
+        ];
     }
 
     /**
@@ -829,17 +854,37 @@ final class SubscriptionService
                 // 瀑布：按管理员开关决定可用扣款腿。余额优先，不足再走存档卡。两者均在
                 // 结算事务内原子完成订单 activated + 推进周期（exactly-once）。
                 $renewed = false;
+                $paidVia = null;
 
-                if ($balanceEnabled) {
-                    $renewed = self::payRenewalFromBalance($subscription, $invoice);
+                if ($balanceEnabled && self::payRenewalFromBalance($subscription, $invoice)) {
+                    $renewed = true;
+                    $paidVia = '账户余额（自动续费）';
                 }
 
-                if (! $renewed && $stripeEnabled) {
-                    $renewed = self::chargeRenewalToCard($subscription, $invoice);
+                if (! $renewed && $stripeEnabled && self::chargeRenewalToCard($subscription, $invoice)) {
+                    $renewed = true;
+                    $paidVia = '银行卡（自动续费）';
                 }
 
                 if ($renewed) {
                     echo "订阅 #{$subscription->id} 自动续费成功" . PHP_EOL;
+
+                    // 续费成功通知。结算事务已提交,通知失败绝不影响续费结果;
+                    // 循环内的 $subscription 实例可能是推进前的旧快照,重新读取拿新周期。
+                    try {
+                        $freshSub = (new Subscription())->find($subscription->id) ?? $subscription;
+                        $payload = self::renewalSuccessMailPayload($freshSub, $paidVia);
+                        Notification::notifyUser(
+                            $user,
+                            $payload['title'],
+                            $payload['text'],
+                            $payload['template'],
+                            $payload['extra']
+                        );
+                    } catch (\Throwable $e) {
+                        echo "订阅 #{$subscription->id} 续费成功通知发送失败：" . $e->getMessage() . PHP_EOL;
+                    }
+
                     continue;
                 }
 

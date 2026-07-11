@@ -21,7 +21,8 @@ use function time;
  * 由支付网关回调(Gateway/Base::postPayment)、余额支付路径与 5 分钟 cron 兜底共用:
  * 激活在「订单行锁 + 状态复查」事务里进行,重复/并发调用只成功一次。仅处理自管
  * 订单类型(topup / subscription 新购 / subscription 续费);tabp、bandwidth、time
- * 遗留商店类型返回 false,留给 cron 原有循环。必须保持静默(web 请求路径公用)。
+ * 遗留商店类型返回 false,留给 cron 原有循环。事务内保持静默(web 请求路径公用,
+ * 不得 echo);开通/续费成功的用户通知由 tryActivate 在事务提交后尽力而为地发出。
  */
 final class OrderActivation
 {
@@ -31,7 +32,10 @@ final class OrderActivation
      */
     public static function tryActivate(int $orderId): bool
     {
-        return (bool) DB::transaction(static function () use ($orderId): bool {
+        /** @var array{user: User, title: string, text: string, template: string, extra: array}|null $notification */
+        $notification = null;
+
+        $activated = (bool) DB::transaction(static function () use ($orderId, &$notification): bool {
             $order = (new Order())->where('id', $orderId)->lockForUpdate()->first();
 
             if ($order === null) {
@@ -61,12 +65,30 @@ final class OrderActivation
             return match (true) {
                 $order->product_type === 'topup' => self::activateTopup($order),
                 $order->product_type === 'subscription' && $order->subscription_id === null
-                    => self::activateNewSubscription($order),
+                    => self::activateNewSubscription($order, $notification),
                 $order->product_type === 'subscription' && $order->subscription_id !== null
-                    => self::activateRenewal($order),
+                    => self::activateRenewal($order, $notification),
                 default => false,
             };
         });
+
+        // 通知在激活事务提交之后才发:IM 分支是同步网络调用,不能拖在事务里拉长锁;
+        // 通知任何失败(队列写入/IM 网络)都不得影响已完成的激活结果,静默吞掉。
+        if ($activated && $notification !== null) {
+            try {
+                Notification::notifyUser(
+                    $notification['user'],
+                    $notification['title'],
+                    $notification['text'],
+                    $notification['template'],
+                    $notification['extra']
+                );
+            } catch (Throwable) {
+                // 尽力而为:激活已成功,通知丢失可接受
+            }
+        }
+
+        return $activated;
     }
 
     /**
@@ -113,8 +135,9 @@ final class OrderActivation
     /**
      * 新购订阅激活:建 Subscription(auto_renew=1 opt-out)+ 发放会员权益。
      * 已有 active/pending_renewal 订阅时不重复开通,留给 cron 在旧订阅结束后处理。
+     * 激活成功时填充 $notification(开通成功邮件),由 tryActivate 在事务提交后发出。
      */
-    private static function activateNewSubscription(Order $order): bool
+    private static function activateNewSubscription(Order $order, ?array &$notification): bool
     {
         if (! in_array($order->billing_provider, SubscriptionService::SELF_MANAGED, true)) {
             return false;
@@ -181,14 +204,29 @@ final class OrderActivation
         $order->update_time = time();
         $order->save();
 
+        $notification = [
+            'user' => $user,
+            'title' => $_ENV['appName'] . '-订阅开通成功',
+            'text' => '你好，你的订阅已开通并立即生效，以下是订阅详情。',
+            'template' => 'subscription_activated.tpl',
+            'extra' => [
+                'plan_name' => $content->name ?? null,
+                'billing_cycle_text' => SubscriptionService::billingCycleText($billingCycle),
+                'amount' => $order->price,
+                'start_date' => $today->format('Y-m-d'),
+                'end_date' => $endDate->format('Y-m-d'),
+            ],
+        ];
+
         return true;
     }
 
     /**
      * 续费订单激活:推进订阅周期(newStart = end_date + 1 天,提前付款不吃亏)。
      * 流量重置归 resetSubscriptionBandwidth 在 reset_day 负责,此处绝不重置。
+     * 激活成功时填充 $notification(续费成功邮件),由 tryActivate 在事务提交后发出。
      */
-    private static function activateRenewal(Order $order): bool
+    private static function activateRenewal(Order $order, ?array &$notification): bool
     {
         if (! in_array($order->billing_provider, SubscriptionService::SELF_MANAGED, true)) {
             return false;
@@ -211,6 +249,16 @@ final class OrderActivation
         $order->status = 'activated';
         $order->update_time = time();
         $order->save();
+
+        // advanceRenewedPeriod 已把 $subscription 推进到新周期,载荷里的 end_date 即新到期日。
+        $paymentMethodText = match ((new Invoice())->where('order_id', $order->id)->first()?->status) {
+            'paid_balance' => '账户余额',
+            'paid_gateway' => '在线支付',
+            'paid_admin' => '管理员操作',
+            default => null,
+        };
+        $notification = ['user' => $user]
+            + SubscriptionService::renewalSuccessMailPayload($subscription, $paymentMethodText);
 
         return true;
     }

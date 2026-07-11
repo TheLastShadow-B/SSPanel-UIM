@@ -276,3 +276,56 @@ it('renders finance.tpl wrapping preformatted text', function () {
     expect($html)->toContain('财务日报')->toContain('77.00');
     emailAssertBalanced($html);
 });
+
+it('renders subscription_activated.tpl with full fields', function () {
+    $html = emailRender('subscription_activated.tpl', [
+        'user' => emailStubUser(),
+        'text' => '你好，你的订阅已开通并立即生效，以下是订阅详情。',
+        'plan_name' => '测试订阅 Pro',
+        'billing_cycle_text' => '月付',
+        'amount' => '10.00',
+        'start_date' => '2026-07-11',
+        'end_date' => '2026-08-10',
+    ]);
+
+    expect($html)->toContain('订阅开通成功')->toContain('测试订阅 Pro')->toContain('月付')
+        ->toContain('10.00')->toContain('2026-07-11 至 2026-08-10')
+        ->toContain('/user/subscription')->toContain('查看我的订阅');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_activated.tpl gracefully without structured fields', function () {
+    $html = emailRender('subscription_activated.tpl', [
+        'user' => emailStubUser(),
+        'text' => '老队列正文',
+    ]);
+
+    expect($html)->toContain('订阅开通成功')->toContain('老队列正文')->not->toContain('订阅详情');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_renewed.tpl with full fields', function () {
+    $html = emailRender('subscription_renewed.tpl', [
+        'user' => emailStubUser(),
+        'text' => '你好，你的订阅已续费成功，服务将不间断延续。',
+        'plan_name' => '测试订阅 Pro',
+        'billing_cycle_text' => '月付',
+        'amount' => '30.00',
+        'end_date' => '2026-09-10',
+        'payment_method_text' => '账户余额（自动续费）',
+    ]);
+
+    expect($html)->toContain('订阅续费成功')->toContain('账户余额（自动续费）')
+        ->toContain('30.00')->toContain('2026-09-10')->toContain('查看我的订阅');
+    emailAssertBalanced($html);
+});
+
+it('renders subscription_renewed.tpl gracefully without structured fields', function () {
+    $html = emailRender('subscription_renewed.tpl', [
+        'user' => emailStubUser(),
+        'text' => '老队列正文',
+    ]);
+
+    expect($html)->toContain('订阅续费成功')->toContain('老队列正文')->not->toContain('支付方式');
+    emailAssertBalanced($html);
+});
