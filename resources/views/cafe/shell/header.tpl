@@ -49,6 +49,10 @@
                 <span class="side-ico"><i class="ti ti-stack-2"></i></span>
                 我的订阅
             </a>
+            <a href="/user/server" class="side-link {if ($nav|default:'') === 'server'}active{/if}">
+                <span class="side-ico"><i class="ti ti-server"></i></span>
+                节点状态
+            </a>
             <a href="/user/announcement" class="side-link {if ($nav|default:'') === 'announcement'}active{/if}">
                 <span class="side-ico"><i class="ti ti-speakerphone"></i></span>
                 公告

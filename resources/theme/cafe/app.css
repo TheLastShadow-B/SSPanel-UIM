@@ -253,6 +253,15 @@
         @apply border-b-0;
     }
 
+    /* ---- 敏感信息模糊(hover 显示) ---- */
+    .spoiler {
+        filter: blur(5px);
+        transition: filter 0.3s;
+    }
+    .spoiler:hover {
+        filter: none;
+    }
+
     /* ---- toast ---- */
     .toast {
         @apply c-card text-ink pointer-events-auto flex min-w-64 items-center
