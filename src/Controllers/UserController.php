@@ -8,11 +8,8 @@ use App\Models\Ann;
 use App\Models\Config;
 use App\Services\Analytics;
 use App\Services\Auth;
-use App\Services\Captcha;
 use App\Services\Config\ClientConfig;
-use App\Services\Reward;
 use App\Services\Subscribe;
-use App\Utils\ResponseHelper;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -29,7 +26,6 @@ final class UserController extends BaseController
      */
     public function index(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $captcha = [];
         $traffic_logs = [];
         $class_expire_days = $this->user->class > 0 ?
             round((strtotime($this->user->class_expire) - time()) / 86400) : 0;
@@ -37,12 +33,6 @@ final class UserController extends BaseController
             ->orderBy('status', 'desc')
             ->orderBy('sort')
             ->orderBy('date', 'desc')->first();
-
-        if (Config::obtain('enable_checkin') &&
-            Config::obtain('enable_checkin_captcha') &&
-            $this->user->isAbleToCheckin()) {
-            $captcha = Captcha::generate();
-        }
 
         if (Config::obtain('traffic_log')) {
             $hourly_usage = Analytics::getUserTodayHourlyUsage($this->user->id);
@@ -77,7 +67,6 @@ final class UserController extends BaseController
         return $response->write(
             $this->view()
                 ->assign('ann', $ann)
-                ->assign('captcha', $captcha)
                 ->assign('traffic_logs', json_encode($traffic_logs))
                 ->assign('class_expire_days', $class_expire_days)
                 ->assign('UniversalSub', $universalSub)
@@ -103,35 +92,6 @@ final class UserController extends BaseController
                 ->assign('anns', $anns)
                 ->fetch('user/announcement.tpl')
         );
-    }
-
-    public function checkin(ServerRequest $request, Response $response, array $args): ResponseInterface
-    {
-        if (! Config::obtain('enable_checkin') || ! $this->user->isAbleToCheckin()) {
-            return ResponseHelper::error($response, '暂时还不能签到');
-        }
-
-        if (Config::obtain('enable_checkin_captcha')) {
-            $ret = Captcha::verify($request->getParams());
-
-            if (! $ret) {
-                return ResponseHelper::error($response, '系统无法接受你的验证结果，请刷新页面后重试');
-            }
-        }
-
-        $traffic = Reward::issueCheckinReward($this->user->id);
-
-        if (! $traffic) {
-            return ResponseHelper::error($response, '签到失败');
-        }
-
-        return $response->withJson([
-            'ret' => 1,
-            'msg' => '获得了 ' . $traffic . 'MB 流量',
-            'data' => [
-                'last-checkin-time' => Tools::toDateTime(time()),
-            ],
-        ]);
     }
 
     /**

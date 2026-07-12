@@ -118,33 +118,4 @@ final class Reward
         }
     }
 
-    public static function issueCheckinReward($user_id): int|false
-    {
-        $user = (new User())->where('id', $user_id)->first();
-
-        if ($user === null) {
-            return false;
-        }
-
-        $checkin_min = Config::obtain('checkin_min');
-        $checkin_max = Config::obtain('checkin_max');
-
-        if ($checkin_min === $checkin_max) {
-            $traffic = $checkin_min;
-        } else {
-            try {
-                $traffic = random_int($checkin_min, $checkin_max);
-            } catch (Exception) {
-                $traffic = 0;
-            }
-        }
-
-        if ($traffic !== 0) {
-            $user->transfer_enable += Tools::mbToB($traffic);
-            $user->last_check_in_time = time();
-            $user->save();
-        }
-
-        return $traffic;
-    }
 }

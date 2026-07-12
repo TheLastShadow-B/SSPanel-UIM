@@ -55,20 +55,17 @@ final class Cron
 
     public static function detectInactiveUser(): void
     {
-        $checkin_days = Config::obtain('detect_inactive_user_checkin_days');
         $login_days = Config::obtain('detect_inactive_user_login_days');
         $use_days = Config::obtain('detect_inactive_user_use_days');
 
         (new User())->where('is_admin', 0)
             ->where('is_inactive', 0)
-            ->where('last_check_in_time', '<', time() - 86400 * $checkin_days)
             ->where('last_login_time', '<', time() - 86400 * $login_days)
             ->where('last_use_time', '<', time() - 86400 * $use_days)
             ->update(['is_inactive' => 1]);
 
         (new User())->where('is_admin', 0)
             ->where('is_inactive', 1)
-            ->where('last_check_in_time', '>', time() - 86400 * $checkin_days)
             ->where('last_login_time', '>', time() - 86400 * $login_days)
             ->where('last_use_time', '>', time() - 86400 * $use_days)
             ->update(['is_inactive' => 0]);

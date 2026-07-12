@@ -155,8 +155,6 @@ final class Callback
 
     public static function getUserIndexKeyboard($user): array
     {
-        $checkin = (! $user->isAbleToCheckin() ? '已签到' : '签到');
-
         $keyboard = [
             [
                 [
@@ -176,12 +174,6 @@ final class Callback
                 [
                     'text' => '分享计划',
                     'callback_data' => 'user.invite',
-                ],
-            ],
-            [
-                [
-                    'text' => $checkin,
-                    'callback_data' => 'user.checkin.' . $user->im_value,
                 ],
             ],
         ];
@@ -225,16 +217,6 @@ final class Callback
             case 'invite':
                 // 分享计划
                 $this->userInvite();
-                break;
-            case 'checkin':
-                // 签到
-                if ((int) $Operate[2] !== $this->trigger_user['id']) {
-                    $this->answerCallbackQuery([
-                        'text' => '你好，你无法操作他人的账户。',
-                        'show_alert' => true,
-                    ]);
-                }
-                $this->userCheckin();
                 break;
             case 'center':
                 // 用户中心
@@ -945,54 +927,4 @@ final class Callback
         );
     }
 
-    /**
-     * 每日签到
-     *
-     * @throws TelegramSDKException|GuzzleException
-     */
-    public function userCheckin(): void
-    {
-        if ($this->user->isAbleToCheckin()) {
-            $traffic = Reward::issueCheckinReward($this->user->id);
-
-            if (! $traffic) {
-                $msg = '签到失败';
-            } else {
-                $msg = '获得了 ' . $traffic . 'MB 流量';
-            }
-        } else {
-            $msg = '你今天已经签到过了';
-        }
-
-        $this->answerCallbackQuery([
-            'text' => $msg,
-            'show_alert' => true,
-        ]);
-        // 回送信息
-        if ($this->chat_id > 0) {
-            $temp = self::getUserIndexKeyboard($this->user);
-        } else {
-            $temp['text'] = Message::getUserTrafficInfo($this->user);
-
-            $temp['keyboard'] = [
-                [
-                    [
-                        'text' => (! $this->user->isAbleToCheckin() ? '已签到' : '签到'),
-                        'callback_data' => 'user.checkin.' . $this->trigger_user['id'],
-                    ],
-                ],
-            ];
-        }
-
-        $this->replyWithMessage([
-            'text' => $temp['text'] . PHP_EOL . PHP_EOL . $msg,
-            'reply_to_message_id' => $this->message_id,
-            'parse_mode' => 'Markdown',
-            'reply_markup' => json_encode(
-                [
-                    'inline_keyboard' => $temp['keyboard'],
-                ]
-            ),
-        ]);
-    }
 }

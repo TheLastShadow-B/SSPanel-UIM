@@ -84,18 +84,6 @@ final class MyCommand extends Command
                 'text' => $text,
                 'parse_mode' => 'Markdown',
                 'reply_to_message_id' => $message_id,
-                'reply_markup' => json_encode(
-                    [
-                        'inline_keyboard' => [
-                            [
-                                [
-                                    'text' => (! $user->isAbleToCheckin() ? '已签到' : '签到'),
-                                    'callback_data' => 'user.checkin.' . $send_user['id'],
-                                ],
-                            ],
-                        ],
-                    ]
-                ),
             ]
         );
     }

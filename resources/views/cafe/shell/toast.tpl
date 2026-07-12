@@ -49,11 +49,6 @@
                 for (const key in res.data) {
                     if (!Object.prototype.hasOwnProperty.call(res.data, key)) continue;
 
-                    if (key === 'last-checkin-time') {
-                        const btn = document.getElementById('check-in');
-                        if (btn) { btn.textContent = '已签到'; btn.disabled = true; }
-                    }
-
                     const el = document.getElementById(key);
                     if (el) {
                         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {

@@ -83,6 +83,12 @@
         </nav>
 
         <div class="border-hairline mt-3 border-t pt-3">
+            {if $user->is_admin}
+                <a href="/admin" class="side-link">
+                    <span class="side-ico"><i class="ti ti-shield-cog"></i></span>
+                    管理后台
+                </a>
+            {/if}
             {if isset($smarty.cookies.admin_uid) && $smarty.cookies.admin_uid}
                 <a href="/user/switch_back_admin" class="side-link">
                     <span class="side-ico"><i class="ti ti-arrow-back-up"></i></span>

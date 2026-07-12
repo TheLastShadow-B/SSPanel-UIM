@@ -6,42 +6,6 @@
     <p class="text-faint mt-1 text-sm">欢迎回来，{$user->user_name}</p>
 </div>
 
-{* ============ 签到 banner ============ *}
-{if $public_setting['enable_checkin']}
-    <div class="c-card bg-success-tint/60 mb-5 flex flex-wrap items-center gap-3 border-0 px-5 py-3.5">
-        <span class="bg-success-tint text-success flex size-9 items-center justify-center rounded-full text-lg">
-            <i class="ti ti-gift"></i>
-        </span>
-        <div class="min-w-0 flex-1">
-            <div class="text-ink text-sm font-medium">
-                每日签到可领取
-                {if $public_setting['checkin_min'] !== $public_setting['checkin_max']}
-                    {$public_setting['checkin_min']} - {$public_setting['checkin_max']} MB
-                {else}
-                    {$public_setting['checkin_min']} MB
-                {/if}
-                流量
-            </div>
-            <div class="text-faint mt-0.5 text-xs">上次签到：<span id="last-checkin-time">{$user->lastCheckInTime()}</span></div>
-        </div>
-        {if !$user->isAbleToCheckin()}
-            <button id="check-in" class="btn-secondary btn-sm" disabled>今日已签到</button>
-        {else}
-            {if $public_setting['enable_checkin_captcha']}
-                {include file='captcha/div.tpl'}
-            {/if}
-            <button id="check-in" class="btn-primary btn-sm !bg-success"
-                    hx-post="/user/checkin" hx-swap="none" hx-vals='js:{
-                        {if $public_setting['enable_checkin_captcha']}
-                            {include file='captcha/ajax.tpl'}
-                        {/if}
-                    }'>
-                立即签到
-            </button>
-        {/if}
-    </div>
-{/if}
-
 <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
     {* ============ 订阅实体卡 ============ *}
@@ -177,10 +141,6 @@
     </div>
 
 </div>
-
-{if $public_setting['enable_checkin_captcha'] && $user->isAbleToCheckin()}
-    {include file='captcha/js.tpl'}
-{/if}
 
 <script>
     window.CAFE_SUB = "{$UniversalSub}";
