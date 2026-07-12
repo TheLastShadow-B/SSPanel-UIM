@@ -157,28 +157,18 @@
     {* ---------------- 设置 ---------------- *}
     <div x-show="tab === 'settings'" x-cloak class="grid gap-5 lg:grid-cols-2">
 
-        {* 订阅链接 *}
+        {* 订阅安全 *}
         <div class="c-card-pad">
-            <h3 class="mb-1 text-base">订阅链接</h3>
+            <h3 class="mb-1 text-base">订阅安全</h3>
             <p class="text-faint mb-4 text-xs leading-relaxed">
-                通用订阅链接可导入所有主流客户端。请勿泄露给他人；如怀疑泄露，立即重置。
+                订阅链接等同于账户的使用凭证，请勿泄露给他人。如怀疑泄露，立即重置——
+                重置后旧链接立刻失效，所有客户端需从下方「客户端导入」重新导入。
             </p>
-            <div class="mb-4 flex justify-center">
-                <div id="sub-qr" class="rounded-xl bg-white p-3 shadow-sm"></div>
-            </div>
-            <div class="bg-tile text-faint mb-4 truncate rounded-(--radius-tile) px-3.5 py-2.5 font-mono text-xs" id="universal-sub-text">
-                {$UniversalSub}
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <button class="btn-primary btn-sm copy" data-clipboard-text="{$UniversalSub}">
-                    <i class="ti ti-copy"></i> 复制链接
-                </button>
-                <button class="btn-danger-soft btn-sm"
-                        hx-post="/user/edit/url_reset" hx-swap="none"
-                        hx-confirm="重置后旧的订阅链接将立即失效，所有客户端需重新导入。确认重置？">
-                    <i class="ti ti-refresh-alert"></i> 重置链接
-                </button>
-            </div>
+            <button class="btn-danger-soft btn-sm"
+                    hx-post="/user/edit/url_reset" hx-swap="none"
+                    hx-confirm="重置后旧的订阅链接将立即失效，所有客户端需重新导入。确认重置？">
+                <i class="ti ti-refresh-alert"></i> 重置订阅链接
+            </button>
         </div>
 
         {* 订阅计划 *}
@@ -296,7 +286,6 @@
     </div>
 </div>
 
-<script src="/theme/cafe/js/qrcode.min.js"></script>
 <script>
     window.CAFE_SUB = "{$UniversalSub}";
     window.CAFE_TRAFFIC = {$traffic_logs|default:'[]'};
@@ -308,12 +297,6 @@
 {literal}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // 订阅二维码
-        const qrBox = document.getElementById('sub-qr');
-        if (qrBox && window.CAFE_SUB) {
-            new QRCode(qrBox, { text: window.CAFE_SUB, width: 148, height: 148, correctLevel: QRCode.CorrectLevel.M });
-        }
-
         // 每小时用量:纯 SVG 柱状图
         const box = document.getElementById('hourly-chart');
         if (!box) return;

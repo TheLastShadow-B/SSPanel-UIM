@@ -129,15 +129,9 @@
             </template>
         </div>
 
-        <div class="bg-tile text-faint mb-3 truncate rounded-(--radius-tile) px-3.5 py-2.5 font-mono text-xs">
-            {$UniversalSub}
-        </div>
-        <div class="mt-auto flex gap-2">
-            <button class="btn-primary btn-sm copy flex-1" data-clipboard-text="{$UniversalSub}">
-                <i class="ti ti-copy"></i> 复制通用链接
-            </button>
-            <a href="/user/subscription#settings" class="btn-secondary btn-sm">全部客户端</a>
-        </div>
+        <a href="/user/subscription#settings" class="btn-secondary btn-sm mt-auto w-full">
+            <i class="ti ti-apps"></i> 全部客户端与导入方式
+        </a>
     </div>
 
     {* ============ 置顶公告卡 ============ *}
