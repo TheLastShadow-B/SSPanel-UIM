@@ -322,7 +322,8 @@
         const padB = 18, n = 24, gap = 6;
         const bw = (W - gap * (n - 1)) / n;
         const max = Math.max.apply(null, data.concat([1]));
-        let svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">';
+        // width 100% + viewBox:窗口/容器尺寸变化时随容器缩放,不产生横向溢出
+        let svg = '<svg width="100%" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">';
         for (let i = 0; i < n; i++) {
             const v = data[i] || 0;
             const h = Math.max(v / max * (H - padB - 8), 3);
