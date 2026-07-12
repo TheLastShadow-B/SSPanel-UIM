@@ -77,6 +77,8 @@ final class View
     public static function getConfig(): array
     {
         return [
+            // 主题静态资源缓存戳:CSS 构建产物变化即失效浏览器缓存
+            'assets_version' => @filemtime(BASE_PATH . '/public/theme/cafe/app.css') ?: VERSION,
             'appName' => $_ENV['appName'],
             'baseUrl' => $_ENV['baseUrl'],
             'jump_delay' => $_ENV['jump_delay'],

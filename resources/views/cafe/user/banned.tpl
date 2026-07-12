@@ -7,7 +7,7 @@
     <meta name="referrer" content="never">
     <title>账户已被封禁 - {$config['appName']}</title>
     <link rel="icon" href="/favicon.ico">
-    <link href="/theme/cafe/app.css?v={$smarty.const.VERSION}" rel="stylesheet"/>
+    <link href="/theme/cafe/app.css?v={$config['assets_version']}" rel="stylesheet"/>
     <link href="//{$config['jsdelivr_url']}/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" rel="stylesheet"/>
 </head>
 
