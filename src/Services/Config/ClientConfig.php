@@ -35,14 +35,7 @@ final class ClientConfig
                     'name' => $client['name'],
                     'description' => $data['desc'] ?? $client['description'],
                     'format' => $client['format'],
-                    // {sub} 处于 scheme URL 的 url= 参数内,必须百分号编码:
-                    // Surge 对未编码的嵌套 URL 会静默失败,Clash/Stash 两种形式均接受。
-                    // 模板中紧随其后的 /<format> 保持原样,客户端解码后仍还原为完整 URL。
-                    'importUrl' => str_replace(
-                        ['{sub}', '{name}'],
-                        [rawurlencode($sub), rawurlencode($name)],
-                        $data['importUrl'] ?? $client['importUrl']
-                    ),
+                    'importUrl' => self::buildImportUrl($data['importUrl'] ?? $client['importUrl'], $sub, $name),
                     'downloadUrl' => $data['storeUrl'] ??
                         (isset($data['ext']) ? ($r2 ? '/user' : '') . '/clients/' . ($data['file'] ?? str_replace(' ', '.', $client['name'])) . ".{$data['ext']}" : ''),
                     'isAppStore' => isset($data['storeUrl']),
@@ -51,5 +44,21 @@ final class ClientConfig
         }
 
         return ['clients' => $result, 'icons' => self::$config['icons']];
+    }
+
+    /**
+     * 构造一键导入 scheme URL。
+     * `{sub}/<format>` 处于 url= 参数值内,按各客户端文档(Surge 明确要求)
+     * 必须整体百分号编码;Clash/Stash 同样接受编码形式。
+     */
+    private static function buildImportUrl(string $template, string $sub, string $name): string
+    {
+        $url = preg_replace_callback(
+            '/\{sub\}(\/[a-z0-9_-]+)?/i',
+            static fn (array $m): string => rawurlencode($sub . ($m[1] ?? '')),
+            $template
+        );
+
+        return str_replace('{name}', rawurlencode($name), $url);
     }
 }
