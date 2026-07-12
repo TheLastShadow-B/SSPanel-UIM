@@ -89,7 +89,8 @@
 @layer base {
     html {
         @apply bg-canvas text-body font-sans antialiased;
-        font-size: 15px;
+        /* 根字号即全局缩放旋钮:整套 UI 均为 rem 单位,改这里等比缩放 */
+        font-size: 16px;
     }
 
     h1, h2, h3, h4 {
