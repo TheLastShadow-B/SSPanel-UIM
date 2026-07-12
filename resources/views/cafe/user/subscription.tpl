@@ -154,25 +154,11 @@
         </div>
     </div>
 
-    {* ---------------- 设置 ---------------- *}
-    <div x-show="tab === 'settings'" x-cloak class="grid gap-5 lg:grid-cols-2">
+    {* ---------------- 设置:客户端导入为主内容(左 2/3),订阅计划靠右 ---------------- *}
+    <div x-show="tab === 'settings'" x-cloak class="grid items-start gap-5 lg:grid-cols-3">
 
-        {* 订阅安全 *}
-        <div class="c-card-pad">
-            <h3 class="mb-1 text-base">订阅安全</h3>
-            <p class="text-faint mb-4 text-xs leading-relaxed">
-                订阅链接等同于账户的使用凭证，请勿泄露给他人。如怀疑泄露，立即重置——
-                重置后旧链接立刻失效，所有客户端需从下方「客户端导入」重新导入。
-            </p>
-            <button class="btn-danger-soft btn-sm"
-                    hx-post="/user/edit/url_reset" hx-swap="none"
-                    hx-confirm="重置后旧的订阅链接将立即失效，所有客户端需重新导入。确认重置？">
-                <i class="ti ti-refresh-alert"></i> 重置订阅链接
-            </button>
-        </div>
-
-        {* 订阅计划 *}
-        <div class="c-card-pad">
+        {* 订阅计划(含订阅安全) *}
+        <div class="c-card-pad order-last">
             <h3 class="mb-3 text-base">订阅计划</h3>
             {if $subscription !== null}
                 <div class="kv-row">
@@ -217,6 +203,16 @@
                     <a href="/user/product" class="btn-primary btn-sm">去商店看看</a>
                 </div>
             {/if}
+
+            <div class="border-hairline mt-2 mb-4 border-t"></div>
+            <p class="text-faint mb-3 text-xs leading-relaxed">
+                订阅链接等同于账户的使用凭证。如怀疑泄露请立即重置，重置后所有客户端需重新导入。
+            </p>
+            <button class="btn-danger-soft btn-sm"
+                    hx-post="/user/edit/url_reset" hx-swap="none"
+                    hx-confirm="重置后旧的订阅链接将立即失效，所有客户端需重新导入。确认重置？">
+                <i class="ti ti-refresh-alert"></i> 重置订阅链接
+            </button>
         </div>
 
         {* ============ 客户端导入 ============ *}
