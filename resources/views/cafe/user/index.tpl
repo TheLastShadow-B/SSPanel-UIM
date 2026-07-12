@@ -1,4 +1,4 @@
-{include file='user/header.tpl' nav='dashboard'}
+{include file='shell/header.tpl' nav='dashboard'}
 
 {* ============ 页头 ============ *}
 <div class="mb-6">
@@ -169,4 +169,4 @@
     {include file='captcha/js.tpl'}
 {/if}
 
-{include file='user/footer.tpl'}
+{include file='shell/footer.tpl'}

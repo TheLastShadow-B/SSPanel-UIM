@@ -1,4 +1,4 @@
-{include file='user/header.tpl' nav='dashboard'}
+{include file='shell/header.tpl' nav='dashboard'}
 
 <a href="/user" class="text-body hover:text-ink mb-5 inline-flex items-center gap-1.5 text-sm font-medium">
     <span class="bg-tile flex size-7 items-center justify-center rounded-full"><i class="ti ti-arrow-left"></i></span>
@@ -269,4 +269,4 @@
 </script>
 {/literal}
 
-{include file='user/footer.tpl'}
+{include file='shell/footer.tpl'}

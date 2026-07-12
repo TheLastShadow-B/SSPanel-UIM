@@ -2,7 +2,7 @@
     </div>
 </div>
 
-{include file='toast.tpl'}
+{include file='shell/toast.tpl'}
 
 </body>
 

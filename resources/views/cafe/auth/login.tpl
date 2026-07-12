@@ -98,7 +98,7 @@
     {include file='captcha/js.tpl'}
 {/if}
 
-{include file='toast.tpl'}
+{include file='shell/toast.tpl'}
 
 {literal}
 <script>

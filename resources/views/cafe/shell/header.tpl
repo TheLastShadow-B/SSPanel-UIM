@@ -1,4 +1,4 @@
-{* 页面通过 {include file='user/header.tpl' nav='dashboard'} 传入 nav 以高亮侧边栏 *}
+{* 页面通过 {include file='shell/header.tpl' nav='dashboard'} 传入 nav 以高亮侧边栏 *}
 <!doctype html>
 <html lang="zh"{if $user->is_dark_mode} data-theme="dark"{/if}>
 
