@@ -8,7 +8,7 @@
     <span></span>
 </div>
 
-<div x-data="cafeServerTable('/admin/detect/log/ajax', 'logs', ["id", "user_id", "node_id", "node_name", "list_id", "rule_name", "datetime"])" class="c-card">
+<div x-data="cafeServerTable('/admin/detect/log/ajax', 'logs', ['id', 'user_id', 'node_id', 'node_name', 'list_id', 'rule_name', 'datetime'])" class="c-card">
     <div class="flex flex-wrap items-center justify-between gap-3 p-5 pb-3">
         <h3 class="text-base">全部记录</h3>
         <input type="search" x-model="search" @input="onSearch()" placeholder="搜索…"

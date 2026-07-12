@@ -8,7 +8,7 @@
     <span></span>
 </div>
 
-<div x-data="cafeServerTable('/admin/detect/ban/ajax', 'bans', ["id", "user_id", "detect_number", "ban_time", "start_time", "end_time", "ban_end_time", "all_detect_number"])" class="c-card">
+<div x-data="cafeServerTable('/admin/detect/ban/ajax', 'bans', ['id', 'user_id', 'detect_number', 'ban_time', 'start_time', 'end_time', 'ban_end_time', 'all_detect_number'])" class="c-card">
     <div class="flex flex-wrap items-center justify-between gap-3 p-5 pb-3">
         <h3 class="text-base">全部记录</h3>
         <input type="search" x-model="search" @input="onSearch()" placeholder="搜索…"
