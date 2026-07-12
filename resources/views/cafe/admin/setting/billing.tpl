@@ -39,17 +39,15 @@
                         <div class="">
                             <div class="tab-content">
                                 <div id="gateway" x-show="stab === 'gateway'" >
-                                    {foreach $payment_gateways as $key => $value}
-                                    <div class="form-row">
-                                        <div class="row align-items-center">
-                                            <label class="">{$key}</label>
-                                            <label class="col-auto ms-auto form-check form-check-single form-switch">
+                                    <div class="max-w-xl">
+                                        {foreach $payment_gateways as $key => $value}
+                                            <label class="border-hairline flex cursor-pointer items-center justify-between gap-3 border-b py-3 last:border-b-0">
+                                                <span class="text-body text-sm font-medium">{$key}</span>
                                                 <input id="{$value}_enable" class="accent-primary size-4" type="checkbox"
-                                                       {if in_array($value, $active_payment_gateway)}checked="" {/if}>
+                                                       {if in_array($value, $active_payment_gateway)}checked{/if}>
                                             </label>
-                                        </div>
+                                        {/foreach}
                                     </div>
-                                    {/foreach}
                                 </div>
                                 <div id="f2f" x-show="stab === 'f2f'" x-cloak>
                                     <div class="">
