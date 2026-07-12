@@ -193,6 +193,8 @@ final class OrderController extends BaseController
             $order->op = '<button class="btn btn-red" id="delete-order-' . $order->id . '"
              onclick="deleteOrder(' . $order->id . ')">删除</button>';
 
+            $order->can_cancel = in_array($order->status, ['pending_payment', 'pending_activation']);
+
             if (in_array($order->status, ['pending_payment', 'pending_activation'])) {
                 $order->op .= '
                 <button class="btn btn-orange" id="cancel-order-' . $order->id . '"

@@ -229,6 +229,7 @@ final class SubscriptionController extends BaseController
             $content = json_decode($sub->product_content);
             $sub->product_name = $content->name ?? '订阅套餐';
             $sub->op = '<a class="btn btn-primary" href="/admin/subscription/' . $sub->id . '/edit">编辑</a>';
+            $sub->can_cancel = in_array($sub->status, ['active', 'pending_renewal']);
 
             if (in_array($sub->status, ['active', 'pending_renewal'])) {
                 $sub->op .= ' <button class="btn btn-red" onclick="cancelSubscription(' . $sub->id . ')">取消</button>';

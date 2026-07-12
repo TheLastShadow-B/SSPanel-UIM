@@ -235,6 +235,8 @@ final class TicketController extends BaseController
             $ticket->op = '<button class="btn btn-red" id="delete-ticket" 
             onclick="deleteTicket(' . $ticket->id . ')">删除</button>';
 
+            $ticket->can_close = $ticket->status !== 'closed';
+
             if ($ticket->status !== 'closed') {
                 $ticket->op .= '
                 <button class="btn btn-orange" id="close-ticket" 
