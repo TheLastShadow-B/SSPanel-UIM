@@ -108,8 +108,8 @@
 
 @utility btn {
     @apply inline-flex cursor-pointer items-center justify-center gap-1.5
-        rounded-full px-5 py-2.5 text-sm font-medium transition-colors
-        disabled:cursor-not-allowed disabled:opacity-50;
+        rounded-full px-5 py-2.5 text-sm font-medium whitespace-nowrap
+        transition-colors disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 @utility badge {

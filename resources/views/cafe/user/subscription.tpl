@@ -235,7 +235,7 @@
                             </div>
                             <div class="text-faint mt-0.5 text-xs" x-text="c.description"></div>
                         </div>
-                        <div class="flex flex-wrap gap-1.5">
+                        <div class="grid w-full shrink-0 grid-cols-3 gap-1.5 sm:w-[21.5rem]">
                             <a class="btn-primary btn-sm" :href="c.importUrl"><i class="ti ti-link"></i> 一键导入</a>
                             <button class="btn-secondary btn-sm copy" :data-clipboard-text="subUrl(c)"><i class="ti ti-copy"></i> 复制订阅</button>
                             <a class="btn-outline btn-sm" :href="dlUrl(c)" :target="c.isAppStore ? '_blank' : null">
@@ -264,7 +264,7 @@
                                         <div class="text-ink text-sm font-medium" x-text="c.name"></div>
                                         <div class="text-faint mt-0.5 text-xs" x-text="c.description"></div>
                                     </div>
-                                    <div class="flex flex-wrap gap-1.5">
+                                    <div class="grid w-full shrink-0 grid-cols-3 gap-1.5 sm:w-[21.5rem]">
                                         <a class="btn-primary btn-sm" :href="c.importUrl"><i class="ti ti-link"></i> 一键导入</a>
                                         <button class="btn-secondary btn-sm copy" :data-clipboard-text="subUrl(c)"><i class="ti ti-copy"></i> 复制订阅</button>
                                         <a class="btn-outline btn-sm" :href="dlUrl(c)" :target="c.isAppStore ? '_blank' : null">
