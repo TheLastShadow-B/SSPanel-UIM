@@ -14,10 +14,10 @@
     </div>
 {/if}
 
-{* ============ 实体头 ============ *}
-<div class="mb-6 flex flex-wrap items-center gap-5">
+{* ============ 实体头(移动端纵向堆叠,桌面端左右布局)============ *}
+<div class="mb-6 flex flex-col gap-5 lg:flex-row lg:items-center">
     <div class="flex min-w-0 flex-1 items-center gap-4">
-        <span class="bg-primary-tint text-primary flex size-16 shrink-0 items-center justify-center rounded-full text-3xl">
+        <span class="bg-primary-tint text-primary flex size-14 shrink-0 items-center justify-center rounded-full text-2xl lg:size-16 lg:text-3xl">
             <i class="ti ti-coffee"></i>
         </span>
         <div class="min-w-0">
@@ -45,13 +45,13 @@
     </div>
 
     {* 速览条 *}
-    <div class="c-card flex divide-x divide-(--color-hairline)">
-        <div class="px-6 py-4">
+    <div class="c-card flex shrink-0 divide-x divide-(--color-hairline)">
+        <div class="flex-1 px-5 py-4 lg:flex-none lg:px-6">
             <div class="text-faint text-xs">剩余流量</div>
             <div class="text-ink mt-0.5 text-lg font-semibold">{$user->unusedTraffic()}</div>
             <a href="/user/product" class="btn-primary btn-sm mt-2"><i class="ti ti-refresh"></i> 续费 / 加购</a>
         </div>
-        <div class="px-6 py-4">
+        <div class="flex-1 px-5 py-4 lg:flex-none lg:px-6">
             <div class="text-faint text-xs">流量重置日</div>
             <div class="text-ink mt-0.5 text-lg font-semibold">
                 {if $subscription !== null}{$subscription->next_reset_date}{else}--{/if}
