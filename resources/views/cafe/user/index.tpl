@@ -54,7 +54,7 @@
                 <div class="text-ink truncate text-base font-semibold">
                     {if $user->class > 0}LV.{$user->class} 订阅{else}免费用户{/if}
                 </div>
-                <div class="text-faint text-xs">1 台设备在线上限不限 · 点击查看详情</div>
+                <div class="text-faint text-xs">点击查看用量与订阅设置</div>
             </div>
             <i class="ti ti-chevron-right text-faint transition-transform group-hover:translate-x-0.5"></i>
         </div>
