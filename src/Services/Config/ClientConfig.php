@@ -35,9 +35,12 @@ final class ClientConfig
                     'name' => $client['name'],
                     'description' => $data['desc'] ?? $client['description'],
                     'format' => $client['format'],
+                    // {sub} 处于 scheme URL 的 url= 参数内,必须百分号编码:
+                    // Surge 对未编码的嵌套 URL 会静默失败,Clash/Stash 两种形式均接受。
+                    // 模板中紧随其后的 /<format> 保持原样,客户端解码后仍还原为完整 URL。
                     'importUrl' => str_replace(
                         ['{sub}', '{name}'],
-                        [$sub, rawurlencode($name)],
+                        [rawurlencode($sub), rawurlencode($name)],
                         $data['importUrl'] ?? $client['importUrl']
                     ),
                     'downloadUrl' => $data['storeUrl'] ??
