@@ -65,8 +65,8 @@
     </div>
 </div>
 
-{* ============ 胶囊 tab ============ *}
-<div x-data="{ tab: 'overview' }">
+{* ============ 胶囊 tab(支持 #settings 锚点直达)============ *}
+<div x-data="{ tab: window.location.hash === '#settings' ? 'settings' : 'overview' }">
     <div class="pill-tabs mb-5">
         <button class="pill-tab" :class="tab === 'overview' && 'active'" @click="tab = 'overview'">总览</button>
         <button class="pill-tab" :class="tab === 'settings' && 'active'" @click="tab = 'settings'">设置</button>
@@ -228,12 +228,117 @@
                 </div>
             {/if}
         </div>
+
+        {* ============ 客户端导入 ============ *}
+        <div class="c-card-pad lg:col-span-2" x-data="clientImport()">
+            <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <h3 class="text-base">客户端导入</h3>
+                <span class="badge-primary"><i class="ti ti-device-desktop"></i> 检测到你正在使用 <span x-text="os"></span></span>
+            </div>
+            <p class="text-faint mb-4 text-xs">选择你的客户端,一键导入订阅或复制该客户端专用的订阅链接</p>
+
+            {* 推荐客户端 *}
+            <div class="mb-5 flex flex-col gap-3">
+                <template x-for="c in recommended" :key="c.name">
+                    <div class="bg-primary-tint/40 border-primary/20 flex flex-col gap-3 rounded-(--radius-tile) border p-4 sm:flex-row sm:items-center">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-ink flex items-center gap-2 text-sm font-semibold">
+                                <i class="ti ti-rocket text-primary"></i>
+                                <span x-text="c.name"></span>
+                                <span class="badge-primary">推荐</span>
+                            </div>
+                            <div class="text-faint mt-0.5 text-xs" x-text="c.description"></div>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            <a class="btn-primary btn-sm" :href="c.importUrl"><i class="ti ti-link"></i> 一键导入</a>
+                            <button class="btn-secondary btn-sm copy" :data-clipboard-text="subUrl(c)"><i class="ti ti-copy"></i> 复制订阅</button>
+                            <a class="btn-outline btn-sm" :href="dlUrl(c)" :target="c.isAppStore ? '_blank' : null">
+                                <i class="ti" :class="c.isAppStore ? 'ti-brand-appstore' : 'ti-download'"></i>
+                                <span x-text="c.isAppStore ? 'App Store' : '下载'"></span>
+                            </a>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            {* 全部平台 *}
+            <div class="border-hairline overflow-hidden rounded-(--radius-tile) border">
+                <template x-for="platform in platforms" :key="platform">
+                    <div class="border-hairline border-b last:border-b-0">
+                        <button class="hover:bg-tile/60 flex w-full cursor-pointer items-center gap-2.5 px-4 py-3 text-left transition-colors"
+                                @click="open = open === platform ? null : platform">
+                            <i class="ti text-body text-lg" :class="icons[platform] || 'ti-devices'"></i>
+                            <span class="text-ink flex-1 text-sm font-medium" x-text="platform"></span>
+                            <i class="ti ti-chevron-down text-faint transition-transform" :class="open === platform && 'rotate-180'"></i>
+                        </button>
+                        <div x-show="open === platform" x-cloak class="bg-tile/40">
+                            <template x-for="c in data[platform]" :key="c.name">
+                                <div class="border-hairline flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="text-ink text-sm font-medium" x-text="c.name"></div>
+                                        <div class="text-faint mt-0.5 text-xs" x-text="c.description"></div>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <a class="btn-primary btn-sm" :href="c.importUrl"><i class="ti ti-link"></i> 一键导入</a>
+                                        <button class="btn-secondary btn-sm copy" :data-clipboard-text="subUrl(c)"><i class="ti ti-copy"></i> 复制订阅</button>
+                                        <a class="btn-outline btn-sm" :href="dlUrl(c)" :target="c.isAppStore ? '_blank' : null">
+                                            <i class="ti" :class="c.isAppStore ? 'ti-brand-appstore' : 'ti-download'"></i>
+                                            <span x-text="c.isAppStore ? 'App Store' : '下载'"></span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
     </div>
 </div>
 
 <script src="/theme/cafe/js/qrcode.min.js"></script>
-<script>window.CAFE_SUB = "{$UniversalSub}"; window.CAFE_TRAFFIC = {$traffic_logs|default:'[]'};</script>
+<script>
+    window.CAFE_SUB = "{$UniversalSub}";
+    window.CAFE_TRAFFIC = {$traffic_logs|default:'[]'};
+    window.CAFE_CLIENTS = {$clientData|default:'{ }'};
+    window.CAFE_ICONS = {$platformIcons|default:'{ }'};
+    window.CAFE_R2 = {if $config['enable_r2_client_download']}true{else}false{/if};
+</script>
 {literal}
+<script>
+    // 客户端导入组件:按 UA 推荐 + 全平台手风琴
+    function clientImport() {
+        return {
+            data: window.CAFE_CLIENTS || {},
+            icons: window.CAFE_ICONS || {},
+            open: null,
+            os: (function () {
+                const ua = navigator.userAgent;
+                if (ua.match(/iPhone|iPad|iPod/i)) return 'iOS';
+                if (ua.indexOf('Android') !== -1) return 'Android';
+                if (ua.indexOf('Mac') !== -1) return 'macOS';
+                if (ua.indexOf('Linux') !== -1) return 'Linux';
+                return 'Windows';
+            })(),
+            get recommended() {
+                return this.data[this.os] || this.data['Windows'] || [];
+            },
+            get platforms() {
+                return Object.keys(this.data);
+            },
+            subUrl(c) {
+                return window.CAFE_SUB + '/' + c.format;
+            },
+            dlUrl(c) {
+                let u = c.downloadUrl;
+                if (!c.isAppStore && u && u.includes('/clients/') && window.CAFE_R2) {
+                    u = '/user' + u;
+                }
+                return u;
+            }
+        };
+    }
+</script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // 订阅二维码

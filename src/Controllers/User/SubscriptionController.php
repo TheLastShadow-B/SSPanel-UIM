@@ -11,6 +11,7 @@ use App\Models\OnlineLog;
 use App\Models\Order;
 use App\Models\Subscription;
 use App\Services\Analytics;
+use App\Services\Config\ClientConfig;
 use App\Services\Subscribe;
 use App\Utils\Tools;
 use Carbon\Carbon;
@@ -85,12 +86,22 @@ final class SubscriptionController extends BaseController
             $online_ip->location = Tools::getIpLocation($formatted_ip);
         }
 
+        $universalSub = Subscribe::getUniversalSubLink($this->user);
+        $r2Enabled = filter_var($_ENV['enable_r2_client_download'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
+        $clientData = ClientConfig::getClients(
+            $universalSub,
+            $_ENV['appName'] ?? 'SSPanel',
+            $r2Enabled
+        );
+
         return $response->write(
             $this->view()
                 ->assign('subscription', $subscription)
                 ->assign('pendingInvoice', $pendingInvoice)
                 ->assign('traffic_logs', json_encode($traffic_logs))
-                ->assign('UniversalSub', Subscribe::getUniversalSubLink($this->user))
+                ->assign('UniversalSub', $universalSub)
+                ->assign('clientData', json_encode($clientData['clients']))
+                ->assign('platformIcons', json_encode($clientData['icons']))
                 ->assign('online_ips', $online_ips)
                 ->fetch('user/subscription.tpl')
         );

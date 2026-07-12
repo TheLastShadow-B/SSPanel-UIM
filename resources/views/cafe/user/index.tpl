@@ -108,7 +108,7 @@
             <h3 class="text-base">快速导入</h3>
         </div>
         <p class="text-faint mb-4 text-xs leading-relaxed">
-            复制通用订阅链接，粘贴到任意客户端即可使用；或前往订阅详情页扫码 / 一键导入。
+            复制通用订阅链接，粘贴到任意客户端即可使用；或点击「更多方式」选择 Clash / Surge / Stash 等客户端一键导入。
         </p>
         <div class="bg-tile text-faint mb-4 truncate rounded-(--radius-tile) px-3.5 py-2.5 font-mono text-xs">
             {$UniversalSub}
@@ -117,7 +117,7 @@
             <button class="btn-primary btn-sm copy flex-1" data-clipboard-text="{$UniversalSub}">
                 <i class="ti ti-copy"></i> 复制订阅链接
             </button>
-            <a href="/user/subscription" class="btn-secondary btn-sm">更多方式</a>
+            <a href="/user/subscription#settings" class="btn-secondary btn-sm">更多方式</a>
         </div>
     </div>
 
