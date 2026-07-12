@@ -101,23 +101,42 @@
         <span class="text-sm font-medium">购买新订阅</span>
     </a>
 
-    {* ============ 快速导入卡 ============ *}
-    <div class="c-card-pad flex flex-col">
-        <div class="mb-3 flex items-center gap-2">
-            <i class="ti ti-rocket text-primary text-lg"></i>
-            <h3 class="text-base">快速导入</h3>
+    {* ============ 快速导入卡(按检测到的系统直接给出推荐客户端)============ *}
+    <div class="c-card-pad flex flex-col" x-data="clientImport()">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+                <i class="ti ti-rocket text-primary text-lg"></i>
+                <h3 class="text-base">快速导入</h3>
+            </div>
+            <span class="badge-primary" x-text="os"></span>
         </div>
-        <p class="text-faint mb-4 text-xs leading-relaxed">
-            复制通用订阅链接，粘贴到任意客户端即可使用；或点击「更多方式」选择 Clash / Surge / Stash 等客户端一键导入。
-        </p>
-        <div class="bg-tile text-faint mb-4 truncate rounded-(--radius-tile) px-3.5 py-2.5 font-mono text-xs">
+
+        <div class="mb-3 flex flex-col gap-2">
+            <template x-for="c in recommended" :key="c.name">
+                <div class="bg-tile flex items-center gap-2.5 rounded-(--radius-tile) px-3 py-2.5">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-ink truncate text-sm font-medium" x-text="c.name"></div>
+                        <div class="text-faint truncate text-xs" x-text="c.description"></div>
+                    </div>
+                    <a class="btn-primary btn-sm shrink-0" :href="c.importUrl">
+                        <i class="ti ti-link"></i> 一键导入
+                    </a>
+                    <button class="btn-secondary btn-sm copy shrink-0 !px-2.5" :data-clipboard-text="subUrl(c)"
+                            title="复制该客户端的订阅链接">
+                        <i class="ti ti-copy"></i>
+                    </button>
+                </div>
+            </template>
+        </div>
+
+        <div class="bg-tile text-faint mb-3 truncate rounded-(--radius-tile) px-3.5 py-2.5 font-mono text-xs">
             {$UniversalSub}
         </div>
         <div class="mt-auto flex gap-2">
             <button class="btn-primary btn-sm copy flex-1" data-clipboard-text="{$UniversalSub}">
-                <i class="ti ti-copy"></i> 复制订阅链接
+                <i class="ti ti-copy"></i> 复制通用链接
             </button>
-            <a href="/user/subscription#settings" class="btn-secondary btn-sm">更多方式</a>
+            <a href="/user/subscription#settings" class="btn-secondary btn-sm">全部客户端</a>
         </div>
     </div>
 
@@ -168,5 +187,13 @@
 {if $public_setting['enable_checkin_captcha'] && $user->isAbleToCheckin()}
     {include file='captcha/js.tpl'}
 {/if}
+
+<script>
+    window.CAFE_SUB = "{$UniversalSub}";
+    window.CAFE_CLIENTS = {$clientData|default:'{ }'};
+    window.CAFE_ICONS = {$platformIcons|default:'{ }'};
+    window.CAFE_R2 = {if $config['enable_r2_client_download']}true{else}false{/if};
+</script>
+{include file='shell/client_import.tpl'}
 
 {include file='shell/footer.tpl'}

@@ -304,41 +304,8 @@
     window.CAFE_ICONS = {$platformIcons|default:'{ }'};
     window.CAFE_R2 = {if $config['enable_r2_client_download']}true{else}false{/if};
 </script>
+{include file='shell/client_import.tpl'}
 {literal}
-<script>
-    // 客户端导入组件:按 UA 推荐 + 全平台手风琴
-    function clientImport() {
-        return {
-            data: window.CAFE_CLIENTS || {},
-            icons: window.CAFE_ICONS || {},
-            open: null,
-            os: (function () {
-                const ua = navigator.userAgent;
-                if (ua.match(/iPhone|iPad|iPod/i)) return 'iOS';
-                if (ua.indexOf('Android') !== -1) return 'Android';
-                if (ua.indexOf('Mac') !== -1) return 'macOS';
-                if (ua.indexOf('Linux') !== -1) return 'Linux';
-                return 'Windows';
-            })(),
-            get recommended() {
-                return this.data[this.os] || this.data['Windows'] || [];
-            },
-            get platforms() {
-                return Object.keys(this.data);
-            },
-            subUrl(c) {
-                return window.CAFE_SUB + '/' + c.format;
-            },
-            dlUrl(c) {
-                let u = c.downloadUrl;
-                if (!c.isAppStore && u && u.includes('/clients/') && window.CAFE_R2) {
-                    u = '/user' + u;
-                }
-                return u;
-            }
-        };
-    }
-</script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // 订阅二维码
