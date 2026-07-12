@@ -5,15 +5,22 @@ declare(strict_types=1);
 namespace App\Controllers\User;
 
 use App\Controllers\BaseController;
+use App\Models\Config;
 use App\Models\Invoice;
+use App\Models\OnlineLog;
 use App\Models\Order;
 use App\Models\Subscription;
+use App\Services\Analytics;
+use App\Services\Subscribe;
+use App\Utils\Tools;
 use Carbon\Carbon;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function json_decode;
+use function json_encode;
+use function time;
 
 final class SubscriptionController extends BaseController
 {
@@ -57,10 +64,34 @@ final class SubscriptionController extends BaseController
             }
         }
 
+        // 详情页总览:小时用量、在线设备、订阅链接(cafe 主题使用,tabler 模板忽略这些变量)
+        $traffic_logs = [];
+        if (Config::obtain('traffic_log')) {
+            $hourly_usage = Analytics::getUserTodayHourlyUsage($this->user->id);
+            foreach ($hourly_usage as $usage) {
+                $traffic_logs[] = Tools::bToMB((int) $usage);
+            }
+        }
+
+        $online_ips = (new OnlineLog())->where('user_id', $this->user->id)
+            ->where('last_time', '>', time() - 300)
+            ->orderBy('last_time', 'desc')
+            ->get();
+
+        foreach ($online_ips as $online_ip) {
+            $formatted_ip = $online_ip->ip();
+            $online_ip->node_name = $online_ip->nodeName();
+            $online_ip->formatted_ip = $formatted_ip;
+            $online_ip->location = Tools::getIpLocation($formatted_ip);
+        }
+
         return $response->write(
             $this->view()
                 ->assign('subscription', $subscription)
                 ->assign('pendingInvoice', $pendingInvoice)
+                ->assign('traffic_logs', json_encode($traffic_logs))
+                ->assign('UniversalSub', Subscribe::getUniversalSubLink($this->user))
+                ->assign('online_ips', $online_ips)
                 ->fetch('user/subscription.tpl')
         );
     }

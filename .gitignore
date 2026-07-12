@@ -44,8 +44,6 @@ flake.nix
 .direnv/
 
 node_modules
-package.json
-package-lock.json
 
 *.cache
 

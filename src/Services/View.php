@@ -21,7 +21,8 @@ final class View
         $smarty = new Smarty(); //实例化smarty
         $user = Auth::getUser();
 
-        $smarty->setTemplateDir(BASE_PATH . '/resources/views/' . self::getTheme($user) . '/'); //设置模板文件存放目录
+        // 主题目录数组:未迁移到新主题的模板(含管理端)自动回退 tabler 渲染
+        $smarty->setTemplateDir(self::getTemplateDirs(self::getTheme($user)));
         $smarty->setCompileDir(BASE_PATH . '/storage/framework/smarty/compile/'); //设置生成文件存放目录
         $smarty->setCacheDir(BASE_PATH . '/storage/framework/smarty/cache/'); //设置缓存文件存放目录
         // add config
@@ -35,7 +36,7 @@ final class View
     public static function getTwig(): Environment
     {
         $user = Auth::getUser();
-        $loader = new FilesystemLoader(BASE_PATH . '/resources/views/' . self::getTheme($user) . '/');
+        $loader = new FilesystemLoader(self::getTemplateDirs(self::getTheme($user)));
 
         $twig = new Environment($loader, [
             'cache' => BASE_PATH . '/storage/framework/twig/cache/',
@@ -46,6 +47,20 @@ final class View
         $twig->addGlobal('user', $user);
 
         return $twig;
+    }
+
+    /**
+     * @return string[] 模板查找目录,主题在前、tabler 兜底
+     */
+    public static function getTemplateDirs(string $theme): array
+    {
+        $dirs = [BASE_PATH . '/resources/views/' . $theme . '/'];
+
+        if ($theme !== 'tabler') {
+            $dirs[] = BASE_PATH . '/resources/views/tabler/';
+        }
+
+        return $dirs;
     }
 
     public static function getTheme($user): string

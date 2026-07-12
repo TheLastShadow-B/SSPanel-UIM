@@ -1,0 +1,26 @@
+{
+  "name": "sspanel-uim-theme",
+  "version": "1.0.0",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "build:cafe": "tailwindcss -i resources/theme/cafe/app.css -o public/theme/cafe/app.css --minify",
+    "watch:cafe": "tailwindcss -i resources/theme/cafe/app.css -o public/theme/cafe/app.css --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheLastShadow-B/SSPanel-UIM.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/TheLastShadow-B/SSPanel-UIM/issues"
+  },
+  "homepage": "https://github.com/TheLastShadow-B/SSPanel-UIM#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.2",
+    "tailwindcss": "^4.3.2"
+  },
+  "private": true
+}

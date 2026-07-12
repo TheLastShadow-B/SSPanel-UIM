@@ -1,0 +1,261 @@
+/* ===================================================================
+ * cafe theme — SSPanel-UIM 用户端设计系统
+ * 设计语言参考 app.usmobile.com(实测提取 token),见
+ * docs/superpowers/specs/2026-07-13-frontend-redesign-design.md
+ * 构建:npm run build:cafe → public/theme/cafe/app.css(产物入库)
+ * =================================================================== */
+
+@import "tailwindcss";
+
+@source "../../views/cafe";
+
+/* 深色模式:<html data-theme="dark">(由用户设置驱动,非系统偏好) */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@font-face {
+    font-family: "Outfit";
+    font-style: normal;
+    font-weight: 300 900;
+    font-display: swap;
+    src: url("/theme/cafe/fonts/outfit-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+        U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+        U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Outfit";
+    font-style: normal;
+    font-weight: 300 900;
+    font-display: swap;
+    src: url("/theme/cafe/fonts/outfit-latin-ext.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+        U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+        U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@theme {
+    --font-sans: "Outfit", -apple-system, "PingFang SC", "MiSans",
+        "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
+
+    /* 主色:US Mobile 饱和蓝 */
+    --color-primary: #1d5ff6;
+    --color-primary-hover: #1750d4;
+    --color-primary-tint: #eaf0fe;
+
+    /* 画布与表面 */
+    --color-canvas: #f9fafd;
+    --color-card: #ffffff;
+    --color-hairline: #e1e3e6;
+    --color-tile: #f3f5f7;
+
+    /* 文字 */
+    --color-ink: #191c22;
+    --color-body: #52525b;
+    --color-faint: #8a8f98;
+
+    /* 语义色 */
+    --color-success: #17b26a;
+    --color-success-tint: #e7f8f0;
+    --color-warning: #e28800;
+    --color-warning-tint: #fdf1dc;
+    --color-danger: #f04438;
+    --color-danger-tint: #feeceb;
+
+    --radius-card: 16px;
+    --radius-tile: 10px;
+}
+
+/* 深色 = 夜间咖啡厅:同一套语义变量换值,组件零改动 */
+[data-theme="dark"] {
+    --color-primary: #4c7dff;
+    --color-primary-hover: #6b93ff;
+    --color-primary-tint: #1b2745;
+
+    --color-canvas: #0e1116;
+    --color-card: #151a22;
+    --color-hairline: #242a35;
+    --color-tile: #1c222c;
+
+    --color-ink: #e8eaee;
+    --color-body: #a6adba;
+    --color-faint: #6b7280;
+
+    --color-success-tint: #10291d;
+    --color-warning-tint: #2d2210;
+    --color-danger-tint: #2f1715;
+}
+
+@layer base {
+    html {
+        @apply bg-canvas text-body font-sans antialiased;
+        font-size: 15px;
+    }
+
+    h1, h2, h3, h4 {
+        @apply text-ink font-semibold;
+    }
+
+    ::selection {
+        background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+    }
+}
+
+/* 基础类定义为 @utility,以便组件类中可 @apply 复用 */
+@utility c-card {
+    @apply bg-card border-hairline rounded-(--radius-card) border;
+}
+
+@utility btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-1.5
+        rounded-full px-5 py-2.5 text-sm font-medium transition-colors
+        disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@utility badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+}
+
+@layer components {
+    .c-card-pad {
+        @apply c-card p-5 sm:p-6;
+    }
+
+    /* 虚线幽灵卡(新建实体入口) */
+    .c-ghost-card {
+        @apply border-hairline text-faint hover:border-primary hover:text-primary
+            flex min-h-56 cursor-pointer flex-col items-center justify-center
+            gap-3 rounded-(--radius-card) border-2 border-dashed bg-transparent
+            transition-colors;
+    }
+
+    /* ---- 按钮:胶囊形 ---- */
+    .btn-primary {
+        @apply btn bg-primary text-white;
+    }
+    .btn-primary:hover {
+        background: var(--color-primary-hover);
+    }
+
+    .btn-secondary {
+        @apply btn bg-tile text-ink hover:bg-hairline;
+    }
+
+    .btn-outline {
+        @apply btn border-hairline text-ink hover:border-primary hover:text-primary border bg-transparent;
+    }
+
+    .btn-danger-soft {
+        @apply btn bg-danger-tint text-danger;
+    }
+
+    .btn-sm {
+        @apply px-3.5 py-1.5 text-xs;
+    }
+
+    /* ---- 徽章 pill ---- */
+    .badge-primary { @apply badge bg-primary-tint text-primary; }
+    .badge-success { @apply badge bg-success-tint text-success; }
+    .badge-warning { @apply badge bg-warning-tint text-warning; }
+    .badge-danger  { @apply badge bg-danger-tint text-danger; }
+    .badge-neutral { @apply badge bg-tile text-body; }
+
+    /* 值 pill(key-value 行右侧的白底描边小块) */
+    .value-pill {
+        @apply border-hairline text-ink inline-flex items-center rounded-lg border
+            px-2.5 py-1 text-sm font-medium;
+    }
+
+    /* ---- 统计瓦片 ---- */
+    .stat-tile {
+        @apply bg-tile rounded-(--radius-tile) px-4 py-3.5 text-center;
+    }
+    .stat-tile .stat-value {
+        @apply text-ink text-xl font-semibold tracking-tight;
+    }
+    .stat-tile .stat-label {
+        @apply text-faint mt-0.5 text-xs;
+    }
+
+    /* ---- key-value 行 ---- */
+    .kv-row {
+        @apply flex items-center justify-between gap-3 py-2.5;
+    }
+    .kv-row + .kv-row {
+        @apply border-hairline border-t;
+    }
+    .kv-key { @apply text-body text-sm; }
+    .kv-val { @apply text-ink text-sm font-semibold; }
+
+    /* ---- 胶囊分段 tab ---- */
+    .pill-tabs {
+        @apply flex items-center gap-1;
+    }
+    .pill-tab {
+        @apply text-body hover:text-ink cursor-pointer rounded-full px-4 py-2
+            text-sm font-medium transition-colors;
+    }
+    .pill-tab.active {
+        @apply bg-primary text-white;
+    }
+
+    /* ---- 表单 ---- */
+    .field-label {
+        @apply text-ink mb-1.5 block text-sm font-medium;
+    }
+    .field-input {
+        @apply border-hairline bg-card text-ink placeholder-faint w-full
+            rounded-xl border px-3.5 py-2.5 text-sm transition-colors outline-none;
+    }
+    .field-input:focus {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+    }
+
+    /* ---- 侧边栏 ---- */
+    .side-link {
+        @apply text-body hover:text-ink flex items-center gap-3 rounded-xl px-3
+            py-2 text-sm font-medium transition-colors;
+    }
+    .side-link .side-ico {
+        @apply bg-tile text-body flex size-8 items-center justify-center
+            rounded-lg text-base transition-colors;
+    }
+    .side-link:hover .side-ico {
+        @apply text-ink;
+    }
+    .side-link.active {
+        @apply text-primary;
+    }
+    .side-link.active .side-ico {
+        @apply bg-primary text-white;
+    }
+
+    /* ---- 进度条 ---- */
+    .meter {
+        @apply bg-tile h-1.5 w-full overflow-hidden rounded-full;
+    }
+    .meter > span {
+        @apply bg-primary block h-full rounded-full transition-[width] duration-500;
+    }
+
+    /* ---- 表格卡 ---- */
+    .table-card table {
+        @apply w-full text-sm;
+    }
+    .table-card thead th {
+        @apply text-faint border-hairline border-b px-5 py-3 text-left text-xs font-medium;
+    }
+    .table-card tbody td {
+        @apply text-body border-hairline border-b px-5 py-3;
+    }
+    .table-card tbody tr:last-child td {
+        @apply border-b-0;
+    }
+
+    /* ---- toast ---- */
+    .toast {
+        @apply c-card text-ink pointer-events-auto flex min-w-64 items-center
+            gap-2.5 px-4 py-3 text-sm font-medium shadow-lg;
+    }
+}
