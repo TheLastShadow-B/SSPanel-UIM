@@ -53,7 +53,9 @@
                         body: body
                     });
                     const json = await resp.json();
-                    this.rows = json[dataKey] || [];
+                    // 后端可能返回 Laravel 分页器对象(行在 .data),也可能是数组
+                    const raw = json[dataKey];
+                    this.rows = Array.isArray(raw) ? raw : ((raw && raw.data) || []);
                     this.filtered = json.recordsFiltered || 0;
                 } catch (e) {
                     console.error('表格数据加载失败:', e);
