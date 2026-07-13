@@ -39,10 +39,11 @@
                         <div class="">
                             <div class="tab-content">
                                 <div id="gateway" x-show="stab === 'gateway'" >
-                                    <div class="max-w-xl">
+                                    <div class="grid max-w-4xl gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                         {foreach $payment_gateways as $key => $value}
-                                            <label class="border-hairline flex cursor-pointer items-center justify-between gap-3 border-b py-3 last:border-b-0">
-                                                <span class="text-body text-sm font-medium">{$key}</span>
+                                            <label class="border-hairline has-checked:border-primary has-checked:bg-primary-tint/40 flex cursor-pointer
+                                                          items-center justify-between gap-3 rounded-xl border px-4 py-3.5 transition-colors">
+                                                <span class="text-ink text-sm font-medium">{$key}</span>
                                                 <input id="{$value}_enable" class="accent-primary size-4" type="checkbox"
                                                        {if in_array($value, $active_payment_gateway)}checked{/if}>
                                             </label>
