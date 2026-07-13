@@ -1,5 +1,5 @@
 {* toast 通知 + htmx JSON 协议处理(cafe 主题共享部件) *}
-<div id="toast-stack" class="pointer-events-none fixed right-4 bottom-4 z-50 flex flex-col gap-2"></div>
+<div id="toast-stack" class="pointer-events-none fixed top-4 right-4 z-50 flex flex-col items-end gap-2"></div>
 
 {literal}
 <script>

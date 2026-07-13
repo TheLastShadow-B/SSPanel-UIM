@@ -318,9 +318,9 @@
         filter: none;
     }
 
-    /* ---- toast ---- */
+    /* ---- toast:按内容自适应宽度,过长换行 ---- */
     .toast {
-        @apply c-card text-ink pointer-events-auto flex min-w-64 items-center
+        @apply c-card text-ink pointer-events-auto flex w-fit max-w-sm items-center
             gap-2.5 px-4 py-3 text-sm font-medium shadow-lg;
     }
 }
