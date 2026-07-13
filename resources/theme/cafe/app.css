@@ -38,6 +38,14 @@
     --font-sans: "Outfit", -apple-system, "PingFang SC", "MiSans",
         "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif;
 
+    /* 字号阶梯整体上调一级(xs 13 / sm 15 / base 17),间距不受影响 */
+    --text-xs: 0.8125rem;
+    --text-xs--line-height: 1.25rem;
+    --text-sm: 0.9375rem;
+    --text-sm--line-height: 1.4rem;
+    --text-base: 1.0625rem;
+    --text-base--line-height: 1.6rem;
+
     /* 主色:US Mobile 饱和蓝 */
     --color-primary: #1d5ff6;
     --color-primary-hover: #1750d4;
