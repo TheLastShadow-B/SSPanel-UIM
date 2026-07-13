@@ -9,6 +9,7 @@ use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function json_encode;
 
 final class AdminController extends BaseController
 {
@@ -39,6 +40,9 @@ final class AdminController extends BaseController
 
         return $response->write(
             $this->view()
+                ->assign('income_trend', json_encode(Analytics::getIncomeTrend()))
+                ->assign('traffic_trend', json_encode(Analytics::getTrafficTrend()))
+                ->assign('reg_trend', json_encode(Analytics::getRegTrend()))
                 ->assign('today_income', $today_income)
                 ->assign('yesterday_income', $yesterday_income)
                 ->assign('this_month_income', $this_month_income)

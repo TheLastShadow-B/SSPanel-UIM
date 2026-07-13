@@ -267,6 +267,14 @@
         @apply border-b-0;
     }
 
+    /* ---- 趋势图柱体悬停 ---- */
+    .cbar {
+        transition: opacity 0.15s;
+    }
+    .cbar:hover {
+        opacity: 0.72;
+    }
+
     /* ---- 敏感信息模糊(hover 显示) ---- */
     .spoiler {
         filter: blur(5px);

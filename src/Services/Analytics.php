@@ -10,6 +10,8 @@ use App\Models\Paylist;
 use App\Models\User;
 use App\Utils\Tools;
 use function array_fill;
+use function array_sum;
+use function is_array;
 use function date;
 use function floatval;
 use function is_null;
@@ -141,6 +143,105 @@ final class Analytics
     public static function getActiveUser(): int
     {
         return (new User())->where('is_inactive', 0)->count();
+    }
+
+    /**
+     * 近 N 天(含今天)每日收入,按天补零。
+     *
+     * @return array<int, array{date: string, value: float}>
+     */
+    public static function getIncomeTrend(int $days = 14): array
+    {
+        $start = strtotime('00:00:00', strtotime('-' . ($days - 1) . ' days'));
+        $buckets = [];
+
+        for ($i = 0; $i < $days; $i++) {
+            $buckets[date('m-d', strtotime("+{$i} days", $start))] = 0.0;
+        }
+
+        $rows = (new Paylist())->where('status', 1)
+            ->where('datetime', '>=', $start)
+            ->get(['total', 'datetime']);
+
+        foreach ($rows as $row) {
+            $key = date('m-d', (int) $row->datetime);
+            if (isset($buckets[$key])) {
+                $buckets[$key] += (float) $row->total;
+            }
+        }
+
+        $trend = [];
+        foreach ($buckets as $date => $value) {
+            $trend[] = ['date' => $date, 'value' => round($value, 2)];
+        }
+
+        return $trend;
+    }
+
+    /**
+     * 近 N 天(含今天)全站每日流量(GB),按天补零。
+     *
+     * @return array<int, array{date: string, value: float}>
+     */
+    public static function getTrafficTrend(int $days = 14): array
+    {
+        $start_day = strtotime('-' . ($days - 1) . ' days');
+        $buckets = [];
+
+        for ($i = 0; $i < $days; $i++) {
+            $buckets[date('Y-m-d', strtotime("+{$i} days", $start_day))] = 0;
+        }
+
+        $rows = (new HourlyUsage())->where('date', '>=', date('Y-m-d', $start_day))
+            ->get(['date', 'usage']);
+
+        foreach ($rows as $row) {
+            $key = $row->date;
+            if (isset($buckets[$key])) {
+                $hours = json_decode($row->usage, true);
+                if (is_array($hours)) {
+                    $buckets[$key] += array_sum($hours);
+                }
+            }
+        }
+
+        $trend = [];
+        foreach ($buckets as $date => $bytes) {
+            $trend[] = ['date' => date('m-d', strtotime($date)), 'value' => Tools::bToGB((int) $bytes)];
+        }
+
+        return $trend;
+    }
+
+    /**
+     * 近 N 天(含今天)每日新注册用户数,按天补零。
+     *
+     * @return array<int, array{date: string, value: int}>
+     */
+    public static function getRegTrend(int $days = 14): array
+    {
+        $start = date('Y-m-d 00:00:00', strtotime('-' . ($days - 1) . ' days'));
+        $buckets = [];
+
+        for ($i = 0; $i < $days; $i++) {
+            $buckets[date('m-d', strtotime("+{$i} days", strtotime($start)))] = 0;
+        }
+
+        $rows = (new User())->where('reg_date', '>=', $start)->get(['reg_date']);
+
+        foreach ($rows as $row) {
+            $key = date('m-d', strtotime((string) $row->reg_date));
+            if (isset($buckets[$key])) {
+                $buckets[$key]++;
+            }
+        }
+
+        $trend = [];
+        foreach ($buckets as $date => $value) {
+            $trend[] = ['date' => $date, 'value' => $value];
+        }
+
+        return $trend;
     }
 
     public static function getUserHourlyUsage(int $user_id, string $date): array
