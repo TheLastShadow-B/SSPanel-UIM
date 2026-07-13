@@ -38,7 +38,7 @@
                 <div class="flex justify-end">
                     <div class="max-w-[85%] sm:max-w-[70%]">
                         <div class="text-faint mb-1 text-right text-xs">{$comment->commenter_name} · {$comment->datetime}</div>
-                        <div class="bg-primary rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed break-words text-white
+                        <div class="bg-primary ml-auto w-fit rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed break-words text-white
                                     [&_.ticket-img]:border-white/30 [&_a]:text-white">
                             {$comment->comment}
                         </div>
@@ -55,7 +55,7 @@
                     </span>
                     <div class="max-w-[85%] sm:max-w-[70%]">
                         <div class="text-faint mb-1 text-xs">{$comment->commenter_name} · {$comment->datetime}</div>
-                        <div class="bg-tile text-ink rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed break-words [&_a]:text-primary">
+                        <div class="bg-tile text-ink w-fit rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed break-words [&_a]:text-primary">
                             {$comment->comment}
                         </div>
                     </div>
