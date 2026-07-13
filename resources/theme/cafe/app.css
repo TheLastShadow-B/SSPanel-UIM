@@ -277,9 +277,28 @@
         @apply border-b-0;
     }
 
-    /* ---- 工单消息内联图片 ---- */
+    /* ---- 工单消息内联图片(点击灯箱放大) ---- */
     .ticket-img {
-        @apply border-hairline my-1.5 block max-h-64 max-w-full rounded-lg border object-contain sm:max-w-72;
+        @apply border-hairline my-1.5 block max-h-64 max-w-full cursor-zoom-in rounded-lg
+            border object-contain transition-opacity hover:opacity-90 sm:max-w-72;
+    }
+
+    /* ---- 图片灯箱 ---- */
+    .lightbox-overlay {
+        @apply fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/85 p-6;
+        animation: lightbox-fade 0.15s ease-out;
+    }
+    .lightbox-overlay img {
+        @apply max-h-[92vh] max-w-[92vw] rounded-xl object-contain shadow-2xl;
+        animation: lightbox-zoom 0.18s ease-out;
+    }
+    @keyframes lightbox-fade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @keyframes lightbox-zoom {
+        from { transform: scale(0.92); }
+        to { transform: scale(1); }
     }
 
     /* ---- 趋势图柱体悬停 ---- */

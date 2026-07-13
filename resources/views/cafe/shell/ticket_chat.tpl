@@ -68,6 +68,23 @@
         if (thread) thread.scrollTop = thread.scrollHeight;
     });
 
+    // 图片灯箱:点击消息内图片放大,点击遮罩 / Esc 关闭
+    document.addEventListener('click', function (e) {
+        const img = e.target.closest('.ticket-img');
+        if (!img) return;
+        const overlay = document.createElement('div');
+        overlay.className = 'lightbox-overlay';
+        const big = document.createElement('img');
+        big.src = img.src;
+        big.alt = img.alt || '图片';
+        overlay.appendChild(big);
+        overlay.addEventListener('click', function () { overlay.remove(); });
+        document.addEventListener('keydown', function esc(ev) {
+            if (ev.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+        });
+        document.body.appendChild(overlay);
+    });
+
     // 回复成功后刷新对话
     function afterTicketReply(event) {
         try {

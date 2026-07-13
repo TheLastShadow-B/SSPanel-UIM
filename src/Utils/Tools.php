@@ -246,7 +246,7 @@ final class Tools
 
         $safe = preg_replace(
             '#(?<![\w"])(/uploads/ticket/\d{6}/[a-f0-9]{32}\.(?:png|jpe?g|gif|webp))#',
-            '<a href="$1" target="_blank" rel="noopener"><img src="$1" class="ticket-img" alt="图片"></a>',
+            '<img src="$1" class="ticket-img" alt="图片">',
             $safe
         );
 
