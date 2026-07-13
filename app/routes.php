@@ -52,6 +52,7 @@ return static function (Slim\App $app): void {
         $group->get('/ticket', App\Controllers\User\TicketController::class . ':index');
         $group->get('/ticket/create', App\Controllers\User\TicketController::class . ':create');
         $group->post('/ticket', App\Controllers\User\TicketController::class . ':add');
+        $group->post('/ticket/upload', App\Controllers\User\TicketController::class . ':uploadImage');
         $group->get('/ticket/{id:[0-9]+}/view', App\Controllers\User\TicketController::class . ':detail');
         $group->post('/ticket/{id:[0-9]+}', App\Controllers\User\TicketController::class . ':reply');
         // 资料编辑

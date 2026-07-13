@@ -236,6 +236,23 @@ final class Tools
         return date('Y-m-d H:i:s', $time);
     }
 
+    /**
+     * 工单消息渲染:全文 HTML 转义后,仅将本站工单上传目录下的图片路径
+     * 转为内联图片,最后换行转 <br>。除生成的 img/a 外不产生任何 HTML。
+     */
+    public static function renderTicketComment(string $raw): string
+    {
+        $safe = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
+
+        $safe = preg_replace(
+            '#(?<![\w"])(/uploads/ticket/\d{6}/[a-f0-9]{32}\.(?:png|jpe?g|gif|webp))#',
+            '<a href="$1" target="_blank" rel="noopener"><img src="$1" class="ticket-img" alt="图片"></a>',
+            $safe
+        );
+
+        return nl2br($safe);
+    }
+
     public static function getSsPort(): int
     {
         $max_port = Config::obtain('max_port');

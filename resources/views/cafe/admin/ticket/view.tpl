@@ -5,10 +5,11 @@
     返回工单列表
 </a>
 
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+{* ============ 工单头 ============ *}
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
     <div class="min-w-0">
         <h2 class="truncate text-xl font-semibold tracking-tight">{$ticket->title}</h2>
-        <div class="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+        <div class="mt-1 flex flex-wrap items-center gap-2 text-sm">
             <span class="text-faint">#{$ticket->id}</span>
             {if $ticket->status !== 'closed'}
                 <span class="badge-warning">{$ticket->status}</span>
@@ -29,41 +30,60 @@
     </div>
 </div>
 
-{* ============ 对话流 ============ *}
+{* ============ 对话(管理端视角:管理员在右,用户/AI 在左)============ *}
 <div class="c-card mb-5">
-    <div class="divide-y divide-(--color-hairline)">
+    <div id="ticket-thread" class="flex max-h-[60vh] flex-col gap-5 overflow-y-auto p-5">
         {foreach $comments as $comment}
-            <div class="flex gap-4 px-5 py-4">
-                <span class="bg-tile text-body flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
-                    {$comment->commenter_name|truncate:1:''|upper}
-                </span>
-                <div class="min-w-0 flex-1">
-                    <div class="mb-1 flex flex-wrap items-baseline gap-2">
-                        <span class="text-ink text-sm font-medium">{$comment->commenter_name}</span>
-                        <span class="text-faint text-xs">{$comment->datetime}</span>
-                        <span class="text-faint ml-auto text-xs"># {$comment->comment_id + 1}</span>
+            {if $comment->commenter_type === 'admin'}
+                <div class="flex justify-end">
+                    <div class="max-w-[85%] sm:max-w-[70%]">
+                        <div class="text-faint mb-1 text-right text-xs">{$comment->commenter_name} · {$comment->datetime}</div>
+                        <div class="bg-primary rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed break-words text-white
+                                    [&_.ticket-img]:border-white/30 [&_a]:text-white">
+                            {$comment->comment}
+                        </div>
                     </div>
-                    <div class="text-body text-sm leading-relaxed whitespace-pre-wrap">{$comment->comment}</div>
                 </div>
-            </div>
+            {else}
+                <div class="flex justify-start gap-3">
+                    <span class="bg-tile text-body flex size-9 shrink-0 items-center justify-center rounded-full text-sm">
+                        {if $comment->commenter_type === 'llm'}
+                            <i class="ti ti-robot"></i>
+                        {else}
+                            <i class="ti ti-user"></i>
+                        {/if}
+                    </span>
+                    <div class="max-w-[85%] sm:max-w-[70%]">
+                        <div class="text-faint mb-1 text-xs">{$comment->commenter_name} · {$comment->datetime}</div>
+                        <div class="bg-tile text-ink rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed break-words [&_a]:text-primary">
+                            {$comment->comment}
+                        </div>
+                    </div>
+                </div>
+            {/if}
         {/foreach}
+    </div>
+
+    {* ============ 输入区 ============ *}
+    <div class="border-hairline border-t p-4">
+        <textarea id="reply-comment" class="field-input mb-3" rows="3"
+                  placeholder="回复用户,支持直接粘贴 / 拖入图片…"></textarea>
+        <div class="flex items-center justify-between">
+            <button id="attach-image" class="btn-secondary btn-sm" type="button">
+                <i class="ti ti-photo"></i> 图片
+            </button>
+            <input type="file" id="image-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+            <button class="btn-primary btn-sm"
+                    hx-post="/admin/ticket/{$ticket->id}" hx-swap="none"
+                    hx-on::after-request="afterTicketReply(event)"
+                    hx-vals='js:{ comment: document.getElementById("reply-comment").value }'>
+                <i class="ti ti-send"></i> 发送
+            </button>
+        </div>
     </div>
 </div>
 
-{* ============ 回复框 ============ *}
-<div class="c-card-pad">
-    <h3 class="mb-3 text-base">回复用户</h3>
-    <textarea id="reply-comment" class="field-input mb-4" rows="5" placeholder="请输入回复内容"></textarea>
-    <div class="flex justify-end">
-        <button class="btn-primary btn-sm"
-                hx-post="/admin/ticket/{$ticket->id}" hx-swap="none"
-                hx-vals='js:{
-                    comment: document.getElementById("reply-comment").value,
-                }'>
-            <i class="ti ti-send"></i> 回复
-        </button>
-    </div>
-</div>
+{include file='shell/ticket_chat.tpl'}
 
 <script>
     window.TICKET_ID = {$ticket->id};

@@ -45,6 +45,8 @@ flake.nix
 
 node_modules
 
+public/uploads/
+
 *.cache
 
 storage/LocalClientVersion.json

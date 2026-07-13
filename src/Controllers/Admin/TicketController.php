@@ -179,7 +179,7 @@ final class TicketController extends BaseController
         $comments = json_decode($ticket->content);
 
         foreach ($comments as $comment) {
-            $comment->comment = nl2br($comment->comment);
+            $comment->comment = Tools::renderTicketComment($comment->comment);
             $comment->datetime = Tools::toDateTime((int) $comment->datetime);
         }
 

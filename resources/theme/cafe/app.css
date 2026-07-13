@@ -277,6 +277,11 @@
         @apply border-b-0;
     }
 
+    /* ---- 工单消息内联图片 ---- */
+    .ticket-img {
+        @apply border-hairline my-1.5 block max-h-64 max-w-full rounded-lg border object-contain sm:max-w-72;
+    }
+
     /* ---- 趋势图柱体悬停 ---- */
     .cbar {
         transition: opacity 0.15s;

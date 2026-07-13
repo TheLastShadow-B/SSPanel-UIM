@@ -151,6 +151,56 @@ final class TicketController extends BaseController
         return $response->withHeader('HX-Refresh', 'true');
     }
 
+
+    /**
+     * 工单图片上传:校验为真实图片(≤5MB),随机文件名存储,返回站内相对路径。
+     */
+    public function uploadImage(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        if (! Config::obtain('enable_ticket')) {
+            return ResponseHelper::error($response, '工单功能未启用');
+        }
+
+        $file = $request->getUploadedFiles()['image'] ?? null;
+
+        if ($file === null || $file->getError() !== UPLOAD_ERR_OK) {
+            return ResponseHelper::error($response, '上传失败');
+        }
+
+        if ($file->getSize() > 5 * 1024 * 1024) {
+            return ResponseHelper::error($response, '图片不能超过 5MB');
+        }
+
+        $tmp_path = $file->getStream()->getMetadata('uri');
+        $image_info = @getimagesize($tmp_path);
+        $allowed = [
+            IMAGETYPE_PNG => 'png',
+            IMAGETYPE_JPEG => 'jpg',
+            IMAGETYPE_GIF => 'gif',
+            IMAGETYPE_WEBP => 'webp',
+        ];
+
+        if ($image_info === false || ! isset($allowed[$image_info[2]])) {
+            return ResponseHelper::error($response, '仅支持 PNG / JPG / GIF / WebP 图片');
+        }
+
+        $month = date('Ym');
+        $dir = BASE_PATH . '/public/uploads/ticket/' . $month;
+
+        if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
+            return ResponseHelper::error($response, '存储目录创建失败');
+        }
+
+        $name = bin2hex(random_bytes(16)) . '.' . $allowed[$image_info[2]];
+        $file->moveTo($dir . '/' . $name);
+
+        return $response->withJson([
+            'ret' => 1,
+            'msg' => '上传成功',
+            'url' => '/uploads/ticket/' . $month . '/' . $name,
+        ]);
+    }
+
     /**
      * @throws Exception
      */
@@ -170,7 +220,7 @@ final class TicketController extends BaseController
         $comments = json_decode($ticket->content);
 
         foreach ($comments as $comment) {
-            $comment->comment = nl2br($comment->comment);
+            $comment->comment = Tools::renderTicketComment($comment->comment);
             $comment->datetime = Tools::toDateTime((int) $comment->datetime);
         }
 
