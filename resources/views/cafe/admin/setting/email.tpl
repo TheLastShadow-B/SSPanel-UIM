@@ -95,7 +95,10 @@
                                             <input type="text" class="field-input" id="recipient" value="">
                                             <div class="row my-3">
                                                 <div class="col">
-                                                    <button id="test-email" class="btn btn-primary">发送测试邮件
+                                                    <button id="test-email" class="btn btn-primary"
+                                                            hx-post="/admin/setting/test/email" hx-swap="none"
+                                                            hx-vals='js:{ recipient: document.getElementById("recipient").value }'>
+                                                        发送测试邮件
                                                     </button>
                                                 </div>
                                             </div>
