@@ -74,9 +74,9 @@
                 概况
             </a>
 
-            <button class="side-caption flex w-full cursor-pointer items-center justify-between pr-2" @click="toggle('users')">
+            <button class="side-caption" @click="toggle('users')">
                 用户与节点
-                <i class="ti ti-chevron-down transition-transform" :class="!g.users && '-rotate-90'"></i>
+                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.users && '-rotate-90'"></i>
             </button>
             <div x-show="g.users" class="flex flex-col gap-0.5">
                 <a href="/admin/user" class="side-link {if ($nav|default:'') === 'users'}active{/if}">
@@ -89,9 +89,9 @@
                 </a>
             </div>
 
-            <button class="side-caption flex w-full cursor-pointer items-center justify-between pr-2" @click="toggle('finance')">
+            <button class="side-caption" @click="toggle('finance')">
                 财务
-                <i class="ti ti-chevron-down transition-transform" :class="!g.finance && '-rotate-90'"></i>
+                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.finance && '-rotate-90'"></i>
             </button>
             <div x-show="g.finance" class="flex flex-col gap-0.5">
                 <a href="/admin/product" class="side-link {if ($nav|default:'') === 'product'}active{/if}">
@@ -120,9 +120,9 @@
                 </a>
             </div>
 
-            <button class="side-caption flex w-full cursor-pointer items-center justify-between pr-2" @click="toggle('ops')">
+            <button class="side-caption" @click="toggle('ops')">
                 运营
-                <i class="ti ti-chevron-down transition-transform" :class="!g.ops && '-rotate-90'"></i>
+                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.ops && '-rotate-90'"></i>
             </button>
             <div x-show="g.ops" class="flex flex-col gap-0.5">
                 <a href="/admin/announcement" class="side-link {if ($nav|default:'') === 'announcement'}active{/if}">
@@ -139,9 +139,9 @@
                 </a>
             </div>
 
-            <button class="side-caption flex w-full cursor-pointer items-center justify-between pr-2" @click="toggle('audit')">
+            <button class="side-caption" @click="toggle('audit')">
                 审计
-                <i class="ti ti-chevron-down transition-transform" :class="!g.audit && '-rotate-90'"></i>
+                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.audit && '-rotate-90'"></i>
             </button>
             <div x-show="g.audit" class="flex flex-col gap-0.5">
                 <a href="/admin/detect" class="side-link {if ($nav|default:'') === 'detect'}active{/if}">
@@ -158,9 +158,9 @@
                 </a>
             </div>
 
-            <button class="side-caption flex w-full cursor-pointer items-center justify-between pr-2" @click="toggle('logs')">
+            <button class="side-caption" @click="toggle('logs')">
                 日志
-                <i class="ti ti-chevron-down transition-transform" :class="!g.logs && '-rotate-90'"></i>
+                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.logs && '-rotate-90'"></i>
             </button>
             <div x-show="g.logs" class="flex flex-col gap-0.5">
                 <a href="/admin/login" class="side-link {if ($nav|default:'') === 'log-login'}active{/if}">
@@ -193,9 +193,9 @@
                 </a>
             </div>
 
-            <button class="side-caption flex w-full cursor-pointer items-center justify-between pr-2" @click="toggle('system')">
+            <button class="side-caption" @click="toggle('system')">
                 系统
-                <i class="ti ti-chevron-down transition-transform" :class="!g.system && '-rotate-90'"></i>
+                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.system && '-rotate-90'"></i>
             </button>
             <div x-show="g.system" class="flex flex-col gap-0.5">
                 <a href="/admin/setting/billing" class="side-link {if ($nav|default:'') === 'setting'}active{/if}">

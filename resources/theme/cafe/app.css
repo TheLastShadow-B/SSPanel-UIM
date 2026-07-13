@@ -232,9 +232,11 @@
         @apply bg-primary text-white;
     }
 
-    /* ---- 侧边栏分组标题(管理端导航较密,需分组标注) ---- */
+    /* ---- 侧边栏分组标题:可折叠开关,与菜单项同规格,颜色淡一档区分层级 ---- */
     .side-caption {
-        @apply text-faint mt-4 mb-1 px-3 text-[11px] font-semibold tracking-wider uppercase;
+        @apply text-faint hover:text-ink hover:bg-tile mt-2 flex w-full cursor-pointer
+            items-center justify-between rounded-xl px-3 py-2 text-sm font-medium
+            transition-colors;
     }
 
     /* ---- 设置表单行:左标签右控件,窄屏堆叠 ---- */
