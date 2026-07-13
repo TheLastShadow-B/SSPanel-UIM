@@ -141,8 +141,8 @@
             svg += '<path class="cbar" d="' + bar(x, y, bw, h) + '" fill="var(--color-primary)">' +
                 '<title>' + d.date + ' · ' + fmt(d.value) + '</title></path>';
 
-            // x 轴:每 3 天 + 最后一天
-            if (i % 3 === 0 || i === n - 1) {
+            // x 轴:每 3 天 + 最后一天(紧邻最后一天的常规刻度让位,避免标签重叠)
+            if (i === n - 1 || (i % 3 === 0 && i < n - 2)) {
                 svg += '<text x="' + (x + bw / 2) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="10" ' +
                     'fill="var(--color-faint)">' + d.date + '</text>';
             }
