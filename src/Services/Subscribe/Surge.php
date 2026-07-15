@@ -102,6 +102,9 @@ final class Surge extends Base
                 case 14:
                     $line = $this->buildTrojanLine($user, $node_raw, $node_custom_config);
                     break;
+                case 15:
+                    $line = $this->buildHysteria2Line($user, $node_raw, $node_custom_config);
+                    break;
                 default:
                     // sort=2 (TUIC), sort=3 (WireGuard), and any other value — not supported by Surge
                     $line = null;
@@ -317,6 +320,45 @@ final class Surge extends Base
 
         $udp = (bool) ($custom['udp'] ?? true);
         $parts[] = 'udp-relay=' . ($udp ? 'true' : 'false');
+
+        return implode(', ', $parts);
+    }
+
+    private function buildHysteria2Line($user, $node_raw, array $custom): ?string
+    {
+        $port = $custom['offset_port_user'] ?? $custom['offset_port_node'] ?? 443;
+        $sni = $custom['host'] ?? '';
+        $allow_insecure = (bool) ($custom['allow_insecure'] ?? false);
+
+        $hy2_opts = $custom['Hy2Opts'] ?? [];
+        $down_mbps = (int) ($hy2_opts['down_mbps'] ?? 0);
+        $obfs = $hy2_opts['obfs'] ?? '';
+        $obfs_password = $hy2_opts['obfs_password'] ?? '';
+
+        $parts = [
+            'hysteria2',
+            $node_raw->server,
+            (string) $port,
+            'password=' . $user->passwd,
+        ];
+
+        if ($obfs !== '' && $obfs_password !== '') {
+            // Surge only implements the salamander obfuscation (salamander-password=).
+            // Any other obfs type would leave the node unable to connect — skip it.
+            if ($obfs !== 'salamander') {
+                return null;
+            }
+            $parts[] = 'salamander-password=' . $obfs_password;
+        }
+
+        if ($down_mbps > 0) {
+            $parts[] = 'download-bandwidth=' . $down_mbps;
+        }
+
+        if ($sni !== '') {
+            $parts[] = 'sni=' . $sni;
+        }
+        $parts[] = 'skip-cert-verify=' . ($allow_insecure ? 'true' : 'false');
 
         return implode(', ', $parts);
     }
