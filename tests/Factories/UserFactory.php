@@ -61,7 +61,7 @@ class UserFactory
             'is_admin' => 0,
             'is_banned' => 0,
             'is_shadow_banned' => 0,
-            'theme' => 'tabler',
+            'theme' => 'cafe',
             'locale' => 'zh-CN',
             'reg_date' => date('Y-m-d H:i:s'),
             'method' => 'aes-256-gcm',

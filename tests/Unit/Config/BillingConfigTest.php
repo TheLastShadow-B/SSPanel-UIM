@@ -47,7 +47,7 @@ it('renders an input for every new billing key in the admin template', function 
     // The save JS iterates $update_field and reads $('#<item>').val(); each new
     // class='billing' key therefore needs a matching element id or its value is
     // clobbered with undefined on save.
-    $tpl = file_get_contents(BASE_PATH . '/resources/views/tabler/admin/setting/billing.tpl');
+    $tpl = file_get_contents(BASE_PATH . '/resources/views/cafe/admin/setting/billing.tpl');
     foreach ([
         'stripe_publishable_key',
         'stripe_auto_billing_enabled',
@@ -65,7 +65,7 @@ it('renders a live (uncommented) input for cryptomus_currency', function () {
     // stored value (and, on the NOT NULL value column, could abort the whole
     // save). Smarty comments are {* ... *}; strip them so a commented-out
     // input is NOT counted as present.
-    $tpl = file_get_contents(BASE_PATH . '/resources/views/tabler/admin/setting/billing.tpl');
+    $tpl = file_get_contents(BASE_PATH . '/resources/views/cafe/admin/setting/billing.tpl');
     $live = preg_replace('/\{\*.*?\*\}/s', '', $tpl);
     expect($live)->toContain('id="cryptomus_currency"');
 });

@@ -276,7 +276,7 @@ it('index returns 200 and renders the publishable key + saved card summary', fun
     seedPublishableKey('pk_test_index');
     seedRenderPublicSettings();
     $user = makePmUser('cus_index');
-    $user->isLogin = false; // View::getTheme -> $_ENV['theme'] (tabler), avoids a numeric theme dir
+    $user->isLogin = false; // View::getTheme -> $_ENV['theme'] (cafe), avoids a numeric theme dir
     $GLOBALS['user'] = $user;
 
     $fake = fakePmStripe(['cus_index' => 'pm_index_default']);

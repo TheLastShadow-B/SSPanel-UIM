@@ -21,7 +21,6 @@ final class View
         $smarty = new Smarty(); //实例化smarty
         $user = Auth::getUser();
 
-        // 主题目录数组:未迁移到新主题的模板(含管理端)自动回退 tabler 渲染
         $smarty->setTemplateDir(self::getTemplateDirs(self::getTheme($user)));
         $smarty->setCompileDir(BASE_PATH . '/storage/framework/smarty/compile/'); //设置生成文件存放目录
         $smarty->setCacheDir(BASE_PATH . '/storage/framework/smarty/cache/'); //设置缓存文件存放目录
@@ -50,25 +49,20 @@ final class View
     }
 
     /**
-     * @return string[] 模板查找目录,主题在前、tabler 兜底
+     * @return string[] 模板查找目录
      */
     public static function getTemplateDirs(string $theme): array
     {
-        $dirs = [BASE_PATH . '/resources/views/' . $theme . '/'];
-
-        if ($theme !== 'tabler') {
-            $dirs[] = BASE_PATH . '/resources/views/tabler/';
-        }
-
-        return $dirs;
+        return [BASE_PATH . '/resources/views/' . $theme . '/'];
     }
 
     public static function getTheme($user): string
     {
-        if ($user->isLogin) {
-            $theme = $user->theme;
-        } else {
-            $theme = $_ENV['theme'];
+        $theme = $user->isLogin ? $user->theme : $_ENV['theme'];
+
+        // 历史用户的 theme 字段可能仍是已删除的旧主题(如 tabler),统一回退 cafe
+        if (! is_string($theme) || $theme === '' || ! is_dir(BASE_PATH . '/resources/views/' . $theme)) {
+            return 'cafe';
         }
 
         return $theme;

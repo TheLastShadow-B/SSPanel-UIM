@@ -16,20 +16,46 @@ afterEach(function () {
 describe('View::getTheme', function () {
     it('returns user theme when user is logged in', function () {
         $this->user->isLogin = true;
-        $this->user->theme = 'tabler';
+        $this->user->theme = 'cafe';
 
         $theme = $this->view->getTheme($this->user);
 
-        expect($theme)->toBe('tabler');
+        expect($theme)->toBe('cafe');
     });
 
     it('returns default theme when user is not logged in', function () {
-        $_ENV['theme'] = 'not-tabler';
+        $_ENV['theme'] = 'cafe';
         $this->user->isLogin = false;
 
         $theme = $this->view->getTheme($this->user);
 
-        expect($theme)->toBe('not-tabler');
+        expect($theme)->toBe('cafe');
+    });
+
+    it('falls back to cafe when user theme no longer exists', function () {
+        $this->user->isLogin = true;
+        $this->user->theme = 'tabler';
+
+        $theme = $this->view->getTheme($this->user);
+
+        expect($theme)->toBe('cafe');
+    });
+
+    it('falls back to cafe when default theme is invalid', function () {
+        $_ENV['theme'] = 'no-such-theme';
+        $this->user->isLogin = false;
+
+        $theme = $this->view->getTheme($this->user);
+
+        expect($theme)->toBe('cafe');
+    });
+});
+
+describe('View::getTemplateDirs', function () {
+    it('returns only the theme directory', function () {
+        $dirs = $this->view->getTemplateDirs('cafe');
+
+        expect($dirs)->toBe([BASE_PATH . '/resources/views/cafe/']);
     });
 });
 

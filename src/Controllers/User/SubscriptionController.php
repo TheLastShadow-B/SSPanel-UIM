@@ -65,7 +65,7 @@ final class SubscriptionController extends BaseController
             }
         }
 
-        // 详情页总览:小时用量、在线设备、订阅链接(cafe 主题使用,tabler 模板忽略这些变量)
+        // 详情页总览:小时用量、在线设备、订阅链接
         $traffic_logs = [];
         if (Config::obtain('traffic_log')) {
             $hourly_usage = Analytics::getUserTodayHourlyUsage($this->user->id);
