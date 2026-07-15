@@ -166,10 +166,6 @@
                     <span class="value-pill">{$subscription->content->name}</span>
                 </div>
                 <div class="kv-row">
-                    <span class="kv-key">计费周期</span>
-                    <span class="value-pill">{$subscription->billing_cycle_text}</span>
-                </div>
-                <div class="kv-row">
                     <span class="kv-key">周期流量</span>
                     <span class="value-pill">{$subscription->content->bandwidth} GB</span>
                 </div>
@@ -179,7 +175,7 @@
                 </div>
                 <div class="kv-row">
                     <span class="kv-key">续费价格</span>
-                    <span class="kv-val">¥ {$subscription->renewal_price} / 周期</span>
+                    <span class="kv-val">¥ {$subscription->renewal_price} · {$subscription->billing_cycle_text}</span>
                 </div>
                 <div class="kv-row">
                     <span class="kv-key">自动续费</span>
