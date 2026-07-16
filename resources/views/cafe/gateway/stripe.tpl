@@ -9,15 +9,15 @@
         <span class="payment payment-xs payment-provider-visa"></span>
         等标识的信用卡或借记卡
     </p>
-    <div class="flex flex-col gap-2 sm:flex-row">
-        <button class="btn-primary flex-1" type="button"
+    <div class="flex flex-col gap-2">
+        <button class="btn-primary w-full" type="button"
                 hx-post="/user/payment/purchase/stripe" hx-swap="none"
                 hx-vals='js:{
                     invoice_id: {$invoice->id},
                 }'>
             <i class="ti ti-credit-card"></i> 前往 Stripe 支付
         </button>
-        <button class="btn-secondary flex-1" type="button"
+        <button class="btn-secondary w-full" type="button"
                 hx-post="/user/payment/purchase/stripe" hx-swap="none"
                 hx-confirm="确认使用已绑定的支付方式立即扣款 ¥{$invoice->price}？"
                 hx-vals='js:{
