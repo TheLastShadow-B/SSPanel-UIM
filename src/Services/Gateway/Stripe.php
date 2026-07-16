@@ -108,6 +108,44 @@ final class Stripe extends Base
             $exchange_amount *= 100;
         }
 
+        // 已绑卡快捷支付:支付方式全部服务端推导(客户的默认支付方式),不读任何
+        // 客户端 id。成功后与 Checkout 走同一结算路径 —— payment_intent.succeeded
+        // webhook 按 metadata.trade_no 调 postPayment,幂等键锚定 tradeno 防重复扣款。
+        if ((bool) $request->getParam('use_saved_card')) {
+            $stripeService = StripeService::getInstance();
+
+            try {
+                $customerId = $stripeService->ensureCustomer($user);
+                $paymentMethodId = $stripeService->getDefaultPaymentMethod($customerId);
+
+                if ($paymentMethodId === null) {
+                    return $response->withJson([
+                        'ret' => 0,
+                        'msg' => '尚未绑定支付方式，请先在「个人设置 → 支付方式」中绑定',
+                    ]);
+                }
+
+                $stripeService->chargeOffSession(
+                    $customerId,
+                    $paymentMethodId,
+                    (int) round($exchange_amount),
+                    $stripe_currency,
+                    'inv_card_' . $pl->tradeno,
+                    ['trade_no' => $pl->tradeno, 'invoice_id' => (string) $invoice->id]
+                );
+            } catch (ApiErrorException $e) {
+                return $response->withJson([
+                    'ret' => 0,
+                    'msg' => '扣款未成功：' . ($e->getError()->message ?? '卡片被拒绝，请尝试其他支付方式'),
+                ]);
+            }
+
+            return $response->withHeader(
+                'HX-Redirect',
+                $_ENV['baseUrl'] . '/user/invoice/' . $invoice_id . '/view?paid=1'
+            );
+        }
+
         $stripe = StripeService::getInstance()->client();
         $session = null;
 

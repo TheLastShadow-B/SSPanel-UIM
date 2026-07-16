@@ -80,18 +80,17 @@
         <div x-data="{ paytab: '{if $invoice->type !== 'topup'}balance{else}gateway{/if}' }">
             <div class="c-card-pad">
                 <h3 class="mb-3 text-base">支付方式</h3>
-                <div class="pill-tabs mb-4">
-                    {if $invoice->type !== 'topup'}
+                {* 只有一种支付途径时不渲染 tab 栏,免得单个胶囊看起来像可点的按钮 *}
+                {if $invoice->type !== 'topup' && count($payments) > 0}
+                    <div class="pill-tabs mb-4">
                         <button class="pill-tab" :class="paytab === 'balance' && 'active'" @click="paytab = 'balance'">
                             <i class="ti ti-coins"></i> 余额
                         </button>
-                    {/if}
-                    {if count($payments) > 0}
                         <button class="pill-tab" :class="paytab === 'gateway' && 'active'" @click="paytab = 'gateway'">
                             <i class="ti ti-credit-card"></i> 在线支付
                         </button>
-                    {/if}
-                </div>
+                    </div>
+                {/if}
 
                 {if $invoice->type !== 'topup'}
                     <div x-show="paytab === 'balance'">
