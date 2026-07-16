@@ -25,6 +25,7 @@
                 <th>名称</th>
                 <th>地址</th>
                 <th>状态</th>
+                <th>在线</th>
                 <th>类型</th>
                 <th>倍率</th>
                 <th>等级 / 组别</th>
@@ -40,6 +41,10 @@
                     <td class="text-ink max-w-44 truncate font-medium" x-text="row.name"></td>
                     <td class="max-w-44 truncate font-mono text-xs" x-text="row.server"></td>
                     <td><span class="badge-neutral" x-text="row.type"></span></td>
+                    <td>
+                        <span :class="row.online_status === 1 ? 'badge-success' : (row.online_status === -1 ? 'badge-danger' : 'badge-warning')"
+                              x-text="row.online_status === 1 ? '在线' : (row.online_status === -1 ? '离线' : '无心跳')"></span>
+                    </td>
                     <td><span class="badge-primary" x-text="row.sort"></span></td>
                     <td class="whitespace-nowrap">
                         <span x-text="row.traffic_rate + ' 倍'"></span>
