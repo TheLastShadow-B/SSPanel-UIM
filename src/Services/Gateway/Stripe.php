@@ -125,7 +125,7 @@ final class Stripe extends Base
                     ]);
                 }
 
-                $stripeService->chargeOffSession(
+                $paymentIntent = $stripeService->chargeOffSession(
                     $customerId,
                     $paymentMethodId,
                     (int) round($exchange_amount),
@@ -133,6 +133,12 @@ final class Stripe extends Base
                     'inv_card_' . $pl->tradeno,
                     ['trade_no' => $pl->tradeno, 'invoice_id' => (string) $invoice->id]
                 );
+
+                // off-session 卡扣款是同步的:成功即当场结算,不依赖 webhook 送达
+                // (postPayment 幂等,webhook 事件到达时自然去重)。
+                if ($paymentIntent->status === 'succeeded') {
+                    $this->postPayment($pl->tradeno);
+                }
             } catch (ApiErrorException $e) {
                 return $response->withJson([
                     'ret' => 0,

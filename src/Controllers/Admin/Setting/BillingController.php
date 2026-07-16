@@ -88,9 +88,20 @@ final class BillingController extends BaseController
             'stripe_version' => '2026-03-25.dahlia',
         ]);
 
+        $notify_url = $_ENV['baseUrl'] . '/payment/notify/stripe';
+
         try {
-            $stripe->webhookEndpoints->create([
-                'url' => $_ENV['baseUrl'] . '/payment/notify/stripe',
+            // 先清掉指向本站回调的旧 endpoint:重复点击会产生多个 endpoint,
+            // 每个签名密钥不同,与库中密钥不符的事件全部验签 400。
+            $existing = $stripe->webhookEndpoints->all(['limit' => 100]);
+            foreach ($existing->data as $ep) {
+                if ($ep->url === $notify_url) {
+                    $stripe->webhookEndpoints->delete($ep->id, []);
+                }
+            }
+
+            $endpoint = $stripe->webhookEndpoints->create([
+                'url' => $notify_url,
                 'enabled_events' => [
                     // One-time / first-purchase settlement (Stripe::notify, inline)
                     // and self-managed renewal off-session charges.
@@ -107,9 +118,17 @@ final class BillingController extends BaseController
             ]);
         }
 
+        // 签名密钥只在创建响应里出现一次,必须立即入库,否则 notify 验签全部失败。
+        if (! Config::set('stripe_endpoint_secret', (string) $endpoint->secret)) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => 'Webhook 已创建，但保存签名密钥失败，请手动填写 stripe_endpoint_secret',
+            ]);
+        }
+
         return $response->withJson([
             'ret' => 1,
-            'msg' => '设置 Stripe Webhook 成功',
+            'msg' => '设置 Stripe Webhook 成功，签名密钥已自动保存',
         ]);
     }
 
