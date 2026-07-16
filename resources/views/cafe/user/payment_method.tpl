@@ -33,21 +33,26 @@
 
         <div class="border-hairline my-5 border-t"></div>
 
-        <button id="pm-add" type="button" class="btn-primary">
-            <i class="ti ti-credit-card"></i>
-            {if $card}更换信用卡{else}添加信用卡{/if}
-        </button>
-
-        <div id="pm-form" class="mt-4" style="display:none;">
-            <div id="payment-element"></div>
-            <div id="pm-error" class="text-danger mt-2 text-sm"></div>
-            <button id="pm-submit" type="button" class="btn-primary mt-4">
-                保存卡片
+        {if $publishable_key === ''}
+            <p class="text-faint text-sm">站点尚未启用银行卡支付，暂时无法绑定信用卡。</p>
+        {else}
+            <button id="pm-add" type="button" class="btn-primary">
+                <i class="ti ti-credit-card"></i>
+                {if $card}更换信用卡{else}添加信用卡{/if}
             </button>
-        </div>
+
+            <div id="pm-form" class="mt-4" style="display:none;">
+                <div id="payment-element"></div>
+                <div id="pm-error" class="text-danger mt-2 text-sm"></div>
+                <button id="pm-submit" type="button" class="btn-primary mt-4">
+                    保存卡片
+                </button>
+            </div>
+        {/if}
     </div>
 </div>
 
+{if $publishable_key !== ''}
 <div id="pm-root"
      data-publishable-key="{$publishable_key}"
      data-return-url="{$config['baseUrl']}/user/payment-method"></div>
@@ -147,5 +152,6 @@
 })();
 </script>
 {/literal}
+{/if}
 
 {include file='shell/footer.tpl'}

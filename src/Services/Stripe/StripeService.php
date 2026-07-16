@@ -29,10 +29,20 @@ class StripeService
 
     public function __construct(?StripeClient $client = null)
     {
-        $this->client = $client ?? new StripeClient([
-            'api_key' => (string) Config::obtain('stripe_api_key'),
-            'stripe_version' => '2026-03-25.dahlia',
-        ]);
+        if ($client === null) {
+            // StripeClient rejects an empty-string api_key in its constructor; pass
+            // null instead so an unconfigured site fails at request time with an
+            // AuthenticationException (an ApiErrorException callers already catch)
+            // rather than 500ing before any try block is entered.
+            $apiKey = (string) Config::obtain('stripe_api_key');
+
+            $client = new StripeClient([
+                'api_key' => $apiKey === '' ? null : $apiKey,
+                'stripe_version' => '2026-03-25.dahlia',
+            ]);
+        }
+
+        $this->client = $client;
     }
 
     public function client(): StripeClient
