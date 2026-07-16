@@ -5,7 +5,7 @@
     <p class="text-faint mt-1 text-sm">选择适合你的订阅套餐或流量包</p>
 </div>
 
-<div x-data="{ tab: 'subscription' }">
+<div x-data="{ tab: window.location.hash === '#bandwidth' ? 'bandwidth' : 'subscription' }">
     <div class="pill-tabs mb-6">
         <button class="pill-tab" :class="tab === 'subscription' && 'active'" @click="tab = 'subscription'">
             <i class="ti ti-star"></i> 订阅套餐

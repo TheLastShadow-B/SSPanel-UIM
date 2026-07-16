@@ -49,7 +49,11 @@
         <div class="flex-1 px-5 py-4 lg:flex-none lg:px-6">
             <div class="text-faint text-xs">剩余流量</div>
             <div class="text-ink mt-0.5 text-lg font-semibold">{$user->unusedTraffic()}</div>
-            <a href="/user/product" class="btn-primary btn-sm mt-2"><i class="ti ti-refresh"></i> 续费 / 加购</a>
+            {if $subscription !== null}
+                <a href="/user/product#bandwidth" class="btn-primary btn-sm mt-2"><i class="ti ti-plus"></i> 加购流量包</a>
+            {else}
+                <a href="/user/product" class="btn-primary btn-sm mt-2"><i class="ti ti-shopping-bag"></i> 订购套餐</a>
+            {/if}
         </div>
         <div class="flex-1 px-5 py-4 lg:flex-none lg:px-6">
             <div class="text-faint text-xs">流量重置日</div>
