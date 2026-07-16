@@ -41,7 +41,7 @@
                     <td class="max-w-44 truncate font-mono text-xs" x-text="row.server"></td>
                     <td><span class="badge-neutral" x-text="row.type"></span></td>
                     <td><span class="badge-primary" x-text="row.sort"></span></td>
-                    <td>
+                    <td class="whitespace-nowrap">
                         <span x-text="row.traffic_rate + ' 倍'"></span>
                         <template x-if="row.is_dynamic_rate === '是'">
                             <span class="badge-warning" x-text="'动态·' + row.dynamic_rate_type"></span>
