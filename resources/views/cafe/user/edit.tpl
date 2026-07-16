@@ -112,6 +112,18 @@
                 </div>
             {/if}
         </div>
+
+        <div class="c-card-pad">
+            <h3 class="mb-1 text-base">支付方式</h3>
+            <p class="text-faint mb-4 text-xs leading-relaxed">
+                绑定银行卡用于订阅自动续费，余额不足时将从已绑定的卡自动扣款。
+            </p>
+            <div class="flex justify-end">
+                <a href="/user/payment-method" class="btn-secondary btn-sm">
+                    <i class="ti ti-credit-card"></i> 管理支付方式
+                </a>
+            </div>
+        </div>
     </div>
 
     {* ================ 登录安全 ================ *}
