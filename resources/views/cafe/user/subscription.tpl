@@ -49,22 +49,26 @@
         <div class="flex-1 px-5 py-4 lg:flex-none lg:px-6">
             <div class="text-faint text-xs">剩余流量</div>
             <div class="text-ink mt-0.5 text-lg font-semibold">{$user->unusedTraffic()}</div>
-            {if $subscription !== null}
-                <a href="/user/product#bandwidth" class="btn-primary btn-sm mt-2"><i class="ti ti-plus"></i> 加购流量包</a>
-            {else}
-                <a href="/user/product" class="btn-primary btn-sm mt-2"><i class="ti ti-shopping-bag"></i> 订购套餐</a>
-            {/if}
+            <div class="mt-2 flex h-8 items-center">
+                {if $subscription !== null}
+                    <a href="/user/product#bandwidth" class="btn-primary btn-sm"><i class="ti ti-plus"></i> 加购流量包</a>
+                {else}
+                    <a href="/user/product" class="btn-primary btn-sm"><i class="ti ti-shopping-bag"></i> 订购套餐</a>
+                {/if}
+            </div>
         </div>
         <div class="flex-1 px-5 py-4 lg:flex-none lg:px-6">
             <div class="text-faint text-xs">流量重置日</div>
             <div class="text-ink mt-0.5 text-lg font-semibold">
                 {if $subscription !== null}{$subscription->next_reset_date}{else}--{/if}
             </div>
-            {if $subscription !== null && $subscription->auto_renew}
-                <span class="badge-success mt-2"><i class="ti ti-circle-check"></i> 自动续费已开启</span>
-            {elseif $subscription !== null}
-                <span class="badge-neutral mt-2">自动续费已关闭</span>
-            {/if}
+            <div class="mt-2 flex h-8 items-center">
+                {if $subscription !== null && $subscription->auto_renew}
+                    <span class="badge-success"><i class="ti ti-circle-check"></i> 自动续费已开启</span>
+                {elseif $subscription !== null}
+                    <span class="badge-neutral">自动续费已关闭</span>
+                {/if}
+            </div>
         </div>
     </div>
 </div>
