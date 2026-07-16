@@ -277,6 +277,14 @@
         @apply border-b-0;
     }
 
+    /* ---- JSONEditor(节点自定义配置):圆角与裁剪放在编辑器自身,
+            容器若裁剪会切掉编辑器边框;边框色贴合主题发丝线 ---- */
+    #custom_config .jsoneditor {
+        border-color: var(--color-hairline);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+    }
+
     /* ---- 工单消息内联图片(点击灯箱放大) ---- */
     .ticket-img {
         @apply border-hairline my-1.5 block max-h-64 max-w-full cursor-zoom-in rounded-lg

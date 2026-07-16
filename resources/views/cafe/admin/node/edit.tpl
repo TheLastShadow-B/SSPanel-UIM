@@ -69,7 +69,7 @@
         </div>
         <div class="mb-3">
             <label class="field-label">自定义配置</label>
-            <div id="custom_config" class="h-64 overflow-hidden rounded-xl"></div>
+            <div id="custom_config" class="h-64"></div>
             <p class="text-faint mt-1.5 text-xs">
                 请参考 <a href="https://docs.sspanel.io/docs/configuration/nodes" target="_blank" class="text-primary">节点自定义配置文档</a> 修改节点自定义配置
             </p>
