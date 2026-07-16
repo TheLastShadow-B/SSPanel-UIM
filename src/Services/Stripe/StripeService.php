@@ -138,6 +138,17 @@ class StripeService
      * payment method (used by the renewal engine's card fallback and the
      * card-binding page). Does not touch any Stripe subscription.
      */
+    /**
+     * 客户最近附加的支付方式(Stripe 列表按创建时间倒序)。
+     * 用于 setup_intent.succeeded webhook 迟到/丢失时的页面兜底。
+     */
+    public function getLatestAttachedPaymentMethod(string $customerId): ?string
+    {
+        $pms = $this->client()->customers->allPaymentMethods($customerId, ['limit' => 1]);
+
+        return $pms->data[0]->id ?? null;
+    }
+
     public function setCustomerDefaultPaymentMethod(string $customerId, string $paymentMethodId): void
     {
         $this->client()->paymentMethods->attach($paymentMethodId, ['customer' => $customerId]);

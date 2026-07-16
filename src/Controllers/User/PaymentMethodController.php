@@ -39,6 +39,17 @@ final class PaymentMethodController extends BaseController
             $customerId = $stripe->ensureCustomer($this->user);
             $paymentMethodId = $stripe->getDefaultPaymentMethod($customerId);
 
+            if ($paymentMethodId === null) {
+                // setup_intent.succeeded webhook 迟到/丢失兜底:confirmSetup 已把
+                // 支付方式附加到客户上,只是默认位没设。采用最近附加的一张并设为
+                // 默认(S5:全部服务端推导,不读任何客户端 id)。
+                $paymentMethodId = $stripe->getLatestAttachedPaymentMethod($customerId);
+
+                if ($paymentMethodId !== null) {
+                    $stripe->setCustomerDefaultPaymentMethod($customerId, $paymentMethodId);
+                }
+            }
+
             if ($paymentMethodId !== null) {
                 $pm = $stripe->retrievePaymentMethod($paymentMethodId);
 
@@ -46,6 +57,14 @@ final class PaymentMethodController extends BaseController
                     $card = [
                         'brand' => $pm->card->brand ?? '',
                         'last4' => $pm->card->last4 ?? '',
+                        'email' => '',
+                    ];
+                } elseif ($pm !== null && $pm->type === 'link') {
+                    // Link 钱包保存的支付方式没有 card 明细,展示 Link 账户邮箱。
+                    $card = [
+                        'brand' => 'Link',
+                        'last4' => '',
+                        'email' => (string) ($pm->link->email ?? ''),
                     ];
                 }
             }

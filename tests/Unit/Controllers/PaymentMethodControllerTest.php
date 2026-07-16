@@ -55,6 +55,12 @@ function fakePmStripe(array $defaults = [], string $clientSecret = 'seti_secret_
         public array $setupIntentCalls = [];
         /** @var array<int,string> */
         public array $detachCalls = [];
+        /** @var array<string,string> customerId => latest attached (non-default) PM id */
+        public array $attached = [];
+        /** @var array<int,array{0:string,1:string}> recorded setDefault calls */
+        public array $setDefaultCalls = [];
+        /** 'card' | 'link' — shape returned by retrievePaymentMethod */
+        public string $pmType = 'card';
 
         public function __construct(StripeClient $c, public array $defaults, public string $clientSecret)
         {
@@ -84,8 +90,27 @@ function fakePmStripe(array $defaults = [], string $clientSecret = 'seti_secret_
             return $this->defaults[$customerId] ?? null;
         }
 
+        public function getLatestAttachedPaymentMethod(string $customerId): ?string
+        {
+            return $this->attached[$customerId] ?? null;
+        }
+
+        public function setCustomerDefaultPaymentMethod(string $customerId, string $paymentMethodId): void
+        {
+            $this->setDefaultCalls[] = [$customerId, $paymentMethodId];
+        }
+
         public function retrievePaymentMethod(string $pmId): ?PaymentMethod
         {
+            if ($this->pmType === 'link') {
+                return PaymentMethod::constructFrom([
+                    'id' => $pmId,
+                    'object' => 'payment_method',
+                    'type' => 'link',
+                    'link' => ['email' => 'linkuser@example.com'],
+                ]);
+            }
+
             return PaymentMethod::constructFrom([
                 'id' => $pmId,
                 'object' => 'payment_method',
@@ -304,4 +329,41 @@ it('index renders without a saved card when the customer has none', function () 
 
     expect($response->getStatusCode())->toBe(200);
     expect((string) $response->getBody())->toContain('pk_test_empty');
+});
+
+it('index adopts the latest attached PM as default when the webhook has not set one', function () {
+    seedPublishableKey('pk_test_fallback');
+    seedRenderPublicSettings();
+    $user = makePmUser('cus_fallback');
+    $user->isLogin = false;
+    $GLOBALS['user'] = $user;
+
+    $fake = fakePmStripe([]); // no default PM…
+    $fake->attached = ['cus_fallback' => 'pm_attached_late']; // …but one is attached
+    StripeService::setInstance($fake);
+
+    $response = (new PaymentMethodController())->index(pmRequest([]), pmResponse(), []);
+
+    expect($response->getStatusCode())->toBe(200)
+        ->and($fake->setDefaultCalls)->toBe([['cus_fallback', 'pm_attached_late']])
+        ->and((string) $response->getBody())->toContain('4242');
+});
+
+it('index renders a Link payment method with its account email', function () {
+    seedPublishableKey('pk_test_link');
+    seedRenderPublicSettings();
+    $user = makePmUser('cus_link');
+    $user->isLogin = false;
+    $GLOBALS['user'] = $user;
+
+    $fake = fakePmStripe(['cus_link' => 'pm_link_default']);
+    $fake->pmType = 'link';
+    StripeService::setInstance($fake);
+
+    $response = (new PaymentMethodController())->index(pmRequest([]), pmResponse(), []);
+    $body = (string) $response->getBody();
+
+    expect($response->getStatusCode())->toBe(200)
+        ->and($body)->toContain('Link')
+        ->and($body)->toContain('linkuser@example.com');
 });

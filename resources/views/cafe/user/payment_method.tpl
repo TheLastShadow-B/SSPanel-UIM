@@ -17,7 +17,11 @@
                         </span>
                         <span>
                             <span class="text-ink font-semibold uppercase">{$card.brand}</span>
-                            <span class="text-faint ml-1.5">•••• •••• •••• {$card.last4}</span>
+                            {if $card.last4 !== ''}
+                                <span class="text-faint ml-1.5">•••• •••• •••• {$card.last4}</span>
+                            {elseif $card.email !== ''}
+                                <span class="text-faint ml-1.5">{$card.email}</span>
+                            {/if}
                         </span>
                     </div>
                     <button id="pm-remove" type="button" class="btn-danger-soft btn-sm">
