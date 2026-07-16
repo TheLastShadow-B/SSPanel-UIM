@@ -12,9 +12,25 @@
             {if $card}
                 <div class="bg-tile flex items-center justify-between rounded-(--radius-tile) px-4 py-3.5">
                     <div class="flex items-center gap-3">
-                        <span class="bg-primary-tint text-primary flex size-10 items-center justify-center rounded-lg text-lg">
-                            <i class="ti ti-credit-card"></i>
-                        </span>
+                        {assign var="brand_lc" value=$card.brand|lower}
+                        {if $brand_lc === 'link'}
+                            {* Link 品牌绿 *}
+                            <span class="flex size-10 items-center justify-center rounded-lg bg-[#00D66F]/15 text-lg text-[#00A355]">
+                                <i class="ti ti-bolt-filled"></i>
+                            </span>
+                        {elseif $brand_lc === 'visa'}
+                            <span class="bg-primary-tint text-primary flex size-10 items-center justify-center rounded-lg text-2xl">
+                                <i class="ti ti-brand-visa"></i>
+                            </span>
+                        {elseif $brand_lc === 'mastercard'}
+                            <span class="bg-warning-tint text-warning flex size-10 items-center justify-center rounded-lg text-2xl">
+                                <i class="ti ti-brand-mastercard"></i>
+                            </span>
+                        {else}
+                            <span class="bg-primary-tint text-primary flex size-10 items-center justify-center rounded-lg text-lg">
+                                <i class="ti ti-credit-card"></i>
+                            </span>
+                        {/if}
                         <span>
                             <span class="text-ink font-semibold uppercase">{$card.brand}</span>
                             {if $card.last4 !== ''}
