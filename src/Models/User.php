@@ -90,11 +90,21 @@ final class User extends Model
     ];
 
     /**
-     * DiceBear 头像
+     * 点兔(Rabbit House)默认头像:按邮箱哈希从本地头像池稳定取一个,
+     * 同一用户每次都是同一位角色。图源 public/images/avatars/。
      */
-    public function getDiceBearAttribute(): string
+    public const DEFAULT_AVATARS = [
+        'cocoa', 'chino', 'rize', 'chiya', 'syaro', 'maya', 'megu',
+        'aoyama', 'rin', 'mocha', 'yura', 'fuyu', 'natsume', 'eru',
+        'tippy', 'anko', 'wild-geese',
+    ];
+
+    public function getAvatarAttribute(): string
     {
-        return 'https://api.dicebear.com/8.x/identicon/svg?seed=' . hash('sha3-256', $this->email);
+        $pool = self::DEFAULT_AVATARS;
+        $pick = $pool[hexdec(substr(hash('sha3-256', (string) $this->email), 0, 8)) % count($pool)];
+
+        return '/images/avatars/' . $pick . '.png';
     }
 
     /**

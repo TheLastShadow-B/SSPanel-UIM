@@ -242,7 +242,7 @@
                     <div x-data="{ open: false }" class="relative">
                         <button @click="open = !open" class="hover:bg-tile flex items-center gap-2.5 rounded-full p-1 pr-3 transition-colors">
                             <span class="size-8 rounded-full bg-cover bg-center"
-                                  style="background-image: url({$user->dice_bear})"></span>
+                                  style="background-image: url({$user->avatar})"></span>
                             <span class="text-ink hidden text-sm font-medium sm:block">{$user->user_name}</span>
                             <i class="ti ti-chevron-down text-faint text-xs"></i>
                         </button>
