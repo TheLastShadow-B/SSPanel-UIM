@@ -169,8 +169,8 @@
 
 <script>
     const container = document.getElementById('custom_config');
-    const editor = new JSONEditor(container, { ldelim} modes: ['code', 'tree'] {rdelim});
-    editor.set({$node->custom_config});
+    const editor = new JSONEditor(container, {ldelim} modes: ['code', 'tree'] {rdelim});
+    editor.set({if $node->custom_config}{$node->custom_config}{else}{ldelim}{rdelim}{/if});
 
     document.getElementById('reset-bandwidth').addEventListener('click', function () {
         if (!confirm('确定重置此节点的已用流量？')) return;
