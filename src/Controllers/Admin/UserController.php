@@ -254,7 +254,7 @@ final class UserController extends BaseController
 
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $users = (new User())->orderBy('id', 'desc')->get();
+        $users = (new User())->orderBy('id')->get();
 
         foreach ($users as $user) {
             $user->op = '<button class="btn btn-red" id="delete-user-' . $user->id . '" 

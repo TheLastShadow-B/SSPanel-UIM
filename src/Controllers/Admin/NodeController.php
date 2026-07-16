@@ -337,7 +337,7 @@ final class NodeController extends BaseController
      */
     public function ajax(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
-        $nodes = (new Node())->orderBy('id', 'desc')->get();
+        $nodes = (new Node())->orderBy('id')->get();
 
         foreach ($nodes as $node) {
             $node->op = '<button class="btn btn-red" id="delete-node-' . $node->id . '" 
