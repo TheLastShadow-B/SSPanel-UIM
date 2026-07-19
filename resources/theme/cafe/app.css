@@ -226,6 +226,49 @@
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
     }
 
+    /* ---- 下拉框:弃用原生倒三角(位置贴边不可控),自绘 chevron 与输入框留白对齐 ---- */
+    select.field-input {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.5l4 4 4-4' stroke='%238a8f98' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.875rem center;
+        background-size: 1rem 1rem;
+        padding-right: 2.5rem;
+    }
+    [data-theme="dark"] select.field-input {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.5l4 4 4-4' stroke='%236b7280' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+
+    /* Chrome 135+ 可定制下拉:弹出面板贴合主题;其余浏览器自动回退原生面板 */
+    @supports (appearance: base-select) {
+        select.field-input,
+        select.field-input::picker(select) {
+            appearance: base-select;
+        }
+        select.field-input::picker-icon {
+            display: none; /* 沿用上面的自绘 chevron,避免双箭头 */
+        }
+        select.field-input::picker(select) {
+            @apply bg-card border-hairline rounded-xl border shadow-lg;
+            padding: 0.375rem;
+            margin-block-start: 0.375rem;
+        }
+        select.field-input option {
+            @apply text-body rounded-lg text-sm;
+            padding: 0.5rem 0.75rem;
+        }
+        select.field-input option:hover,
+        select.field-input option:focus {
+            @apply bg-tile text-ink;
+        }
+        select.field-input option:checked {
+            @apply bg-primary-tint text-primary font-medium;
+        }
+        select.field-input option::checkmark {
+            display: none;
+        }
+    }
+
     /* ---- 侧边栏 ---- */
     .side-link {
         @apply text-body hover:text-ink flex items-center gap-3 rounded-xl px-3
