@@ -72,6 +72,10 @@
 
     --radius-card: 16px;
     --radius-tile: 10px;
+
+    /* 动效曲线:强 ease-out(UI 进出场)、iOS 抽屉曲线 */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* 深色 = 夜间咖啡厅:同一套语义变量换值,组件零改动 */
@@ -118,7 +122,8 @@
 @utility btn {
     @apply inline-flex cursor-pointer items-center justify-center gap-1.5
         rounded-full px-5 py-2.5 text-sm font-medium whitespace-nowrap
-        transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+        transition duration-150 ease-out active:scale-[0.97]
+        disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 @utility badge {
@@ -326,9 +331,60 @@
         filter: none;
     }
 
-    /* ---- toast:按内容自适应宽度,过长换行 ---- */
+    /* ---- 模态卡入场缩放:wrapper 由 x-transition 负责淡入,
+            卡片用 @starting-style 补一点从 96% 的放大(旧浏览器降级为纯淡入) ---- */
+    .modal-pop {
+        transition: transform 200ms var(--ease-out);
+        @starting-style {
+            transform: scale(0.96);
+        }
+    }
+
+    /* ---- hx-confirm 确认模态进出场 ---- */
+    #cafe-confirm {
+        opacity: 0;
+        transition: opacity 120ms var(--ease-out);
+    }
+    #cafe-confirm.is-open {
+        opacity: 1;
+        transition-duration: 150ms;
+    }
+    #cafe-confirm > div {
+        opacity: 0;
+        transform: scale(0.96);
+        transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
+    }
+    #cafe-confirm.is-open > div {
+        opacity: 1;
+        transform: scale(1);
+        transition-duration: 200ms;
+    }
+
+    /* ---- toast:按内容自适应宽度,过长换行;进出均走顶部边缘 ---- */
     .toast {
         @apply c-card text-ink pointer-events-auto flex w-fit max-w-sm items-center
             gap-2.5 px-4 py-3 text-sm font-medium shadow-lg;
+        transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+    }
+    .toast.toast-out {
+        opacity: 0;
+        transform: translateY(-8px);
+        transition-duration: 150ms;
+    }
+}
+
+/* ---- 无障碍:系统偏好减少动效时,砍掉位移/缩放/循环动画,保留加载指示 ---- */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    /* 旋转加载圈是理解性动画:保留,转速放慢 */
+    .animate-spin {
+        animation-duration: 2s !important;
+        animation-iteration-count: infinite !important;
     }
 }

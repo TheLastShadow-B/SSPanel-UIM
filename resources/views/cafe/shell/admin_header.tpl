@@ -19,13 +19,13 @@
 <body class="bg-canvas min-h-screen">
 <div x-data="{ sidebar: false }" @keydown.escape.window="sidebar = false">
 
-    <div x-show="sidebar" x-cloak @click="sidebar = false"
+    <div x-show="sidebar" x-cloak x-transition.opacity.duration.250ms @click="sidebar = false"
          class="fixed inset-0 z-30 bg-black/40 lg:hidden"></div>
 
     {* ============ 侧边栏 ============ *}
     <aside :class="sidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
            class="bg-card border-hairline fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col
-                  border-r px-4 py-5 transition-transform duration-200 lg:translate-x-0">
+                  border-r px-4 py-5 transition-transform duration-250 ease-drawer lg:translate-x-0">
 
         <a href="/admin" class="mb-4 flex items-center gap-2.5 px-2">
             <img src="/images/uim-logo-round_48x48.png" alt="logo" class="size-9 rounded-xl">

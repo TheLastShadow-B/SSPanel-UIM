@@ -54,9 +54,9 @@
 {include file='tinymce.tpl'}
 
 <template x-teleport="body">
-    <div x-show="showGen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div x-show="showGen" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/40" @click="showGen = false"></div>
-        <div class="c-card relative w-full max-w-md p-6 shadow-xl" @keydown.escape.window="showGen = false">
+        <div class="c-card modal-pop relative w-full max-w-md p-6 shadow-xl" @keydown.escape.window="showGen = false">
             <h3 class="mb-1 text-base">LLM 生成文档</h3>
             <p class="text-faint mb-4 text-xs">生成结果将填入编辑器</p>
             <input id="question" type="text" class="field-input mb-5" placeholder="请输入文档生成提示">

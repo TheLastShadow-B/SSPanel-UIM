@@ -6,16 +6,16 @@
     function showToast(msg, type) {
         const stack = document.getElementById('toast-stack');
         const el = document.createElement('div');
-        el.className = 'toast';
+        el.className = 'toast toast-out';
         const ico = type === 'success' ? 'ti-circle-check text-success' : 'ti-circle-x text-danger';
         el.innerHTML = '<i class="ti ' + ico + ' text-lg"></i><span></span>';
         el.querySelector('span').textContent = msg;
         stack.appendChild(el);
+        void el.offsetHeight;                 // 先落一帧初始态,入场过渡才播得出来
+        el.classList.remove('toast-out');
         setTimeout(function () {
-            el.style.transition = 'opacity .3s, transform .3s';
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(6px)';
-            setTimeout(function () { el.remove(); }, 300);
+            el.classList.add('toast-out');
+            setTimeout(function () { el.remove(); }, 150);
         }, 3200);
     }
 

@@ -12,14 +12,27 @@
 
 {literal}
 <script>
+    let cafeConfirmHideTimer = null;
     document.addEventListener('htmx:confirm', function (evt) {
         // htmx 对每个请求都发 confirm 事件;只拦截真正带 hx-confirm 的
         if (!evt.detail.question) return;
         evt.preventDefault();
 
         const overlay = document.getElementById('cafe-confirm');
-        const show = function () { overlay.classList.remove('hidden'); overlay.classList.add('flex'); };
-        const hide = function () { overlay.classList.add('hidden'); overlay.classList.remove('flex'); };
+        const show = function () {
+            clearTimeout(cafeConfirmHideTimer);
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            void overlay.offsetHeight;        // 先落一帧初始态,过渡才播得出来
+            overlay.classList.add('is-open');
+        };
+        const hide = function () {
+            overlay.classList.remove('is-open');
+            cafeConfirmHideTimer = setTimeout(function () {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+            }, 120);
+        };
 
         document.getElementById('cafe-confirm-msg').textContent = evt.detail.question;
         // onclick 赋值覆盖旧 handler,不会随弹窗次数累积

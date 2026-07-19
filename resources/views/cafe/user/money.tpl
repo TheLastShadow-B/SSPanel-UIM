@@ -78,9 +78,9 @@
 
     {* ============ 充值模态 ============ *}
     <template x-teleport="body">
-        <div x-show="showTopup" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showTopup" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="showTopup = false"></div>
-            <div class="c-card relative w-full max-w-sm p-6 shadow-xl" @keydown.escape.window="showTopup = false">
+            <div class="c-card modal-pop relative w-full max-w-sm p-6 shadow-xl" @keydown.escape.window="showTopup = false">
                 <h3 class="mb-1 text-base">余额充值</h3>
                 <p class="text-faint mb-4 text-xs">充值订单创建后前往账单页完成支付</p>
                 <input id="topup_amount" type="number" step="10" min="1" class="field-input mb-5"
@@ -102,9 +102,9 @@
 
     {* ============ 礼品卡模态 ============ *}
     <template x-teleport="body">
-        <div x-show="showGiftcard" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showGiftcard" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="showGiftcard = false"></div>
-            <div class="c-card relative w-full max-w-sm p-6 shadow-xl" @keydown.escape.window="showGiftcard = false">
+            <div class="c-card modal-pop relative w-full max-w-sm p-6 shadow-xl" @keydown.escape.window="showGiftcard = false">
                 <h3 class="mb-1 text-base">兑换礼品卡</h3>
                 <p class="text-faint mb-4 text-xs">兑换成功后金额自动计入余额</p>
                 <input id="giftcard" type="text" class="field-input mb-5"

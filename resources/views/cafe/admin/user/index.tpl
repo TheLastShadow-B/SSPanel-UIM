@@ -89,9 +89,9 @@
 
     {* ============ 创建用户模态 ============ *}
     <template x-teleport="body">
-        <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showCreate" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="showCreate = false"></div>
-            <div class="c-card relative w-full max-w-md p-6 shadow-xl" @keydown.escape.window="showCreate = false">
+            <div class="c-card modal-pop relative w-full max-w-md p-6 shadow-xl" @keydown.escape.window="showCreate = false">
                 <h3 class="mb-4 text-base">添加用户</h3>
                 {foreach $details['create_dialog'] as $from}
                     <div class="mb-3">

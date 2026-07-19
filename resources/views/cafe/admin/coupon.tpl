@@ -86,9 +86,9 @@
 
     {* ============ 创建优惠码模态 ============ *}
     <template x-teleport="body">
-        <div x-show="showCreate" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showCreate" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="showCreate = false"></div>
-            <div class="c-card relative max-h-[90vh] w-full max-w-md overflow-y-auto p-6 shadow-xl"
+            <div class="c-card modal-pop relative max-h-[90vh] w-full max-w-md overflow-y-auto p-6 shadow-xl"
                  @keydown.escape.window="showCreate = false">
                 <h3 class="mb-4 text-base">创建优惠码</h3>
                 {foreach $details['create_dialog'] as $from}
