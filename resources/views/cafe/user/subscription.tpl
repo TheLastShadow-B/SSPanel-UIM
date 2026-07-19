@@ -301,6 +301,12 @@
         const box = document.getElementById('hourly-chart');
         if (!box) return;
         const data = window.CAFE_TRAFFIC || [];
+        // 全天无用量:画空坐标轴只会像坏了,给明确的空状态
+        if (!data.some(function (v) { return v > 0; })) {
+            box.innerHTML = '<div class="text-faint flex h-full flex-col items-center justify-center gap-2 text-sm">' +
+                '<i class="ti ti-chart-bar-off text-2xl"></i>今日暂无用量数据</div>';
+            return;
+        }
         const W = box.clientWidth || 560, H = box.clientHeight || 176;
         const padB = 18, n = 24, gap = 6;
         const bw = (W - gap * (n - 1)) / n;

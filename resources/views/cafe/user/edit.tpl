@@ -24,21 +24,18 @@
         <div class="c-card-pad">
             <h3 class="mb-1 text-base">登录邮箱</h3>
             <p class="text-faint mb-4 text-xs">当前邮箱：<span class="text-body font-medium" id="email">{$user->email}</span></p>
-            <div class="mb-3">
-                <input id="new-email" type="email" class="field-input" placeholder="新邮箱"
-                       {if ! $config['enable_change_email']}disabled{/if}>
-            </div>
             {if $public_setting['reg_email_verify'] && $config['enable_change_email']}
-                <div class="mb-3 flex gap-2">
+                <div class="mb-3">
+                    <input id="new-email" type="email" class="field-input" placeholder="新邮箱">
+                </div>
+                <div class="flex items-center gap-2">
                     <input id="email-code" type="text" class="field-input flex-1" placeholder="验证码">
                     <button class="btn-secondary btn-sm shrink-0"
                             hx-post="/user/edit/send" hx-swap="none"
                             hx-vals='js:{ email: document.getElementById("new-email").value }'>
                         获取验证码
                     </button>
-                </div>
-                <div class="flex justify-end">
-                    <button class="btn-primary btn-sm"
+                    <button class="btn-primary btn-sm shrink-0"
                             hx-post="/user/edit/email" hx-swap="none"
                             hx-vals='js:{
                                 newemail: document.getElementById("new-email").value,
@@ -48,16 +45,18 @@
                     </button>
                 </div>
             {elseif $config['enable_change_email']}
-                <div class="flex justify-end">
-                    <button class="btn-primary btn-sm"
+                <div class="flex items-center gap-2">
+                    <input id="new-email" type="email" class="field-input flex-1" placeholder="新邮箱">
+                    <button class="btn-primary btn-sm shrink-0"
                             hx-post="/user/edit/email" hx-swap="none"
                             hx-vals='js:{ newemail: document.getElementById("new-email").value }'>
                         修改
                     </button>
                 </div>
             {else}
-                <div class="flex justify-end">
-                    <button class="btn-secondary btn-sm" disabled>不允许修改</button>
+                <div class="flex items-center gap-2">
+                    <input id="new-email" type="email" class="field-input flex-1" placeholder="新邮箱" disabled>
+                    <button class="btn-secondary btn-sm shrink-0" disabled>不允许修改</button>
                 </div>
             {/if}
         </div>
@@ -65,11 +64,9 @@
         <div class="c-card-pad">
             <h3 class="mb-1 text-base">用户名</h3>
             <p class="text-faint mb-4 text-xs">当前用户名：<span class="text-body font-medium" id="username">{$user->user_name}</span></p>
-            <div class="mb-3">
-                <input id="new-username" type="text" class="field-input" placeholder="新用户名" autocomplete="off">
-            </div>
-            <div class="flex justify-end">
-                <button class="btn-primary btn-sm"
+            <div class="flex items-center gap-2">
+                <input id="new-username" type="text" class="field-input flex-1" placeholder="新用户名" autocomplete="off">
+                <button class="btn-primary btn-sm shrink-0"
                         hx-post="/user/edit/username" hx-swap="none"
                         hx-vals='js:{ newusername: document.getElementById("new-username").value }'>
                     修改
@@ -89,9 +86,11 @@
                     <option value="4" {if $user->im_type === 4}selected{/if}>Telegram</option>
                 </select>
             </div>
-            <div class="mb-3">
-                <input id="imvalue" type="text" class="field-input" value="{$user->im_value}" disabled>
-            </div>
+            {if $user->im_value !== ''}
+                <div class="mb-3">
+                    <input id="imvalue" type="text" class="field-input" value="{$user->im_value}" disabled>
+                </div>
+            {/if}
             <div class="flex justify-end" id="oauth-provider"></div>
         </div>
 
@@ -241,15 +240,13 @@
         <div class="c-card-pad">
             <h3 class="mb-1 text-base">更换加密方式</h3>
             <p class="text-faint mb-4 text-xs">不同客户端支持的加密方式可能不同，请参考客户端支持列表设置</p>
-            <div class="mb-4">
-                <select id="user-method" class="field-input">
+            <div class="flex items-center gap-2">
+                <select id="user-method" class="field-input flex-1">
                     {foreach $methods as $method}
                         <option value="{$method}" {if $user->method === $method}selected{/if}>{$method}</option>
                     {/foreach}
                 </select>
-            </div>
-            <div class="flex justify-end">
-                <button class="btn-primary btn-sm"
+                <button class="btn-primary btn-sm shrink-0"
                         hx-post="/user/edit/method" hx-swap="none"
                         hx-vals='js:{ method: document.getElementById("user-method").value }'>
                     修改
@@ -298,15 +295,13 @@
     <div x-show="tab === 'other'" x-cloak class="grid gap-5 lg:grid-cols-2">
         <div class="c-card-pad">
             <h3 class="mb-4 text-base">每日流量报告</h3>
-            <div class="mb-4">
-                <select id="daily-mail" class="field-input">
+            <div class="flex items-center gap-2">
+                <select id="daily-mail" class="field-input flex-1">
                     <option value="0" {if $user->daily_mail_enable === 0}selected{/if}>不接收</option>
                     <option value="1" {if $user->daily_mail_enable === 1}selected{/if}>邮件接收</option>
                     <option value="2" {if $user->daily_mail_enable === 2}selected{/if}>IM 接收</option>
                 </select>
-            </div>
-            <div class="flex justify-end">
-                <button class="btn-primary btn-sm"
+                <button class="btn-primary btn-sm shrink-0"
                         hx-post="/user/edit/daily_mail" hx-swap="none"
                         hx-vals='js:{ mail: document.getElementById("daily-mail").value }'>
                     修改
@@ -317,14 +312,12 @@
         <div class="c-card-pad">
             <h3 class="mb-1 text-base">偏好的联系方式</h3>
             <p class="text-faint mb-4 text-xs">当 IM 未绑定时站点依然会向账户邮箱发送通知信息</p>
-            <div class="mb-4">
-                <select id="contact-method" class="field-input">
+            <div class="flex items-center gap-2">
+                <select id="contact-method" class="field-input flex-1">
                     <option value="1" {if $user->contact_method === 1}selected{/if}>邮件</option>
                     <option value="2" {if $user->contact_method === 2}selected{/if}>IM</option>
                 </select>
-            </div>
-            <div class="flex justify-end">
-                <button class="btn-primary btn-sm"
+                <button class="btn-primary btn-sm shrink-0"
                         hx-post="/user/edit/contact_method" hx-swap="none"
                         hx-vals='js:{ contact: document.getElementById("contact-method").value }'>
                     修改
@@ -334,15 +327,13 @@
 
         <div class="c-card-pad">
             <h3 class="mb-4 text-base">界面主题</h3>
-            <div class="mb-4">
-                <select id="user-theme" class="field-input">
+            <div class="flex items-center gap-2">
+                <select id="user-theme" class="field-input flex-1">
                     {foreach $themes as $theme}
                         <option value="{$theme}" {if $user->theme === $theme}selected{/if}>{$theme}</option>
                     {/foreach}
                 </select>
-            </div>
-            <div class="flex justify-end">
-                <button class="btn-primary btn-sm"
+                <button class="btn-primary btn-sm shrink-0"
                         hx-post="/user/edit/theme" hx-swap="none"
                         hx-vals='js:{ theme: document.getElementById("user-theme").value }'>
                     修改
@@ -352,15 +343,13 @@
 
         <div class="c-card-pad">
             <h3 class="mb-4 text-base">深浅色模式</h3>
-            <div class="mb-4">
-                <select id="theme-mode" class="field-input">
+            <div class="flex items-center gap-2">
+                <select id="theme-mode" class="field-input flex-1">
                     <option value="2" {if $user->is_dark_mode === 2}selected{/if}>自动</option>
                     <option value="0" {if $user->is_dark_mode === 0}selected{/if}>浅色</option>
                     <option value="1" {if $user->is_dark_mode === 1}selected{/if}>深色</option>
                 </select>
-            </div>
-            <div class="flex justify-end">
-                <button class="btn-primary btn-sm"
+                <button class="btn-primary btn-sm shrink-0"
                         hx-post="/user/edit/theme_mode" hx-swap="none"
                         hx-vals='js:{ theme_mode: document.getElementById("theme-mode").value }'>
                     修改
