@@ -355,6 +355,13 @@ final class Surge extends Base
             $parts[] = 'download-bandwidth=' . $down_mbps;
         }
 
+        $hop_ports = str_replace(' ', '', (string) ($hy2_opts['hop_ports'] ?? ''));
+        if ($hop_ports !== '') {
+            // Surge 的 port-hopping 用分号分隔多段；设置后主端口不再参与连接
+            $parts[] = 'port-hopping="' . str_replace(',', ';', $hop_ports) . '"';
+            $parts[] = 'port-hopping-interval=' . max(5, (int) ($hy2_opts['hop_interval'] ?? 30));
+        }
+
         if ($sni !== '') {
             $parts[] = 'sni=' . $sni;
         }

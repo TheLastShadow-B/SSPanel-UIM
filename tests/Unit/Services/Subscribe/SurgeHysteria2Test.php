@@ -88,4 +88,30 @@ describe('Surge buildHysteria2Line', function () {
             ->not->toBeNull()
             ->not->toContain('salamander-password');
     });
+
+    it('emits port-hopping with default interval when hop_ports is set', function () {
+        $line = buildHy2Line(['Hy2Opts' => ['hop_ports' => '61000-65499']]);
+
+        expect($line)
+            ->toContain('port-hopping="61000-65499"')
+            ->toContain('port-hopping-interval=30');
+    });
+
+    it('converts comma-separated hop_ports to semicolons and strips spaces', function () {
+        $line = buildHy2Line(['Hy2Opts' => ['hop_ports' => '61000-63000, 64000-65499']]);
+
+        expect($line)->toContain('port-hopping="61000-63000;64000-65499"');
+    });
+
+    it('clamps hop_interval to a minimum of 5', function () {
+        $line = buildHy2Line(['Hy2Opts' => ['hop_ports' => '61000-65499', 'hop_interval' => 1]]);
+
+        expect($line)->toContain('port-hopping-interval=5');
+    });
+
+    it('omits port-hopping when hop_ports is not set', function () {
+        $line = buildHy2Line(['Hy2Opts' => ['down_mbps' => 100]]);
+
+        expect($line)->not->toContain('port-hopping');
+    });
 });

@@ -142,6 +142,8 @@ final class Stash extends Base
                     $down_mbps = $hy2_opts['down_mbps'] ?? 0;
                     $obfs = $hy2_opts['obfs'] ?? '';
                     $obfs_password = $hy2_opts['obfs_password'] ?? '';
+                    $hop_ports = str_replace(' ', '', (string) ($hy2_opts['hop_ports'] ?? ''));
+                    $hop_interval = max(5, (int) ($hy2_opts['hop_interval'] ?? 30));
 
                     $node = [
                         'name' => $node_raw->name,
@@ -162,6 +164,11 @@ final class Stash extends Base
                     if ($obfs !== '' && $obfs_password !== '') {
                         $node['obfs'] = $obfs;
                         $node['obfs-password'] = $obfs_password;
+                    }
+                    if ($hop_ports !== '') {
+                        // Stash 2.6.4 起支持端口跳跃，字段同 mihomo；旧版会忽略并回落到 port 直连
+                        $node['ports'] = $hop_ports;
+                        $node['hop-interval'] = $hop_interval;
                     }
 
                     break;

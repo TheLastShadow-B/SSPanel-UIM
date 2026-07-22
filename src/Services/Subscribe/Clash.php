@@ -143,6 +143,8 @@ final class Clash extends Base
                     $down_mbps = $hy2_opts['down_mbps'] ?? 0;
                     $obfs = $hy2_opts['obfs'] ?? '';
                     $obfs_password = $hy2_opts['obfs_password'] ?? '';
+                    $hop_ports = str_replace(' ', '', (string) ($hy2_opts['hop_ports'] ?? ''));
+                    $hop_interval = max(5, (int) ($hy2_opts['hop_interval'] ?? 30));
 
                     $node = [
                         'name' => $node_raw->name,
@@ -163,6 +165,11 @@ final class Clash extends Base
                     if ($obfs !== '' && $obfs_password !== '') {
                         $node['obfs'] = $obfs;
                         $node['obfs-password'] = $obfs_password;
+                    }
+                    if ($hop_ports !== '') {
+                        // mihomo 端口跳跃：ports 与 port 并存时以 ports 为准，间隔最小 5 秒
+                        $node['ports'] = $hop_ports;
+                        $node['hop-interval'] = $hop_interval;
                     }
 
                     break;
