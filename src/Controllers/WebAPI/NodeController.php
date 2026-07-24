@@ -11,7 +11,6 @@ use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
 use function json_decode;
-use const JSON_UNESCAPED_SLASHES;
 use const VERSION;
 
 final class NodeController extends BaseController
@@ -32,16 +31,42 @@ final class NodeController extends BaseController
             return ResponseHelper::error($response, 'Node is not enabled.');
         }
 
+        $custom_config = json_decode((string) $node->custom_config, true) ?? [];
+
         $data = [
             'node_speedlimit' => $node->node_speedlimit,
             'sort' => $node->sort,
             'server' => $node->server,
-            'custom_config' => json_decode($node->custom_config, true, JSON_UNESCAPED_SLASHES),
+            'custom_config' => $this->applyXrayrCompat($custom_config, (int) $node->sort),
             'type' => $_ENV['appName'],
             'version' => $this->convertVersionFormat(VERSION),
         ];
 
         return ResponseHelper::successWithDataEtag($request, $response, $data);
+    }
+
+    /**
+     * 为 XrayR 补齐由面板 sort 推导出的开关
+     *
+     * XrayR 不读面板下发的 sort(api/sspanel/sspanel.go 中 nodeInfoResponse.Sort
+     * 从未被引用),协议由其自身 config.yml 的 NodeType 决定。VLESS 入站的开关
+     * 是 custom_config.enable_vless,且判等的是字符串 "1"。
+     *
+     * 由面板注入而非要求 admin 手写,可避免 sort 与 enable_vless 两处声明不一致。
+     */
+    private function applyXrayrCompat(array $custom_config, int $sort): array
+    {
+        if ($sort !== 12) {
+            return $custom_config;
+        }
+
+        $custom_config['enable_vless'] = '1';
+
+        if (($custom_config['security'] ?? '') === 'reality') {
+            $custom_config['enable_reality'] = true;
+        }
+
+        return $custom_config;
     }
 
     /**
