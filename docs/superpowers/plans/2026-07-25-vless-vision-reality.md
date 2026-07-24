@@ -198,7 +198,7 @@ Expected: PASS,9 个测试全绿
 - [ ] **Step 7: 跑全量 Unit 确认无回归**
 
 Run: `./vendor/bin/pest --testsuite=Unit`
-Expected: 全部通过。注意:pest 的汇总行在输出重定向时可能丢失,以 exit code 为准(`echo $?` 应为 0)。
+Expected: 0 个 FAIL。**注意:全量套件的退出码本来就是 1**,因为 `phpunit.xml` 设了 `failOnWarning="true"`,而 `tests/Unit/Utils/CookieTest.php` 有 2 个既有 warning(`Cannot modify header information - headers already sent`)。验收标准是没有新的 FAIL、也没有新的 warning,而不是退出码为 0。另外 pest 的汇总行在输出重定向时可能丢失,必要时用 `grep -cE '^\s+✓'` 数通过块。
 
 - [ ] **Step 8: 提交**
 
@@ -339,7 +339,7 @@ Expected: PASS,3 个测试全绿
 - [ ] **Step 7: 跑全量 Unit 确认无回归**
 
 Run: `./vendor/bin/pest --testsuite=Unit`
-Expected: 全部通过(exit code 0)
+Expected: 0 个 FAIL。**注意:全量套件的退出码本来就是 1**,因为 `phpunit.xml` 设了 `failOnWarning="true"`,而 `tests/Unit/Utils/CookieTest.php` 有 2 个既有 warning(`Cannot modify header information - headers already sent`,源自 `vendor/composer/ClassLoader.php`)。这在本计划的第一个提交之前就存在(已在 `68947d67` 上复现)。验收标准是:**没有新的 FAIL,也没有新的 warning**,而不是退出码为 0。
 
 - [ ] **Step 8: 提交**
 
@@ -508,7 +508,7 @@ Expected: PASS,6 个测试全绿
 - [ ] **Step 5: 跑全量 Unit 确认无回归**
 
 Run: `./vendor/bin/pest --testsuite=Unit`
-Expected: 全部通过(exit code 0)
+Expected: 0 个 FAIL。**注意:全量套件的退出码本来就是 1**,因为 `phpunit.xml` 设了 `failOnWarning="true"`,而 `tests/Unit/Utils/CookieTest.php` 有 2 个既有 warning(`Cannot modify header information - headers already sent`,源自 `vendor/composer/ClassLoader.php`)。这在本计划的第一个提交之前就存在(已在 `68947d67` 上复现)。验收标准是:**没有新的 FAIL,也没有新的 warning**,而不是退出码为 0。
 
 - [ ] **Step 6: 提交**
 
@@ -874,7 +874,7 @@ Expected: PASS,20 个测试全绿
 - [ ] **Step 6: 跑全量 Unit 确认无回归**
 
 Run: `./vendor/bin/pest --testsuite=Unit`
-Expected: 全部通过(exit code 0)
+Expected: 0 个 FAIL。**注意:全量套件的退出码本来就是 1**,因为 `phpunit.xml` 设了 `failOnWarning="true"`,而 `tests/Unit/Utils/CookieTest.php` 有 2 个既有 warning(`Cannot modify header information - headers already sent`,源自 `vendor/composer/ClassLoader.php`)。这在本计划的第一个提交之前就存在(已在 `68947d67` 上复现)。验收标准是:**没有新的 FAIL,也没有新的 warning**,而不是退出码为 0。
 
 - [ ] **Step 7: 提交**
 
@@ -1237,7 +1237,7 @@ Expected: PASS,20 个测试全绿
 - [ ] **Step 6: 跑全量 Unit 确认无回归**
 
 Run: `./vendor/bin/pest --testsuite=Unit`
-Expected: 全部通过(exit code 0)
+Expected: 0 个 FAIL。**注意:全量套件的退出码本来就是 1**,因为 `phpunit.xml` 设了 `failOnWarning="true"`,而 `tests/Unit/Utils/CookieTest.php` 有 2 个既有 warning(`Cannot modify header information - headers already sent`,源自 `vendor/composer/ClassLoader.php`)。这在本计划的第一个提交之前就存在(已在 `68947d67` 上复现)。验收标准是:**没有新的 FAIL,也没有新的 warning**,而不是退出码为 0。
 
 - [ ] **Step 7: 提交**
 
@@ -1264,7 +1264,7 @@ EOF
 
 全部 5 个任务完成后:
 
-- [ ] `./vendor/bin/pest --testsuite=Unit` 全绿(exit code 0)
+- [ ] `./vendor/bin/pest --testsuite=Unit` 无 FAIL,且 warning 数仍为 2(仅 `CookieTest` 的既有两条)。退出码为 1 属正常 —— 见下方说明。
 - [ ] `git log --oneline -5` 应看到 5 次提交,均带 Co-Authored-By trailer
 - [ ] `rg -n "vless|VLESS" --glob '!vendor' src/ resources/ tests/ | wc -l` 应为非零,且不出现在 `Surge.php`
 
