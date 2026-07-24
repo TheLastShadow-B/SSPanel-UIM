@@ -51,6 +51,7 @@
             <select id="sort" class="field-input">
                 <option value="15">Hysteria2</option>
                 <option value="14">Trojan</option>
+                <option value="12">VLESS</option>
                 <option value="11">Vmess</option>
                 <option value="2">TUIC</option>
                 <option value="1">Shadowsocks2022</option>

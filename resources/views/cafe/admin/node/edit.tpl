@@ -61,6 +61,7 @@
             <select id="sort" class="field-input">
                 <option value="15" {if $node->sort === 15}selected{/if}>Hysteria2</option>
                 <option value="14" {if $node->sort === 14}selected{/if}>Trojan</option>
+                <option value="12" {if $node->sort === 12}selected{/if}>VLESS</option>
                 <option value="11" {if $node->sort === 11}selected{/if}>Vmess</option>
                 <option value="2" {if $node->sort === 2}selected{/if}>TUIC</option>
                 <option value="1" {if $node->sort === 1}selected{/if}>Shadowsocks2022</option>
