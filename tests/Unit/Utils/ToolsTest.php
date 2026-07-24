@@ -310,3 +310,51 @@ describe('Tools validation methods', function () {
             ->and(Tools::isJson('what the'))->toBeFalse();
     });
 });
+
+describe('Tools::genRealityPublicKey', function () {
+    it('derives the RFC 7748 public key from a base64url private key', function () {
+        expect(Tools::genRealityPublicKey('dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo'))
+            ->toBe('hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo');
+    });
+
+    it('accepts a padded private key', function () {
+        expect(Tools::genRealityPublicKey('dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo='))
+            ->toBe('hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo');
+    });
+
+    it('accepts a base64url private key containing - and _', function () {
+        expect(Tools::genRealityPublicKey('5lu859F0-nhDf-p_4T0en7M1iL0pCQqrfxiKmKdqTBQ'))
+            ->toBe('gNJVDckF8AzNDP9bD0BQUJAneaGBeZmXpud1M8PrIn0');
+    });
+
+    it('accepts the same key in the standard base64 alphabet', function () {
+        expect(Tools::genRealityPublicKey('5lu859F0+nhDf+p/4T0en7M1iL0pCQqrfxiKmKdqTBQ='))
+            ->toBe('gNJVDckF8AzNDP9bD0BQUJAneaGBeZmXpud1M8PrIn0');
+    });
+
+    it('trims surrounding whitespace', function () {
+        expect(Tools::genRealityPublicKey("  dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo\n"))
+            ->toBe('hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo');
+    });
+
+    it('emits a base64url public key with no padding', function () {
+        $pk = Tools::genRealityPublicKey('dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo');
+
+        expect($pk)
+            ->not->toContain('=')
+            ->not->toContain('+')
+            ->not->toContain('/');
+    });
+
+    it('returns an empty string when the key decodes to fewer than 32 bytes', function () {
+        expect(Tools::genRealityPublicKey('c2hvcnQ='))->toBe('');
+    });
+
+    it('returns an empty string for non-base64 input', function () {
+        expect(Tools::genRealityPublicKey('not!!valid!!base64'))->toBe('');
+    });
+
+    it('returns an empty string for empty input', function () {
+        expect(Tools::genRealityPublicKey(''))->toBe('');
+    });
+});

@@ -12,6 +12,7 @@ use MaxMind\Db\Reader\InvalidDatabaseException;
 use Random\RandomException;
 use function array_diff;
 use function array_flip;
+use function base64_decode;
 use function base64_encode;
 use function bin2hex;
 use function ceil;
@@ -33,10 +34,14 @@ use function random_bytes;
 use function range;
 use function readdir;
 use function round;
+use function rtrim;
 use function shuffle;
+use function sodium_crypto_scalarmult_base;
 use function strlen;
 use function strpos;
+use function strtr;
 use function substr;
+use function trim;
 use const FILTER_FLAG_IPV4;
 use const FILTER_FLAG_IPV6;
 use const FILTER_VALIDATE_EMAIL;
@@ -229,6 +234,24 @@ final class Tools
         };
 
         return base64_encode($pk);
+    }
+
+    /**
+     * 由 REALITY 的 X25519 私钥推导公钥
+     *
+     * 等价于 `xray x25519` 的公钥输出:X25519 基点标量乘。
+     * 入参容忍 base64url / 标准 base64、有无 padding。
+     * 解码失败或长度不足 32 字节时返回空字符串。
+     */
+    public static function genRealityPublicKey(string $private_key): string
+    {
+        $raw = base64_decode(strtr(trim($private_key), '-_', '+/'), true);
+
+        if ($raw === false || strlen($raw) !== 32) {
+            return '';
+        }
+
+        return rtrim(strtr(base64_encode(sodium_crypto_scalarmult_base($raw)), '+/', '-_'), '=');
     }
 
     public static function toDateTime(int $time): string
