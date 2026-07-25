@@ -133,6 +133,10 @@ final class Clash extends Base
                     ];
 
                     break;
+                case 12:
+                    $node = $this->buildVlessNode($user, $node_raw, $node_custom_config ?? []);
+
+                    break;
                 case 15:
                     // Hysteria 2 (mihomo / Clash.Meta core)
                     $hy2_port = $node_custom_config['offset_port_user'] ??
@@ -227,5 +231,82 @@ final class Clash extends Base
             array_merge($clash_config, $clash_nodes, $clash_group_config),
             YAML_UTF8_ENCODING
         );
+    }
+
+    /**
+     * VLESS(sort=12)节点转 mihomo / Clash.Meta proxy 配置
+     *
+     * REALITY 的公钥由 reality-opts.private_key 推导;后端只需私钥,
+     * 客户端只需公钥,故面板不要求 admin 两处各写一遍。
+     * 无法得到公钥时返回空数组,由调用方跳过该节点 —— 缺 pbk 的
+     * REALITY 配置无法握手,不存在可降级的目标。
+     */
+    private function buildVlessNode($user, $node_raw, array $custom): array
+    {
+        $vless_port = $custom['offset_port_user'] ?? ($custom['offset_port_node'] ?? 443);
+        $security = $custom['security'] ?? 'none';
+        $network = $custom['network'] ?? 'tcp';
+        $host = $custom['header']['request']['headers']['Host'][0] ?? $custom['host'] ?? '';
+        $allow_insecure = $custom['allow_insecure'] ?? false;
+        $flow = (string) ($custom['flow'] ?? '');
+        $fingerprint = $custom['fingerprint'] ?? 'chrome';
+        $reality = $custom['reality-opts'] ?? $custom['reality_opts'] ?? [];
+        // Clash 特定配置
+        $udp = $custom['udp'] ?? true;
+        $ws_opts = $custom['ws-opts'] ?? $custom['ws_opts'] ?? null;
+        $h2_opts = $custom['h2-opts'] ?? $custom['h2_opts'] ?? null;
+        $grpc_opts = $custom['grpc-opts'] ?? $custom['grpc_opts'] ?? null;
+        // HTTPUpgrade 在 Clash.Meta 内核中属于 ws 类型
+        if ($network === 'httpupgrade') {
+            $network = 'ws';
+        }
+
+        $is_reality = $security === 'reality';
+
+        // XTLS Vision 仅支持裸 TCP，其余传输层丢弃 flow
+        if ($network !== 'tcp') {
+            $flow = '';
+        }
+
+        $node = [
+            'name' => $node_raw->name,
+            'type' => 'vless',
+            'server' => $node_raw->server,
+            'port' => (int) $vless_port,
+            'uuid' => $user->uuid,
+            'udp' => (bool) $udp,
+            'tls' => $is_reality || $security === 'tls' || $security === 'xtls',
+            'skip-cert-verify' => (bool) $allow_insecure,
+            'servername' => $host,
+            'network' => $network,
+            'client-fingerprint' => $fingerprint,
+            'ws-opts' => $ws_opts,
+            'h2-opts' => $h2_opts,
+            'grpc-opts' => $grpc_opts,
+        ];
+
+        if ($is_reality) {
+            $public_key = Tools::genRealityPublicKey((string) ($reality['private_key'] ?? ''));
+
+            if ($public_key === '') {
+                $public_key = (string) ($reality['public_key'] ?? '');
+            }
+
+            if ($public_key === '') {
+                return [];
+            }
+
+            $node['servername'] = $reality['server_names'][0] ?? $host;
+            $node['reality-opts'] = [
+                'public-key' => $public_key,
+                'short-id' => (string) ($reality['short_ids'][0] ?? ''),
+            ];
+        }
+
+        if ($flow !== '') {
+            $node['flow'] = $flow;
+        }
+
+        return $node;
     }
 }
