@@ -106,7 +106,10 @@ final class Surge extends Base
                     $line = $this->buildHysteria2Line($user, $node_raw, $node_custom_config);
                     break;
                 default:
-                    // sort=2 (TUIC), sort=3 (WireGuard), and any other value — not supported by Surge
+                    // sort=2 (TUIC), sort=3 (WireGuard), sort=12 (VLESS), and any other value.
+                    // Surge itself supports TUIC and WireGuard as protocols — the panel simply
+                    // has no generator branch for them yet. VLESS is the one genuinely
+                    // unsupported by Surge (no REALITY/flow equivalent).
                     $line = null;
             }
 
