@@ -258,7 +258,10 @@ final class Clash extends Base
         $allow_insecure = $custom['allow_insecure'] ?? false;
         $flow = (string) ($custom['flow'] ?? '');
         $fingerprint = $custom['fingerprint'] ?? 'chrome';
-        $reality = $custom['reality-opts'] ?? $custom['reality_opts'] ?? [];
+        // XrayR only reads the hyphenated key (see REALITYConfig in the design doc's XrayR
+        // contract table); a `reality_opts` alias here would silently desync the panel's
+        // derived client config from what the backend actually applies.
+        $reality = $custom['reality-opts'] ?? [];
         // Clash 特定配置
         $udp = $custom['udp'] ?? true;
         $ws_opts = $custom['ws-opts'] ?? $custom['ws_opts'] ?? null;
