@@ -337,3 +337,4 @@ if ((int) $node->sort === 12) {
 2. `custom_config.offset_port_node` 必须写成 JSON 字符串(`"443"` 而非 `443`)
 3. `private_key` 由 `xray x25519` 生成,只填私钥,公钥由面板推导
 4. Surge 用户看不到 VLESS 节点,属预期行为
+5. **第二种运维模式(XrayR 本地管理 REALITY)**:`DisableLocalREALITYConfig` 保持默认值(不设 `true`)时,XrayR 使用自身 `config.yml` 里的本地 `REALITYConfigs` 处理入站,面板下发的 `reality-opts` 对后端不生效。此时面板侧 `custom_config.reality-opts` 只填 `public_key`(不填 `private_key`),仅用于客户端订阅生成——`Clash.php` / `Stash.php` 在 `private_key` 缺失时回落到显式 `public_key` 的路径(`## 错误处理` 表格第 3 行)同时是这一模式的正常触发路径,而不只是错误降级。两种模式二选一,不要混用。
