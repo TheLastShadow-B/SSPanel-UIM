@@ -620,10 +620,17 @@ describe('Clash buildVlessNode', function () {
                 ->toBe('hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo');
     });
 
-    it('maps httpupgrade to ws', function () {
+    it('maps httpupgrade to ws and drops flow along with it', function () {
         $node = buildClashVlessNode(clashRealityCustom(['network' => 'httpupgrade']));
 
         expect($node['network'])->toBe('ws');
+        expect($node)->not->toHaveKey('flow');
+    });
+
+    it('casts a numeric short_id to a string', function () {
+        $node = buildClashVlessNode(clashRealityCustom([], ['short_ids' => [1234]]));
+
+        expect($node['reality-opts']['short-id'])->toBe('1234');
     });
 
     it('takes servername from the first server_names entry', function () {
@@ -869,7 +876,7 @@ Expected: FAIL,报 `ReflectionException: Method App\Services\Subscribe\Clash::bu
 - [ ] **Step 5: 运行测试确认通过**
 
 Run: `./vendor/bin/pest --testsuite=Unit --filter='Clash buildVlessNode'`
-Expected: PASS,20 个测试全绿
+Expected: PASS,21 个测试全绿
 
 - [ ] **Step 6: 跑全量 Unit 确认无回归**
 
@@ -985,10 +992,17 @@ describe('Stash buildVlessNode', function () {
                 ->toBe('hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo');
     });
 
-    it('maps httpupgrade to ws', function () {
+    it('maps httpupgrade to ws and drops flow along with it', function () {
         $node = buildStashVlessNode(stashRealityCustom(['network' => 'httpupgrade']));
 
         expect($node['network'])->toBe('ws');
+        expect($node)->not->toHaveKey('flow');
+    });
+
+    it('casts a numeric short_id to a string', function () {
+        $node = buildStashVlessNode(stashRealityCustom([], ['short_ids' => [1234]]));
+
+        expect($node['reality-opts']['short-id'])->toBe('1234');
     });
 
     it('takes servername from the first server_names entry', function () {
@@ -1232,7 +1246,7 @@ Expected: FAIL,报 `ReflectionException: Method App\Services\Subscribe\Stash::bu
 - [ ] **Step 5: 运行测试确认通过**
 
 Run: `./vendor/bin/pest --testsuite=Unit --filter='Stash buildVlessNode'`
-Expected: PASS,20 个测试全绿
+Expected: PASS,21 个测试全绿
 
 - [ ] **Step 6: 跑全量 Unit 确认无回归**
 
