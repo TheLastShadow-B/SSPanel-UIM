@@ -10,6 +10,7 @@ use App\Utils\ResponseHelper;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
 use Slim\Http\ServerRequest;
+use function is_array;
 use function json_decode;
 use const VERSION;
 
@@ -31,7 +32,7 @@ final class NodeController extends BaseController
             return ResponseHelper::error($response, 'Node is not enabled.');
         }
 
-        $custom_config = json_decode((string) $node->custom_config, true) ?? [];
+        $custom_config = $this->decodeCustomConfig((string) $node->custom_config);
 
         $data = [
             'node_speedlimit' => $node->node_speedlimit,
@@ -43,6 +44,24 @@ final class NodeController extends BaseController
         ];
 
         return ResponseHelper::successWithDataEtag($request, $response, $data);
+    }
+
+    /**
+     * Decode custom_config JSON, degrading a non-array top-level result to [].
+     *
+     * json_decode() can return a non-null scalar (e.g. '123' decodes to int(123)) that
+     * a bare `?? []` does not catch, and applyXrayrCompat() takes a typed `array`
+     * parameter — passing it a scalar throws a TypeError. This runs for every node
+     * type, not just sort=12, on every GET /mod_mu/nodes/{id}/info call. Nested
+     * scalars inside an already-decoded array degrade gracefully via `??` at each
+     * read site in applyXrayrCompat() and the Subscribe generators, and need no
+     * equivalent guard.
+     */
+    private function decodeCustomConfig(string $raw): array
+    {
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     /**

@@ -7,6 +7,7 @@ namespace App\Services\Subscribe;
 use App\Services\Subscribe;
 use App\Utils\Tools;
 use function array_merge;
+use function is_array;
 use function json_decode;
 use function yaml_emit;
 use const YAML_UTF8_ENCODING;
@@ -133,7 +134,14 @@ final class Stash extends Base
 
                     break;
                 case 12:
-                    $node = $this->buildVlessNode($user, $node_raw, $node_custom_config ?? []);
+                    // json_decode('123', true) returns a non-null, non-array scalar that
+                    // `?? []` would not catch, and buildVlessNode()'s typed `array $custom`
+                    // parameter would then throw a TypeError.
+                    $node = $this->buildVlessNode(
+                        $user,
+                        $node_raw,
+                        is_array($node_custom_config) ? $node_custom_config : []
+                    );
 
                     break;
                 case 15:
