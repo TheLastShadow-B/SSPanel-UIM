@@ -35,6 +35,24 @@
 2. `ReflectionMethod::invoke()` 调用 `final class` 的 `private` 方法 —— 可行,PHP 8.1+ 无需 `setAccessible(true)`
 3. Pest 断言链 `expect($x)->toHaveKey(...)->not->toHaveKey(...)` 与 `expect($x)->not->toHaveKey(...)->and($y)->toBe(...)` —— 两种混用写法均可行
 
+## 关于 httpupgrade × flow 断言的有效性(一处已纠正的推理错误)
+
+`buildVlessNode()` 里的 flow 守卫是 `if ($network !== 'tcp') { $flow = ''; }` —— 一个**拒绝列表**。
+
+我最初认为「把 `httpupgrade → ws` 的改写块挪到守卫之后」就能让 `maps httpupgrade to ws and drops flow along with it` 这条断言失败。**这个判断是错的**:`'httpupgrade'` 与 `'ws'` 都不等于 `'tcp'`,两者都会触发守卫,所以调换这两块的次序不改变任何结果,断言照样通过。Task 4 的实现者实测后指出了这一点。
+
+真正能让该断言失败的变异是**放宽守卫本身**,同时保持它在改写之前:
+
+```php
+if ($network !== 'tcp' && $network !== 'httpupgrade') {   // 错误的「httpupgrade 约等于裸 TCP」推理
+    $flow = '';
+}
+```
+
+这条变异下,`httpupgrade` 节点会保留 `flow: xtls-rprx-vision`,新断言精准失败(1 failed / 20 passed),而 `network=ws` 的直接用例与数值 short_id 用例不受影响。这也说明该断言防的是一个真实的误判方向 —— 有人推理「httpupgrade 本质上就是裸 TCP,Vision 应该照样能用」—— 而不是防次序调换。
+
+Task 5 若要复核 Stash 侧的同一条断言,用上面这个变异,不要用调换次序。
+
 ## 相对 Spec 的偏离
 
 1. **测试文件位置**:spec 写的是新建 `tests/Unit/Utils/RealityKeyTest.php`。实际改为并入已有的 `tests/Unit/Utils/ToolsTest.php` —— 该文件已是 `Tools` 的规范测试文件(312 行,每个方法一个 `describe()` 块),新建独立文件会打破这一约定。
