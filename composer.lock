@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d30571b77dd9a9c62b6a5ad1108953a7",
+    "content-hash": "fc213831a4d4411b61b07b4f8006cc14",
     "packages": [
         {
             "name": "adbario/php-dot-notation",
@@ -5813,12 +5813,12 @@
             "version": "3.0.40",
             "source": {
                 "type": "git",
-                "url": "https://github.com/srmklive/laravel-paypal.git",
+                "url": "https://github.com/blendbyte/laravel-paypal.git",
                 "reference": "1ddc49fd836a4785933ab953452152f3fedbac63"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/srmklive/laravel-paypal/zipball/1ddc49fd836a4785933ab953452152f3fedbac63",
+                "url": "https://api.github.com/repos/blendbyte/laravel-paypal/zipball/1ddc49fd836a4785933ab953452152f3fedbac63",
                 "reference": "1ddc49fd836a4785933ab953452152f3fedbac63",
                 "shasum": ""
             },
@@ -15052,6 +15052,7 @@
         "ext-pdo": "*",
         "ext-posix": "*",
         "ext-redis": "*",
+        "ext-sodium": "*",
         "ext-xml": "*",
         "ext-yaml": "*",
         "ext-zip": "*"
