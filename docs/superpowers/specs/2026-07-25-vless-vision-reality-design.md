@@ -217,7 +217,7 @@ $flow        = $custom['flow'] ?? '';
 $fingerprint = $custom['fingerprint'] ?? 'chrome';
 $udp         = $custom['udp'] ?? true;
 $allow_insecure = $custom['allow_insecure'] ?? false;
-$reality     = $custom['reality-opts'] ?? $custom['reality_opts'] ?? [];
+$reality     = $custom['reality-opts'] ?? [];
 ```
 
 规则:
@@ -289,7 +289,8 @@ if ((int) $node->sort === 12) {
 | `security ≠ reality` 但写了 `reality-opts` | 忽略 `reality-opts`,`servername` 取 `host` |
 | `security = reality` 但 `private_key` 缺失/非 32 字节 | 回落 `public_key`;仍无则**跳过该节点**(返回 `[]`) |
 | `short_ids` 为空数组或缺失 | `short-id: ""`(Xray 语义为「任意」) |
-| `custom_config` 整体非法 JSON | 现有行为:`json_decode` 返回 `null`,`?? []` 兜底 |
+| `custom_config` 整体非法 JSON | `json_decode` 返回 `null`,经 `is_array()` 守卫降级为 `[]` |
+| `custom_config` 是合法 JSON 标量(如 `123`、`"x"`、`true`) | 同上,`is_array()` 守卫降级为 `[]`。注意 `JSON_VALID('123')` 为 `1`,故 DB 的 `CHECK (json_valid(...))` 挡不住标量;`?? []` 也挡不住(标量非 null)。必须用 `is_array()` |
 | Surge 订阅遇到 `sort = 12` | 落入 `default` 分支,节点不出现 |
 
 「跳过节点」是对「静默降级」原则的唯一例外:缺 `pbk` 的 REALITY 客户端配置无法握手,不存在可降级的目标。
