@@ -104,6 +104,8 @@ Surge 的 vmess 参数集为 `username`、`ws`、`ws-path`、`ws-headers`、`enc
  WebAPI\NodeController                          Subscribe\{Clash,Stash}
  注入 enable_vless="1"                           派生 pbk / sid / servername
  注入 enable_reality=true (当 security=reality)   降级非法 flow
+ 注入 reality-opts.min_client_ver="0.0.0"
+   (仅当 reality-opts 已存在且未显式指定)
         │                                                   │
         ▼                                                   ▼
      XrayR                                          mihomo / Stash
@@ -170,7 +172,8 @@ admin 在 `custom_config` 写一份,面板负责翻译成 XrayR 与客户端各�
 | `reality-opts.private_key` | 原样 | 推导出 `reality-opts.public-key` |
 | `reality-opts.server_names[]` | 原样(数组) | `servername` = `[0]` |
 | `reality-opts.short_ids[]` | 原样(数组) | `reality-opts.short-id` = `[0]`,缺省 `""` |
-| `reality-opts.{dest,proxy_protocol_ver,min_client_ver,max_client_ver,max_time_diff}` | 原样 | 不下发(纯服务端) |
+| `reality-opts.min_client_ver` | 缺省时由面板注入 `"0.0.0"`(见部署要点 5) | 不下发(纯服务端) |
+| `reality-opts.{dest,proxy_protocol_ver,max_client_ver,max_time_diff}` | 原样 | 不下发(纯服务端) |
 | `allow_insecure` | `allow_insecure` | `skip-cert-verify` |
 | `udp` / `ws-opts` / `grpc-opts` / `h2-opts` | 按现状 | 按现状,与 vmess 分支一致 |
 
@@ -335,9 +338,22 @@ if ((int) $node->sort === 12) {
 ## 部署文档要点
 
 1. XrayR `config.yml` 需设 `NodeType: V2ray` 与 `DisableLocalREALITYConfig: true`
-   - **同时必须写一个 `REALITYConfigs:` 块,哪怕只有 `Show: false`,否则 XrayR 启动即空指针 panic。** 这是 fork 的 bug(v1.0.3 实测):`inboundbuilder.go:220` 在 `DisableLocalREALITYConfig` 为真的分支里读 `config.REALITYConfigs.Show` 而未做 nil 判断,而 else 分支的条件 `config.EnableREALITY && config.REALITYConfigs != nil` 是有保护的。`Show` 是该分支唯一还取自本地配置的字段,其余全部由面板下发。
+   - ~~同时必须写一个 `REALITYConfigs:` 块,否则 XrayR 启动即空指针 panic。~~ **该 panic 已在 fork v1.0.4 修复,此条不再适用**(2026-08-06 复核 `inboundbuilder.go:224`,现为 `Show: config.REALITYConfigs != nil && config.REALITYConfigs.Show`;线上无该块也正常启动)。历史记录:v1.0.3 该分支无 nil 判断,缺块会 panic。
    - REALITY 的 `dest` **不要选 apple / icloud**:Xray 启动时会警告 `Choosing apple, icloud, etc. as the target may get your IP blocked by the GFW`。
 2. `custom_config.offset_port_node` 必须写成 JSON 字符串(`"443"` 而非 `443`)
 3. `private_key` 由 `xray x25519` 生成,只填私钥,公钥由面板推导
 4. Surge 用户看不到 VLESS 节点,属预期行为
-5. **第二种运维模式(XrayR 本地管理 REALITY)**:`DisableLocalREALITYConfig` 保持默认值(不设 `true`)时,XrayR 使用自身 `config.yml` 里的本地 `REALITYConfigs` 处理入站,面板下发的 `reality-opts` 对后端不生效。此时面板侧 `custom_config.reality-opts` 只填 `public_key`(不填 `private_key`),仅用于客户端订阅生成——`Clash.php` / `Stash.php` 在 `private_key` 缺失时回落到显式 `public_key` 的路径(`## 错误处理` 表格第 3 行)同时是这一模式的正常触发路径,而不只是错误降级。两种模式二选一,不要混用。
+5. **🔴 后端不要钉 xray-core 的 master 快照**。2026-08-06 实地事故:fork 的 `go.mod` 钉了 `github.com/xtls/xray-core v1.260327.1-0.20260711155151-50231eaff98c`(Xray **26.7.11**,是 prerelease;官方稳定版为 26.3.27),其中含 commit [`af7eb680`](https://github.com/XTLS/Xray-core/commit/af7eb68028732a8ee3c0e5d6ab2b8a657bb2e770) 给 REALITY 服务端加了默认值:
+
+   ```go
+   } else { config.MinClientVer = []byte{26, 3, 27} }   // infra/conf/transport_security.go
+   ```
+
+   而 **mihomo 的 REALITY 客户端在 ClientHello 的 sessionId 里硬编码上报版本 `1.8.2`**(`component/tls/reality.go`:`SessionId[0..2] = 1,8,2`),低于该下限即被拒,报错 `authentication failed or **validation criteria not met**`。后果:节点自建成起**成功建连 0 次 / REALITY 失败 531 次**,全部 Clash 用户 100% 连不上;原生 xray 客户端上报 26.x 不受影响,故表现为「xray 能连、Clash 全挂」。
+
+   - **修复**:面板在 `sort=12` 且 `security=reality` 时自动注入 `reality-opts.min_client_ver = "0.0.0"`(`NodeController::applyXrayrCompat()`,admin 显式指定则尊重其值)。XrayR 经 `api/sspanel/model.go` 的 `min_client_ver` 字段与 `inboundbuilder.go` 的 `MinClientVer: r.MinClientVer` 透传。**订阅内容不变**,用户无需重新订阅;XrayR 60s 轮询到 `custom_config` 变化会自动重建入站,无需重启。
+   - **取舍**:该默认值来自 Xray PR #6181(uTLS `ModernFingerprints` 更新),用意是挡掉指纹陈旧的老客户端以抗主动探测。设 `0.0.0` 等于放开这道闸门 —— 但只要用户群使用 Clash/mihomo 就别无选择。
+   - ⚠️ **不要用「把 xray-core 降到稳定版」来修**:虽然只需还原 4 处 API 适配(`stats.GetOrRegisterCounter(mgr, name)` ×4、`ExcludeForDomain` 回 `[]string`、`DestOverride` 回 `*conf.StringList`)即可编译通过,但 **Hysteria 在 26.3.27→26.7.11 之间被重写了 117 个文件 / +10195 −3416 行**(含 `config.proto`、`conn.go`、`dialer.go`、`hub.go`、`udphop/`、BBR),而 fork 的 Hy2 代码是照新 API 写的(注释明写 `Up/Down/Congestion/UdpHop` 已废弃、带宽走 `FinalMask.QuicParams`)→ 降级会编译通过但**静默丢掉 Hy2 限速**。
+   - **排查手法备查**:mihomo 加 `log-level: debug` 会打印 `REALITY Authentication: true/false`,是判定 REALITY 握手最快的手段;配合本地起 xray 当 REALITY 服务端做单变量 A/B,再用 `git bisect run` 自动定位到具体 commit。
+
+6. **第二种运维模式(XrayR 本地管理 REALITY)**:`DisableLocalREALITYConfig` 保持默认值(不设 `true`)时,XrayR 使用自身 `config.yml` 里的本地 `REALITYConfigs` 处理入站,面板下发的 `reality-opts` 对后端不生效。此时面板侧 `custom_config.reality-opts` 只填 `public_key`(不填 `private_key`),仅用于客户端订阅生成——`Clash.php` / `Stash.php` 在 `private_key` 缺失时回落到显式 `public_key` 的路径(`## 错误处理` 表格第 3 行)同时是这一模式的正常触发路径,而不只是错误降级。两种模式二选一,不要混用。
