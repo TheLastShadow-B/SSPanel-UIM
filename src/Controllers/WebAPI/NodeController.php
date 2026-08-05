@@ -65,6 +65,15 @@ final class NodeController extends BaseController
     }
 
     /**
+     * REALITY 客户端版本下限。
+     *
+     * Xray 自 commit af7eb680(见 applyXrayrCompat() 注释)起,REALITY 服务端在
+     * 未显式配置时会把 minClientVer 默认为 26.3.27,而 mihomo 的 REALITY 客户端
+     * 硬编码上报 1.8.2,会被一律拒绝。下发本值覆盖该默认。
+     */
+    private const REALITY_MIN_CLIENT_VER = '0.0.0';
+
+    /**
      * 为 XrayR 补齐由面板 sort 推导出的开关
      *
      * XrayR 不读面板下发的 sort(api/sspanel/sspanel.go 中 nodeInfoResponse.Sort
@@ -72,6 +81,14 @@ final class NodeController extends BaseController
      * 是 custom_config.enable_vless,且判等的是字符串 "1"。
      *
      * 由面板注入而非要求 admin 手写,可避免 sort 与 enable_vless 两处声明不一致。
+     *
+     * REALITY 节点另注入 reality-opts.min_client_ver。2026-08-06 实测:XrayR fork
+     * 钉的 xray-core master 快照(Xray 26.7.11)含 commit af7eb680,给 REALITY
+     * 服务端加了 `config.MinClientVer = []byte{26, 3, 27}` 的默认值;mihomo 在
+     * ClientHello 的 sessionId 里硬编码上报 1.8.2,低于该下限即被判
+     * "validation criteria not met" 拒绝,导致全部 Clash 用户 100% 连不上
+     * (原生 xray 客户端上报 26.x,不受影响)。同样由面板注入,免得每建一个
+     * REALITY 节点都重踩。admin 显式写了就尊重其值。
      */
     private function applyXrayrCompat(array $custom_config, int $sort): array
     {
@@ -83,6 +100,15 @@ final class NodeController extends BaseController
 
         if (($custom_config['security'] ?? '') === 'reality') {
             $custom_config['enable_reality'] = true;
+
+            // 仅在 admin 已写了 reality-opts 时注入:该键缺失时 XrayR 收到
+            // REALITYConfig=nil 会整段跳过 REALITY,而凭空造一个只含
+            // min_client_ver 的块会让 xray-core 因缺 privateKey 而构建入站失败。
+            if (is_array($custom_config['reality-opts'] ?? null) &&
+                ! isset($custom_config['reality-opts']['min_client_ver'])
+            ) {
+                $custom_config['reality-opts']['min_client_ver'] = self::REALITY_MIN_CLIENT_VER;
+            }
         }
 
         return $custom_config;
