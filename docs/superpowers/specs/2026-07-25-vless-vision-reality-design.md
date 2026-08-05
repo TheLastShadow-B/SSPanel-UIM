@@ -335,6 +335,8 @@ if ((int) $node->sort === 12) {
 ## 部署文档要点
 
 1. XrayR `config.yml` 需设 `NodeType: V2ray` 与 `DisableLocalREALITYConfig: true`
+   - **同时必须写一个 `REALITYConfigs:` 块,哪怕只有 `Show: false`,否则 XrayR 启动即空指针 panic。** 这是 fork 的 bug(v1.0.3 实测):`inboundbuilder.go:220` 在 `DisableLocalREALITYConfig` 为真的分支里读 `config.REALITYConfigs.Show` 而未做 nil 判断,而 else 分支的条件 `config.EnableREALITY && config.REALITYConfigs != nil` 是有保护的。`Show` 是该分支唯一还取自本地配置的字段,其余全部由面板下发。
+   - REALITY 的 `dest` **不要选 apple / icloud**:Xray 启动时会警告 `Choosing apple, icloud, etc. as the target may get your IP blocked by the GFW`。
 2. `custom_config.offset_port_node` 必须写成 JSON 字符串(`"443"` 而非 `443`)
 3. `private_key` 由 `xray x25519` 生成,只填私钥,公钥由面板推导
 4. Surge 用户看不到 VLESS 节点,属预期行为
