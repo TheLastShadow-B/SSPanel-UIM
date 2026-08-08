@@ -45,7 +45,7 @@
         <div class="mt-2 space-y-1 text-sm leading-relaxed">
             <p><a class="text-primary hover:underline" href="https://github.com/slimphp/Slim">Slim Framework</a></p>
             <p><a class="text-primary hover:underline" href="https://github.com/tabler/tabler">Tabler</a></p>
-            <p><a class="text-primary hover:underline" href="https://github.com/twigphp/Twig">Twig</a></p>
+            <p><a class="text-primary hover:underline" href="https://github.com/smarty-php/smarty">Smarty</a></p>
         </div>
 
         <p class="text-body mt-6 text-sm leading-relaxed">This product includes GeoLite2 data created by MaxMind, available from

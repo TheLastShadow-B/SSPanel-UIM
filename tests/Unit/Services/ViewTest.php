@@ -49,6 +49,22 @@ describe('View::getTheme', function () {
 
         expect($theme)->toBe('cafe');
     });
+
+    it('rejects traversal values that would escape resources/views', function (string $malicious) {
+        $this->user->isLogin = true;
+        $this->user->theme = $malicious;
+
+        $theme = $this->view->getTheme($this->user);
+
+        expect($theme)->toBe('cafe');
+    })->with([
+        '../../storage',
+        '../../public/uploads/ticket',
+        '..',
+        'cafe/../../../etc',
+        '/etc',
+        '',
+    ]);
 });
 
 describe('View::getTemplateDirs', function () {

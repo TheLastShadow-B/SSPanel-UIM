@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Services\Auth;
 use App\Services\View;
 use Smarty\Smarty;
-use Twig\Environment;
 use voku\helper\AntiXSS;
 use function microtime;
 use function round;
@@ -19,11 +18,6 @@ abstract class BaseController
      * @var Smarty
      */
     protected Smarty $view;
-
-    /**
-     * @var Environment
-     */
-    protected Environment $twig;
 
     /**
      * @var User
@@ -64,28 +58,5 @@ abstract class BaseController
         }
 
         return $this->view;
-    }
-
-    /**
-     * Get twig
-     */
-    public function twig(): Environment
-    {
-        $this->twig = View::getTwig();
-
-        if (View::$connection) {
-            $this->twig->addGlobal(
-                'queryLog',
-                View::$connection
-                    ->connection('default')
-                    ->getQueryLog()
-            );
-            $this->twig->addGlobal(
-                'optTime',
-                round((microtime(true) - View::$beginTime) * 1000, 2)
-            );
-        }
-
-        return $this->twig;
     }
 }

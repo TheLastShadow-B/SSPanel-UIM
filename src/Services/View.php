@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Config;
+use App\Utils\Tools;
 use Illuminate\Database\DatabaseManager;
 use Smarty\Smarty;
-use Twig\Environment;
-use Twig\Loader\FilesystemLoader;
+use function in_array;
 use const BASE_PATH;
 
 final class View
@@ -32,22 +32,6 @@ final class View
         return $smarty;
     }
 
-    public static function getTwig(): Environment
-    {
-        $user = Auth::getUser();
-        $loader = new FilesystemLoader(self::getTemplateDirs(self::getTheme($user)));
-
-        $twig = new Environment($loader, [
-            'cache' => BASE_PATH . '/storage/framework/twig/cache/',
-        ]);
-
-        $twig->addGlobal('config', self::getConfig());
-        $twig->addGlobal('public_setting', Config::getPublicConfig());
-        $twig->addGlobal('user', $user);
-
-        return $twig;
-    }
-
     /**
      * @return string[] 模板查找目录
      */
@@ -60,8 +44,9 @@ final class View
     {
         $theme = $user->isLogin ? $user->theme : $_ENV['theme'];
 
-        // 历史用户的 theme 字段可能仍是已删除的旧主题(如 tabler),统一回退 cafe
-        if (! is_string($theme) || $theme === '' || ! is_dir(BASE_PATH . '/resources/views/' . $theme)) {
+        // 历史用户的 theme 字段可能仍是已删除的旧主题(如 tabler),也可能是入库校验收紧前写进的
+        // ../ 越界值 —— 用主题白名单比对而非 is_dir(),避免模板目录被指到 resources/views 之外
+        if (! is_string($theme) || ! in_array($theme, Tools::getDir(BASE_PATH . '/resources/views'), true)) {
             return 'cafe';
         }
 

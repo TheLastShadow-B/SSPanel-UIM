@@ -281,6 +281,11 @@ final class InfoController extends BaseController
             return ResponseHelper::error($response, '主题不能为空');
         }
 
+        // 只接受 resources/views 下真实存在的主题,防止 ../ 之类的值把模板目录指到仓库外
+        if (! in_array($theme, Tools::getDir(BASE_PATH . '/resources/views'), true)) {
+            return ResponseHelper::error($response, '主题不存在');
+        }
+
         $user->theme = $theme;
 
         if (! $user->save()) {
