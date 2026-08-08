@@ -1,12 +1,9 @@
-<link rel="stylesheet"
-      href="//{$config['jsdelivr_url']}/npm/@tabler/core@latest/dist/css/tabler-payments.min.css">
-
 <div>
     <p class="text-faint mb-3 text-xs leading-relaxed">
         支持
-        <span class="payment payment-xs payment-provider-unionpay"></span>
-        <span class="payment payment-xs payment-provider-mastercard"></span>
-        <span class="payment payment-xs payment-provider-visa"></span>
+        <img src="/images/unionpay.svg" alt="银联" class="inline h-5 w-auto rounded-xs align-bottom shadow-xs">
+        <img src="/images/mastercard.svg" alt="Mastercard" class="inline h-5 w-auto rounded-xs align-bottom shadow-xs">
+        <img src="/images/visa.svg" alt="Visa" class="inline h-5 w-auto rounded-xs align-bottom shadow-xs">
         等标识的信用卡或借记卡
     </p>
     <div class="flex flex-col gap-2">
