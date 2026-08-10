@@ -351,12 +351,26 @@ final class Surge extends Base
         ];
 
         if ($obfs !== '' && $obfs_password !== '') {
-            // Surge only implements the salamander obfuscation (salamander-password=).
-            // Any other obfs type would leave the node unable to connect — skip it.
-            if ($obfs !== 'salamander') {
+            // Surge names each obfuscation with its own parameter rather than an
+            // `obfs` type field, and the two are mutually exclusive.
+            //
+            // Availability differs by platform, which decides which one a node can
+            // use: salamander-password is Mac 6.4.3+ only, while gecko-password is
+            // iOS 5.20.0+ / Mac 6.7.0+. A Salamander node therefore has no Surge iOS
+            // story at all — Gecko is the only obfs that reaches every client.
+            //
+            // Surge takes no fragment bounds; it follows whatever the server sends.
+            $obfs_param = match ($obfs) {
+                'salamander' => 'salamander-password',
+                'gecko' => 'gecko-password',
+                // Anything else would leave the node unable to connect. Emitting a
+                // line Surge cannot honour is worse than omitting the node.
+                default => null,
+            };
+            if ($obfs_param === null) {
                 return null;
             }
-            $parts[] = 'salamander-password=' . $obfs_password;
+            $parts[] = $obfs_param . '=' . $obfs_password;
         }
 
         if ($down_mbps > 0) {

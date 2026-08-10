@@ -177,6 +177,20 @@ final class Clash extends Base
                     if ($obfs !== '' && $obfs_password !== '') {
                         $node['obfs'] = $obfs;
                         $node['obfs-password'] = $obfs_password;
+
+                        // Gecko re-frames QUIC handshake packets into randomly sized
+                        // fragments. Each side pads only what it sends and the frame
+                        // header carries padLen, so the bounds need not match for
+                        // reassembly — but an unset client range leaves the client's
+                        // own handshake fragments to mihomo's defaults, which may sit
+                        // above the path MTU. Emit them, tracking the backend's
+                        // geckoDefault*PacketSize.
+                        if ($obfs === 'gecko') {
+                            $node['obfs-min-packet-size'] =
+                                (int) ($hy2_opts['obfs_min_packet_size'] ?? 600);
+                            $node['obfs-max-packet-size'] =
+                                (int) ($hy2_opts['obfs_max_packet_size'] ?? 1300);
+                        }
                     }
                     if ($hop_ports !== '') {
                         // mihomo 端口跳跃：ports 与 port 并存时以 ports 为准，间隔最小 5 秒

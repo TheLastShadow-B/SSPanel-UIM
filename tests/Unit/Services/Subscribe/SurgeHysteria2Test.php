@@ -71,9 +71,38 @@ describe('Surge buildHysteria2Line', function () {
         expect($line)->toContain('salamander-password=sala-pass');
     });
 
-    it('skips nodes with unsupported obfs types', function () {
+    // Gecko is the only obfs Surge iOS can speak (iOS 5.20.0+ / Mac 6.7.0+);
+    // salamander-password is Mac-only, so a Salamander node is invisible to every
+    // iOS client. Surge takes no fragment bounds — it follows the server.
+    it('emits gecko-password for gecko obfs', function () {
         $line = buildHy2Line([
             'Hy2Opts' => ['obfs' => 'gecko', 'obfs_password' => 'gecko-pass'],
+        ]);
+
+        expect($line)
+            ->toContain('gecko-password=gecko-pass')
+            ->not->toContain('salamander-password');
+    });
+
+    it('does not leak gecko fragment bounds into the Surge line', function () {
+        $line = buildHy2Line([
+            'Hy2Opts' => [
+                'obfs' => 'gecko',
+                'obfs_password' => 'gecko-pass',
+                'obfs_min_packet_size' => 600,
+                'obfs_max_packet_size' => 1300,
+            ],
+        ]);
+
+        expect($line)
+            ->not->toContain('600')
+            ->not->toContain('1300')
+            ->not->toContain('packet-size');
+    });
+
+    it('skips nodes with unsupported obfs types', function () {
+        $line = buildHy2Line([
+            'Hy2Opts' => ['obfs' => 'salamandar', 'obfs_password' => 'typo-pass'],
         ]);
 
         expect($line)->toBeNull();

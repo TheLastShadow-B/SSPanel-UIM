@@ -176,6 +176,18 @@ final class Stash extends Base
                     if ($obfs !== '' && $obfs_password !== '') {
                         $node['obfs'] = $obfs;
                         $node['obfs-password'] = $obfs_password;
+
+                        // Each side pads only what it sends and padLen travels in the
+                        // frame header, so Gecko's bounds need not match across ends.
+                        // Emit them anyway: otherwise the client's own handshake
+                        // fragments take mihomo's defaults, which may exceed the path
+                        // MTU. Fallback tracks the backend's geckoDefault*PacketSize.
+                        if ($obfs === 'gecko') {
+                            $node['obfs-min-packet-size'] =
+                                (int) ($hy2_opts['obfs_min_packet_size'] ?? 600);
+                            $node['obfs-max-packet-size'] =
+                                (int) ($hy2_opts['obfs_max_packet_size'] ?? 1300);
+                        }
                     }
                     if ($hop_ports !== '') {
                         // Stash 2.6.4 起支持端口跳跃，字段同 mihomo；旧版会忽略并回落到 port 直连
