@@ -146,54 +146,11 @@ final class Stash extends Base
                     break;
                 case 15:
                     // Hysteria 2 (Stash native)
-                    $hy2_port = $node_custom_config['offset_port_user'] ??
-                        ($node_custom_config['offset_port_node'] ?? 443);
-                    $hy2_opts = $node_custom_config['Hy2Opts'] ?? [];
-                    $host = $node_custom_config['host'] ?? '';
-                    $up_mbps = $hy2_opts['up_mbps'] ?? 0;
-                    $down_mbps = $hy2_opts['down_mbps'] ?? 0;
-                    $obfs = $hy2_opts['obfs'] ?? '';
-                    $obfs_password = $hy2_opts['obfs_password'] ?? '';
-                    $hop_ports = str_replace(' ', '', (string) ($hy2_opts['hop_ports'] ?? ''));
-                    $hop_interval = max(5, (int) ($hy2_opts['hop_interval'] ?? 30));
-
-                    $node = [
-                        'name' => $node_raw->name,
-                        'type' => 'hysteria2',
-                        'server' => $node_raw->server,
-                        'port' => (int) $hy2_port,
-                        'password' => $user->passwd,
-                        'sni' => $host,
-                        'skip-cert-verify' => false,
-                    ];
-
-                    if ($up_mbps > 0) {
-                        $node['up'] = (int) $up_mbps;
-                    }
-                    if ($down_mbps > 0) {
-                        $node['down'] = (int) $down_mbps;
-                    }
-                    if ($obfs !== '' && $obfs_password !== '') {
-                        $node['obfs'] = $obfs;
-                        $node['obfs-password'] = $obfs_password;
-
-                        // Each side pads only what it sends and padLen travels in the
-                        // frame header, so Gecko's bounds need not match across ends.
-                        // Emit them anyway: otherwise the client's own handshake
-                        // fragments take mihomo's defaults, which may exceed the path
-                        // MTU. Fallback tracks the backend's geckoDefault*PacketSize.
-                        if ($obfs === 'gecko') {
-                            $node['obfs-min-packet-size'] =
-                                (int) ($hy2_opts['obfs_min_packet_size'] ?? 600);
-                            $node['obfs-max-packet-size'] =
-                                (int) ($hy2_opts['obfs_max_packet_size'] ?? 1300);
-                        }
-                    }
-                    if ($hop_ports !== '') {
-                        // Stash 2.6.4 起支持端口跳跃，字段同 mihomo；旧版会忽略并回落到 port 直连
-                        $node['ports'] = $hop_ports;
-                        $node['hop-interval'] = $hop_interval;
-                    }
+                    $node = $this->buildHysteria2Node(
+                        $user,
+                        $node_raw,
+                        is_array($node_custom_config) ? $node_custom_config : []
+                    );
 
                     break;
                 case 14:
@@ -252,6 +209,68 @@ final class Stash extends Base
             array_merge($stash_config, $stash_nodes, $stash_group_config),
             YAML_UTF8_ENCODING
         );
+    }
+
+    /**
+     * Hysteria 2(sort=15)节点转 Stash proxy 配置
+     */
+    private function buildHysteria2Node($user, $node_raw, array $custom): array
+    {
+        $hy2_port = $custom['offset_port_user'] ?? ($custom['offset_port_node'] ?? 443);
+        $hy2_opts = $custom['Hy2Opts'] ?? [];
+        $host = $custom['host'] ?? '';
+        $up_mbps = $hy2_opts['up_mbps'] ?? 0;
+        $down_mbps = $hy2_opts['down_mbps'] ?? 0;
+        $obfs = $hy2_opts['obfs'] ?? '';
+        $obfs_password = $hy2_opts['obfs_password'] ?? '';
+        $hop_ports = str_replace(' ', '', (string) ($hy2_opts['hop_ports'] ?? ''));
+        $hop_interval = max(5, (int) ($hy2_opts['hop_interval'] ?? 30));
+
+        $node = [
+            'name' => $node_raw->name,
+            'type' => 'hysteria2',
+            'server' => $node_raw->server,
+            'port' => (int) $hy2_port,
+            // hysteria2 的凭证字段在 Stash 里叫 auth，不是别的协议用的 password。
+            // password 只是个未公开的兼容别名，文档从未列出，不作为下发形式。
+            'auth' => $user->passwd,
+            'sni' => $host,
+            'skip-cert-verify' => false,
+        ];
+
+        // Stash 自研内核不认 mihomo 的 up/down，带宽字段是 up-speed/down-speed，
+        // 取值为纯整数 Mbps(mihomo 那边还接受 "100 Mbps" 这类带单位字符串)。
+        // 写成 up/down 不会报错，Stash 会静默忽略并回落到 BBR 自适应。
+        // https://stash.wiki/proxy-protocols/proxy-types
+        if ($up_mbps > 0) {
+            $node['up-speed'] = (int) $up_mbps;
+        }
+        if ($down_mbps > 0) {
+            $node['down-speed'] = (int) $down_mbps;
+        }
+        if ($obfs !== '' && $obfs_password !== '') {
+            $node['obfs'] = $obfs;
+            $node['obfs-password'] = $obfs_password;
+
+            // Each side pads only what it sends and padLen travels in the
+            // frame header, so Gecko's bounds need not match across ends.
+            // Emit them anyway: otherwise the client's own handshake
+            // fragments take mihomo's defaults, which may exceed the path
+            // MTU. Fallback tracks the backend's geckoDefault*PacketSize.
+            if ($obfs === 'gecko') {
+                $node['obfs-min-packet-size'] =
+                    (int) ($hy2_opts['obfs_min_packet_size'] ?? 600);
+                $node['obfs-max-packet-size'] =
+                    (int) ($hy2_opts['obfs_max_packet_size'] ?? 1300);
+            }
+        }
+        if ($hop_ports !== '') {
+            // Stash 2.6.4 起支持端口跳跃，字段同 mihomo；旧版会忽略并回落到 port 直连
+            $node['ports'] = $hop_ports;
+            $node['hop-interval'] = $hop_interval;
+        }
+
+        return $node;
     }
 
     /**
