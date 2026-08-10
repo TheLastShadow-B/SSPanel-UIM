@@ -69,7 +69,7 @@ final class Clash extends Base
                         'password' => $server_key === '' ? $user_pk : $server_key . ':' .$user_pk,
                         'cipher' => $method,
                         'udp' => (bool) $udp,
-                        'udp_over_tcp' => (bool) $uot,
+                        'udp-over-tcp' => (bool) $uot,
                     ];
 
                     break;
