@@ -81,7 +81,7 @@
     </div>
 
     {* ---------------- 总览 ---------------- *}
-    <div x-show="tab === 'overview'" class="grid gap-5 lg:grid-cols-3">
+    <div x-show="tab === 'overview'" class="grid grid-cols-1 gap-5 lg:grid-cols-3">
 
         <div class="c-card-pad lg:col-span-2">
             <div class="mb-4 flex items-center justify-between">
@@ -163,7 +163,7 @@
     </div>
 
     {* ---------------- 设置:客户端导入为主内容(左 2/3),订阅计划靠右 ---------------- *}
-    <div x-show="tab === 'settings'" x-cloak class="grid items-start gap-5 lg:grid-cols-3">
+    <div x-show="tab === 'settings'" x-cloak class="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
 
         {* 订阅计划(含订阅安全) *}
         <div class="c-card-pad order-last">

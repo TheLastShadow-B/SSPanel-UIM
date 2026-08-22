@@ -20,7 +20,7 @@
     </button>
 </div>
 
-<div class="grid items-start gap-5 lg:grid-cols-2">
+<div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
     <div class="c-card-pad">
         <h3 class="mb-3 text-base">订阅详情</h3>
         <div class="kv-row">

@@ -6,7 +6,7 @@
     <p class="text-faint mt-1 text-sm">欢迎回来，{$user->user_name}</p>
 </div>
 
-<div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+<div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
 
     {* ============ 订阅实体卡 ============ *}
     <a href="/user/subscription" class="c-card hover:border-primary group flex flex-col transition-colors">

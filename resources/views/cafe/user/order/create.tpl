@@ -10,7 +10,7 @@
     <p class="text-faint mt-1 text-sm">核对商品信息并完成下单</p>
 </div>
 
-<div class="grid gap-5 lg:grid-cols-3">
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
     <div class="flex flex-col gap-5 lg:col-span-2">
 
         {* ============ 订单内容 ============ *}

@@ -46,7 +46,7 @@
 </div>
 
 {* ============ 近 14 天趋势 ============ *}
-<div class="grid gap-5 xl:grid-cols-3">
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
     <div class="c-card-pad">
         <div class="mb-1 flex items-baseline justify-between">
             <h3 class="text-base">收入趋势</h3>

@@ -39,7 +39,7 @@
                         <div class="">
                             <div class="tab-content">
                                 <div id="gateway" x-show="stab === 'gateway'" >
-                                    <div class="grid max-w-4xl gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                    <div class="grid grid-cols-1 max-w-4xl gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                         {foreach $payment_gateways as $key => $value}
                                             <label class="border-hairline has-checked:border-primary has-checked:bg-primary-tint/40 flex cursor-pointer
                                                           items-center justify-between gap-3 rounded-xl border px-4 py-3.5 transition-colors">
