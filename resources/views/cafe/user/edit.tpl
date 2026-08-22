@@ -385,7 +385,8 @@
                 </div>
                 <p class="text-faint mb-1 text-xs">若无法扫描二维码，可手动输入以下密钥</p>
                 <p id="totpSecret" class="text-ink mb-4 font-mono text-xs break-all"></p>
-                <input type="text" id="totpCode" placeholder="输入 TOTP 代码" class="field-input mb-5 text-center">
+                <input type="text" id="totpCode" placeholder="输入 TOTP 代码" class="field-input mb-5 text-center"
+                       inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
                 <div class="flex justify-end gap-2">
                     <button class="btn-secondary btn-sm" @click="showTotp = false">取消</button>
                     <button class="btn-primary btn-sm" id="submitTotp">提交</button>
