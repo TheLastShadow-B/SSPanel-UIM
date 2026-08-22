@@ -61,7 +61,7 @@
     </div>
 {/if}
 
-<div class="grid gap-5 lg:grid-cols-2">
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
     {if $public_setting['login_log']}
         <div class="c-card">
             <div class="p-5 pb-3">

@@ -25,7 +25,7 @@
     </div>
 </div>
 
-<div class="grid items-start gap-5 lg:grid-cols-2">
+<div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
     <div class="c-card-pad">
         <h3 class="mb-3 text-base">基本信息</h3>
         <div class="kv-row"><span class="kv-key">提交用户</span><span class="kv-val">#{$order->user_id}</span></div>

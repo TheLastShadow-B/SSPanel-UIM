@@ -17,7 +17,7 @@
     </div>
 {/if}
 
-<div class="grid gap-5 {if $invoice->status === 'unpaid' || $invoice->status === 'partially_paid'}lg:grid-cols-3{/if}">
+<div class="grid grid-cols-1 gap-5 {if $invoice->status === 'unpaid' || $invoice->status === 'partially_paid'}lg:grid-cols-3{/if}">
     <div class="flex flex-col gap-5 {if $invoice->status === 'unpaid' || $invoice->status === 'partially_paid'}lg:col-span-2{/if}">
         <div class="c-card-pad">
             <h3 class="mb-3 text-base">基本信息</h3>

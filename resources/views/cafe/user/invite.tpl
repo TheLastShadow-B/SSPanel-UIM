@@ -5,7 +5,7 @@
     <p class="text-faint mt-1 text-sm">分享邀请链接，好友消费后获得返利</p>
 </div>
 
-<div class="mb-5 grid gap-5 lg:grid-cols-3">
+<div class="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
 
     {* ============ 累计返利大数字 ============ *}
     <div class="c-card-pad from-primary to-primary-hover flex flex-col justify-center bg-gradient-to-br !border-0 text-white">

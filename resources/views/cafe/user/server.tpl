@@ -11,7 +11,7 @@
     </div>
 </div>
 
-<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
     {foreach $servers as $server}
         <div class="c-card p-5 {if $user->class < $server['class']}opacity-70{/if}">
             <div class="mb-3 flex items-center gap-3">

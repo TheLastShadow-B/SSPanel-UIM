@@ -20,7 +20,7 @@
     </div>
 
     {* ================ 资料 ================ *}
-    <div x-show="tab === 'profile'" class="grid gap-5 lg:grid-cols-2">
+    <div x-show="tab === 'profile'" class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div class="c-card-pad">
             <h3 class="mb-1 text-base">登录邮箱</h3>
             <p class="text-faint mb-4 text-xs">当前邮箱：<span class="text-body font-medium" id="email">{$user->email}</span></p>
@@ -126,7 +126,7 @@
     </div>
 
     {* ================ 登录安全 ================ *}
-    <div x-show="tab === 'security'" x-cloak class="grid gap-5 lg:grid-cols-2">
+    <div x-show="tab === 'security'" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div class="c-card-pad">
             <h3 class="mb-4 text-base">修改登录密码</h3>
             <div class="mb-3">
@@ -181,7 +181,7 @@
                 Passkey 是一种新的身份验证标准，使用生物识别或安全密钥进行身份验证以取代传统密码。
             </p>
             {if $webauthnDevices && count($webauthnDevices) > 0}
-                <div class="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                     {foreach $webauthnDevices as $device}
                         <div class="bg-tile rounded-(--radius-tile) p-4">
                             <div class="text-ink text-sm font-medium">{$device->name|default:'未命名'}</div>
@@ -214,7 +214,7 @@
                 FIDO2 是一种基于公钥加密的身份验证标准，支持 Yubikey 等硬件安全密钥。
             </p>
             {if $fidoDevices && count($fidoDevices) > 0}
-                <div class="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                     {foreach $fidoDevices as $device}
                         <div class="bg-tile rounded-(--radius-tile) p-4">
                             <div class="text-ink text-sm font-medium">{$device->name|default:'未命名'}</div>
@@ -236,7 +236,7 @@
     </div>
 
     {* ================ 连接与订阅 ================ *}
-    <div x-show="tab === 'usage'" x-cloak class="grid gap-5 lg:grid-cols-2">
+    <div x-show="tab === 'usage'" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div class="c-card-pad">
             <h3 class="mb-1 text-base">更换加密方式</h3>
             <p class="text-faint mb-4 text-xs">不同客户端支持的加密方式可能不同，请参考客户端支持列表设置</p>
@@ -271,7 +271,7 @@
         <div class="c-card-pad lg:col-span-2">
             <h3 class="mb-1 text-base">重置连接密码</h3>
             <p class="text-faint mb-3 text-xs">重置连接密码与 UUID，重置后需更新订阅才能继续使用</p>
-            <div class="mb-4 grid gap-3 md:grid-cols-2">
+            <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div class="bg-tile rounded-(--radius-tile) px-4 py-3">
                     <div class="text-faint text-xs">当前连接密码</div>
                     <div class="spoiler text-ink mt-0.5 font-mono text-sm" id="passwd">{$user->passwd}</div>
@@ -292,7 +292,7 @@
     </div>
 
     {* ================ 通知与外观 ================ *}
-    <div x-show="tab === 'other'" x-cloak class="grid gap-5 lg:grid-cols-2">
+    <div x-show="tab === 'other'" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div class="c-card-pad">
             <h3 class="mb-4 text-base">每日流量报告</h3>
             <div class="flex items-center gap-2">
@@ -385,7 +385,8 @@
                 </div>
                 <p class="text-faint mb-1 text-xs">若无法扫描二维码，可手动输入以下密钥</p>
                 <p id="totpSecret" class="text-ink mb-4 font-mono text-xs break-all"></p>
-                <input type="text" id="totpCode" placeholder="输入 TOTP 代码" class="field-input mb-5 text-center">
+                <input type="text" id="totpCode" placeholder="输入 TOTP 代码" class="field-input mb-5 text-center"
+                       inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
                 <div class="flex justify-end gap-2">
                     <button class="btn-secondary btn-sm" @click="showTotp = false">取消</button>
                     <button class="btn-primary btn-sm" id="submitTotp">提交</button>

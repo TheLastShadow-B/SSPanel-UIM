@@ -24,7 +24,7 @@
     </div>
 </div>
 
-<div class="grid items-start gap-5 lg:grid-cols-3">
+<div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
     <div class="c-card-pad lg:col-span-2">
         <textarea id="tinymce">{$doc->content}</textarea>
     </div>

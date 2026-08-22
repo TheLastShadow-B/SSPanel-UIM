@@ -24,7 +24,7 @@
     </button>
 </div>
 
-<div class="grid items-start gap-5 xl:grid-cols-3">
+<div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-3">
 
     {* ============ 账户信息 ============ *}
     <div class="c-card-pad">

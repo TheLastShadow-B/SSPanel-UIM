@@ -28,7 +28,7 @@
         </button>
     </div>
 
-    <div class="grid items-start gap-5 lg:grid-cols-2">
+    <div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
 
         {* ============ 基础信息 ============ *}
         <div class="c-card-pad">
