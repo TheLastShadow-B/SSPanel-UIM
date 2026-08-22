@@ -303,6 +303,21 @@
         @apply text-body text-sm leading-snug font-medium;
     }
 
+    /* ---- 一次性验证码:一个真输入框 + 六个展示格 ----
+            分格 input(六个 maxlength="1")在移动端自动填充里识别率极差,
+            系统 AutoFill 与 1Password 都判定不出这是验证码字段。这里只保留
+            一个真字段(透明文字覆盖在展示格上),外观不变但对自动填充而言
+            就是个普通的 one-time-code 输入框;粘贴与 iOS 短信提码也天然可用。
+            尺寸对齐原来的 .field-input !w-12 py-3 text-lg:48 × 54px */
+    .otp-cell {
+        @apply border-hairline bg-card text-ink flex h-[3.375rem] w-12 items-center
+            justify-center rounded-xl border text-lg font-semibold transition-colors;
+    }
+    .otp-cell.is-active {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+    }
+
     /* ---- 进度条 ---- */
     .meter {
         @apply bg-tile h-1.5 w-full overflow-hidden rounded-full;
