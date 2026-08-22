@@ -6,32 +6,31 @@
 <p class="text-faint mt-1.5 mb-7 text-sm">您的账户已启用二步验证，请完成附加身份验证</p>
 
 {if $method['totp']}
-    <div class="mb-6 flex justify-between gap-2" data-code-group>
-        <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-               maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"
-               aria-label="验证码第 1 位" data-code-input="">
-        <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-               maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-               aria-label="验证码第 2 位" data-code-input="">
-        <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-               maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-               aria-label="验证码第 3 位" data-code-input="">
-        <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-               maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-               aria-label="验证码第 4 位" data-code-input="">
-        <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-               maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-               aria-label="验证码第 5 位" data-code-input="">
-        <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-               maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-               aria-label="验证码第 6 位" data-code-input="">
-    </div>
-    <button class="btn-primary mb-3 w-full"
-            hx-post="/auth/totp" hx-swap="none" hx-vals="js:{
+    <form id="totpForm" hx-post="/auth/totp" hx-swap="none" hx-vals="js:{
                 code: readTotpCode(),
             }">
-        提交
-    </button>
+        <div class="mb-6 flex justify-between gap-2" data-code-group>
+            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
+                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"
+                   name="otp-1" aria-label="验证码第 1 位" data-code-input="">
+            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
+                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                   name="otp-2" aria-label="验证码第 2 位" data-code-input="">
+            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
+                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                   name="otp-3" aria-label="验证码第 3 位" data-code-input="">
+            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
+                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                   name="otp-4" aria-label="验证码第 4 位" data-code-input="">
+            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
+                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                   name="otp-5" aria-label="验证码第 5 位" data-code-input="">
+            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
+                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                   name="otp-6" aria-label="验证码第 6 位" data-code-input="">
+        </div>
+        <button type="submit" class="btn-primary mb-3 w-full">提交</button>
+    </form>
 {/if}
 {if $method['fido']}
     <button class="btn-outline w-full" id="webauthnLogin">
@@ -52,8 +51,26 @@
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            var form = document.getElementById('totpForm');
             var group = document.querySelector('[data-code-group]');
             var inputs = Array.prototype.slice.call(document.querySelectorAll('[data-code-input]'));
+            var lastAutoSubmitted = '';
+
+            // 凑齐就自己提交。密码管理器的"填完自动点登录"是启发式的,分格验证码
+            // 这种结构它认不准,与其等它点,不如填满即提交(手输/粘贴同样受益)。
+            // 记住已提交过的码,避免同一个码重复打;换了新码仍会再提交
+            function autoSubmitWhenComplete() {
+                var code = readTotpCode();
+                if (code.length !== inputs.length || code === lastAutoSubmitted) {
+                    return;
+                }
+                lastAutoSubmitted = code;
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                }
+            }
 
             // 从 start 格起逐位铺开,返回最后落笔的格子下标
             function spread(digits, start) {
@@ -74,12 +91,14 @@
                     if (digits.length > 1) {
                         e.target.value = '';
                         inputs[spread(digits, i)].focus();
+                        autoSubmitWhenComplete();
                         return;
                     }
                     e.target.value = digits;
                     if (digits !== '' && i + 1 < inputs.length) {
                         inputs[i + 1].focus();
                     }
+                    autoSubmitWhenComplete();
                 });
 
                 input.addEventListener('keydown', function (e) {
@@ -97,7 +116,11 @@
                 }
                 e.preventDefault();
                 inputs[spread(digits, inputs.indexOf(e.target))].focus();
+                autoSubmitWhenComplete();
             });
+
+            // 兜底:个别密码管理器只派发 change 不派发 input
+            group.addEventListener('change', autoSubmitWhenComplete);
         });
     </script>
     {/literal}
