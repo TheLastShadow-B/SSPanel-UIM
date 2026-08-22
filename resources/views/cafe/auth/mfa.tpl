@@ -6,7 +6,8 @@
 <p class="text-faint mt-1.5 mb-7 text-sm">您的账户已启用二步验证，请完成附加身份验证</p>
 
 {if $method['totp']}
-    <form id="totpForm" hx-post="/auth/totp" hx-swap="none" hx-vals="js:{
+    <form id="totpForm" method="post" action="/auth/totp"
+          hx-post="/auth/totp" hx-swap="none" hx-vals="js:{
                 code: readTotpCode(),
             }">
         {* 只有一个真输入框;六个格子纯展示,透明文字的 input 覆盖在上面。
@@ -20,9 +21,9 @@
                 <div class="otp-cell"></div>
                 <div class="otp-cell"></div>
             </div>
+            <label for="otpCode" class="sr-only">六位验证码</label>
             <input type="text" id="otpCode" name="code" maxlength="6"
                    inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"
-                   aria-label="六位验证码"
                    class="absolute inset-0 h-full w-full bg-transparent text-transparent
                           caret-transparent outline-none">
         </div>
