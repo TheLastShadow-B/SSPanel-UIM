@@ -9,25 +9,22 @@
     <form id="totpForm" hx-post="/auth/totp" hx-swap="none" hx-vals="js:{
                 code: readTotpCode(),
             }">
-        <div class="mb-6 flex justify-between gap-2" data-code-group>
-            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"
-                   name="otp-1" aria-label="验证码第 1 位" data-code-input="">
-            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-                   name="otp-2" aria-label="验证码第 2 位" data-code-input="">
-            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-                   name="otp-3" aria-label="验证码第 3 位" data-code-input="">
-            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-                   name="otp-4" aria-label="验证码第 4 位" data-code-input="">
-            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-                   name="otp-5" aria-label="验证码第 5 位" data-code-input="">
-            <input type="text" class="field-input !w-12 py-3 text-center text-lg font-semibold"
-                   maxlength="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-                   name="otp-6" aria-label="验证码第 6 位" data-code-input="">
+        {* 只有一个真输入框;六个格子纯展示,透明文字的 input 覆盖在上面。
+           分格 input 在移动端自动填充里识别不出来,详见 app.css .otp-cell *}
+        <div class="relative mb-6">
+            <div class="pointer-events-none flex justify-between gap-2" aria-hidden="true" data-otp-cells>
+                <div class="otp-cell"></div>
+                <div class="otp-cell"></div>
+                <div class="otp-cell"></div>
+                <div class="otp-cell"></div>
+                <div class="otp-cell"></div>
+                <div class="otp-cell"></div>
+            </div>
+            <input type="text" id="otpCode" name="code" maxlength="6"
+                   inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code"
+                   aria-label="六位验证码"
+                   class="absolute inset-0 h-full w-full bg-transparent text-transparent
+                          caret-transparent outline-none">
         </div>
         <button type="submit" class="btn-primary mb-3 w-full">提交</button>
     </form>
@@ -41,27 +38,37 @@
 {if $method['totp']}
     {literal}
     <script>
-        // 提交时现读 DOM。密码管理器不保证派发 input 事件,靠事件累积出来的变量会是空的
+        // 提交时现读 DOM 并只取数字。密码管理器不保证派发事件,不能依赖累积出来的变量
         function readTotpCode() {
-            var code = '';
-            document.querySelectorAll('[data-code-input]').forEach(function (input) {
-                code += input.value;
-            });
-            return code.slice(0, 6);
+            var input = document.getElementById('otpCode');
+            return input ? input.value.replace(/\D/g, '').slice(0, 6) : '';
         }
 
         document.addEventListener('DOMContentLoaded', function () {
             var form = document.getElementById('totpForm');
-            var group = document.querySelector('[data-code-group]');
-            var inputs = Array.prototype.slice.call(document.querySelectorAll('[data-code-input]'));
+            var input = document.getElementById('otpCode');
+            var cells = Array.prototype.slice.call(document.querySelectorAll('[data-otp-cells] .otp-cell'));
             var lastAutoSubmitted = '';
 
-            // 凑齐就自己提交。密码管理器的"填完自动点登录"是启发式的,分格验证码
-            // 这种结构它认不准,与其等它点,不如填满即提交(手输/粘贴同样受益)。
-            // 记住已提交过的码,避免同一个码重复打;换了新码仍会再提交
+            // 把真输入框的值画到展示格里,并高亮当前光标所在格
+            function render() {
+                var code = readTotpCode();
+                if (input.value !== code) {
+                    input.value = code;               // 顺手清掉非数字与超出的部分
+                }
+                var focused = document.activeElement === input;
+                var active = Math.min(code.length, cells.length - 1);
+                cells.forEach(function (cell, i) {
+                    cell.textContent = code.charAt(i);
+                    cell.classList.toggle('is-active', focused && i === active);
+                });
+            }
+
+            // 凑齐就自己提交:密码管理器的"填完自动点登录"是启发式的,靠不住。
+            // 记住已提交过的码避免重复打;换了新码仍会再提交
             function autoSubmitWhenComplete() {
                 var code = readTotpCode();
-                if (code.length !== inputs.length || code === lastAutoSubmitted) {
+                if (code.length !== cells.length || code === lastAutoSubmitted) {
                     return;
                 }
                 lastAutoSubmitted = code;
@@ -72,55 +79,40 @@
                 }
             }
 
-            // 从 start 格起逐位铺开,返回最后落笔的格子下标
-            function spread(digits, start) {
-                var i = Math.max(start, 0);
-                for (var d = 0; d < digits.length && i < inputs.length; d++, i++) {
-                    inputs[i].value = digits.charAt(d);
-                }
-                return Math.min(i, inputs.length - 1);
-            }
-
-            inputs.forEach(function (input, i) {
-                input.addEventListener('input', function (e) {
-                    if (e.isComposing) {
-                        return;
-                    }
-                    var digits = e.target.value.replace(/\D/g, '');
-                    // maxlength 只拦用户输入,拦不住脚本赋值:1Password 会把整串写进首格
-                    if (digits.length > 1) {
-                        e.target.value = '';
-                        inputs[spread(digits, i)].focus();
-                        autoSubmitWhenComplete();
-                        return;
-                    }
-                    e.target.value = digits;
-                    if (digits !== '' && i + 1 < inputs.length) {
-                        inputs[i + 1].focus();
-                    }
+            ['input', 'change'].forEach(function (evt) {
+                input.addEventListener(evt, function () {
+                    render();
                     autoSubmitWhenComplete();
-                });
-
-                input.addEventListener('keydown', function (e) {
-                    if (e.key === 'Backspace' && e.target.value === '' && i > 0) {
-                        inputs[i - 1].focus();
-                    }
                 });
             });
 
-            // 粘贴必须自己接管:maxlength="1" 会把 6 位验证码裁成 1 位
-            group.addEventListener('paste', function (e) {
-                var digits = (e.clipboardData ? e.clipboardData.getData('text') : '').replace(/\D/g, '');
+            // 光标恒定停在末尾,否则高亮格会和实际插入位置对不上
+            ['focus', 'click', 'keyup'].forEach(function (evt) {
+                input.addEventListener(evt, function () {
+                    var end = input.value.length;
+                    if (input.selectionStart !== end || input.selectionEnd !== end) {
+                        input.setSelectionRange(end, end);
+                    }
+                    render();
+                });
+            });
+            input.addEventListener('blur', render);
+
+            // maxlength=6 会把 " 482 913 " 这类带空格的粘贴裁成 6 个字符再交给我们,
+            // 数字就丢了,所以粘贴要自己接管:先剥非数字再写入
+            input.addEventListener('paste', function (e) {
+                var digits = (e.clipboardData ? e.clipboardData.getData('text') : '')
+                    .replace(/\D/g, '').slice(0, cells.length);
                 if (digits === '') {
                     return;
                 }
                 e.preventDefault();
-                inputs[spread(digits, inputs.indexOf(e.target))].focus();
+                input.value = digits;
+                render();
                 autoSubmitWhenComplete();
             });
 
-            // 兜底:个别密码管理器只派发 change 不派发 input
-            group.addEventListener('change', autoSubmitWhenComplete);
+            render();
         });
     </script>
     {/literal}
