@@ -147,6 +147,90 @@ final class TcpProbe
         return $rows;
     }
 
+    /**
+     * One pass over the newest round of every enabled node, for the admin console:
+     * a carrier rollup across nodes, per-target reachability, and per-node indicators.
+     */
+    public static function overview(int $now): array
+    {
+        $overview = ['carriers' => [], 'nodes' => [], 'targets' => [], 'measured_at' => null, 'reporting' => 0];
+        foreach (TcpProbeStatus::DISPLAY_NAMES as $carrier => $code) {
+            $overview['carriers'][$carrier] = [
+                'carrier' => $carrier, 'code' => $code, 'name' => TcpProbeStatus::CARRIERS[$carrier],
+                'status' => 'gray', 'label' => TcpProbeStatus::LABELS['gray'], 'latency_ms' => null,
+                'targets' => 0, 'counts' => ['green' => 0, 'yellow' => 0, 'red' => 0, 'gray' => 0],
+            ];
+        }
+        if (! self::installed()) {
+            return $overview;
+        }
+        $targets = self::targets();
+        foreach ($targets as $target) {
+            $overview['targets'][(int) $target['id']] = [
+                'ok' => 0, 'total' => 0, 'latency_ms' => null,
+                'status' => 'gray', 'label' => TcpProbeStatus::LABELS['gray'],
+            ];
+            $overview['carriers'][$target['carrier']]['targets']++;
+        }
+        $probes = DB::table('tcp_probe')->where('enabled', true)->get()->keyBy('node_id');
+        $latencies = array_fill_keys(array_keys($overview['carriers']), []);
+        $reach = [];
+        if ($probes->isNotEmpty()) {
+            $stale = 3 * self::interval(count($targets));
+            $latest = DB::table('tcp_probe_round')->selectRaw('MAX(id)')->whereIn('node_id', $probes->keys()->all())->groupBy('node_id');
+            foreach (DB::table('tcp_probe_round')->whereIn('id', $latest)->get() as $row) {
+                if ($now - $row->measured_at > $stale
+                    || self::config((int) $row->node_id, $targets, $probes->get($row->node_id))['config_hash'] !== $row->config_hash) {
+                    continue;
+                }
+                $round = self::decode($row);
+                $overview['reporting']++;
+                $overview['measured_at'] = max($overview['measured_at'] ?? 0, $round['measured_at']);
+                $overview['nodes'][(int) $row->node_id] = [
+                    'measured_at' => $round['measured_at'],
+                    'states' => array_map(static fn ($state) => $state['status'], $round['states']),
+                ];
+                foreach ($round['states'] as $carrier => $state) {
+                    if (! isset($overview['carriers'][$carrier])) {
+                        continue;
+                    }
+                    $overview['carriers'][$carrier]['counts'][$state['status']]++;
+                    if ($state['latency_ms'] !== null) {
+                        $latencies[$carrier][] = $state['latency_ms'];
+                    }
+                }
+                foreach ($round['results'] as $result) {
+                    if (! isset($overview['targets'][$result['target_id']])) {
+                        continue;
+                    }
+                    $values = array_column(array_filter($result['samples'], static fn ($s) => $s['error'] === null), 'latency_ms');
+                    $overview['targets'][$result['target_id']]['total']++;
+                    $overview['targets'][$result['target_id']]['ok'] += $values === [] ? 0 : 1;
+                    if ($values !== []) {
+                        $reach[$result['target_id']][] = TcpProbeStatus::median($values);
+                    }
+                }
+            }
+        }
+        foreach ($overview['carriers'] as $carrier => &$row) {
+            // Worst status wins, so one broken node is never hidden behind healthy ones.
+            $counts = $row['counts'];
+            $row['status'] = $counts['red'] ? 'red' : ($counts['yellow'] ? 'yellow' : ($counts['green'] ? 'green' : 'gray'));
+            $row['label'] = TcpProbeStatus::LABELS[$row['status']];
+            $row['latency_ms'] = TcpProbeStatus::median($latencies[$carrier]);
+        }
+        unset($row);
+        foreach ($overview['targets'] as $id => &$row) {
+            // Aggregate reachability only; the slow-target rule needs a node's own threshold.
+            $row['status'] = $row['total'] === 0 ? 'gray'
+                : ($row['ok'] === 0 ? 'red' : ($row['ok'] < $row['total'] ? 'yellow' : 'green'));
+            $row['label'] = TcpProbeStatus::LABELS[$row['status']];
+            $row['latency_ms'] = TcpProbeStatus::median($reach[$id] ?? []);
+        }
+        unset($row);
+        return $overview;
+    }
+
     public static function detail(int $nodeId, int $now): array
     {
         $rounds = [];

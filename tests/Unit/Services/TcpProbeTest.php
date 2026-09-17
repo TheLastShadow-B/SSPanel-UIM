@@ -218,6 +218,67 @@ it('renders 96 history bars per carrier with escaped target labels', function ()
         ->and($html)->not->toContain('<script>alert(1)</script>')->toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
 });
 
+it('rolls every enabled node up into the admin overview and renders every row', function () {
+    $this->database->schema()->create('node', function (Blueprint $table) {
+        $table->increments('id'); $table->string('name')->default('');
+    });
+    Node::create(['id' => 1, 'name' => '香港 01']);
+    Node::create(['id' => 2, 'name' => '<script>alert(1)</script>']);
+    DB::table('tcp_probe')->insert(['node_id' => 2, 'enabled' => true, 'threshold_ms' => 250]);
+    // Two consecutive rounds, so both nodes' states leave the unconfirmed gray.
+    foreach ([$this->now - 60, $this->now] as $at) {
+        TcpProbe::report(1, tcpReport($at), $at);
+        TcpProbe::report(2, tcpReport($at, 'timeout', 150), $at);
+    }
+
+    $overview = TcpProbe::overview($this->now);
+    expect($overview['reporting'])->toBe(2)
+        ->and($overview['carriers']['telecom']['counts'])->toBe(['green' => 1, 'yellow' => 1, 'red' => 0, 'gray' => 0])
+        ->and($overview['carriers']['telecom']['status'])->toBe('yellow')
+        ->and($overview['carriers']['telecom']['targets'])->toBe(2)
+        ->and($overview['carriers']['mobile']['counts']['gray'])->toBe(2)
+        ->and($overview['nodes'][2]['states']['telecom'])->toBe('yellow')
+        // One node reaches target 1, both reach target 2.
+        ->and([$overview['targets'][1]['ok'], $overview['targets'][1]['total'], $overview['targets'][1]['status']])->toBe([1, 2, 'yellow'])
+        ->and([$overview['targets'][2]['ok'], $overview['targets'][2]['total'], $overview['targets'][2]['status']])->toBe([2, 2, 'green']);
+
+    $shell = sys_get_temp_dir() . '/sspanel-probe-shell';
+    if (! is_dir($shell . '/shell')) {
+        mkdir($shell . '/shell', 0o777, true);
+    }
+    file_put_contents($shell . '/shell/admin_header.tpl', '<body data-nav="{$nav|default:\'\'}">');
+    file_put_contents($shell . '/shell/admin_footer.tpl', '</body>');
+    $smarty = new \Smarty\Smarty();
+    $smarty->setTemplateDir([$shell, BASE_PATH . '/resources/views/cafe']);
+    $smarty->setCompileDir($shell . '/compile');
+    $smarty->setForceCompile(true);
+    $targets = array_map(static fn ($target) => $target + [
+        'status' => $overview['targets'][$target['id']]['status'], 'status_label' => $overview['targets'][$target['id']]['label'],
+        'latency_ms' => $overview['targets'][$target['id']]['latency_ms'], 'reach' => '1 / 2', 'managed' => false,
+    ], TcpProbe::targets());
+    $nodes = [
+        ['id' => 1, 'name' => '香港 01', 'enabled' => true, 'threshold_ms' => 250,
+            'states' => $overview['nodes'][1]['states'], 'state_labels' => ['telecom' => '正常'], 'reported' => '0 秒前'],
+        ['id' => 2, 'name' => '<script>alert(1)</script>', 'enabled' => true, 'threshold_ms' => 250,
+            'states' => $overview['nodes'][2]['states'], 'state_labels' => ['telecom' => '波动 / 延迟偏高'], 'reported' => '0 秒前'],
+    ];
+    $html = $smarty->assign('installed', true)->assign('overview', $overview)->assign('updated', '0 秒前')
+        ->assign('targets', $targets)->assign('managed', 0)->assign('nodes', $nodes)->assign('node_enabled', 2)
+        ->assign('carriers', TcpProbeStatus::CARRIERS)->assign('carrier_codes', TcpProbeStatus::DISPLAY_NAMES)
+        ->assign('interval_seconds', TcpProbe::interval(count($targets)))
+        ->assign('taier_installed', false)->assign('taier', \App\Services\TaierProbeSource::settings())
+        ->assign('taier_status', 'gray')->assign('taier_cities', [])->assign('csrf_token', 'token')
+        ->fetch('admin/node/probe.tpl');
+
+    expect($html)->toContain('data-nav="node-probe"')->toContain('TaierSpeedtest')
+        ->toContain('name="threshold_ms[2]"')->toContain('name="enabled[1]"')
+        // Every row renders; the list scrolls instead of truncating.
+        ->and(substr_count($html, 'data-probe-target data-carrier'))->toBe(2)
+        ->and(substr_count($html, 'data-probe-node data-search'))->toBe(2)
+        ->and($html)->not->toContain('<script>alert(1)</script>')
+        ->toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+});
+
 it('creates edits and deletes independent targets without replacing existing configuration', function () {
     $controller = (new ReflectionClass(TcpProbeController::class))->newInstanceWithoutConstructor();
     $factory = new HttpFactory();

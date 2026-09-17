@@ -38,7 +38,7 @@
 
         {* 当前页所在分组(强制展开) *}
         {$navgroup = ''}
-        {if in_array($nav|default:'', ['users', 'nodes'])}{$navgroup = 'users'}
+        {if in_array($nav|default:'', ['users', 'nodes', 'node-probe'])}{$navgroup = 'users'}
         {elseif in_array($nav|default:'', ['product', 'subscription', 'order', 'invoice', 'coupon', 'giftcard'])}{$navgroup = 'finance'}
         {elseif in_array($nav|default:'', ['announcement', 'ticket', 'docs'])}{$navgroup = 'ops'}
         {elseif in_array($nav|default:'', ['detect', 'detect-log', 'detect-ban'])}{$navgroup = 'audit'}
@@ -89,6 +89,10 @@
                         <a href="/admin/node" class="side-link {if ($nav|default:'') === 'nodes'}active{/if}">
                             <span class="side-ico"><i class="ti ti-server-2"></i></span>
                             节点
+                        </a>
+                        <a href="/admin/node/probe" class="side-link {if ($nav|default:'') === 'node-probe'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-activity-heartbeat"></i></span>
+                            节点检测
                         </a>
                     </div>
                 </div>

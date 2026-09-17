@@ -6,7 +6,6 @@
         <p class="text-faint mt-1 text-sm">系统中所有节点的列表</p>
     </div>
     <div class="flex gap-2">
-    <a href="/admin/node/probe" class="btn-secondary btn-sm"><i class="ti ti-activity"></i> 回国检测</a>
     <a href="/admin/node/create" class="btn-primary btn-sm">
         <i class="ti ti-plus"></i> 创建节点
     </a>

@@ -1,5 +1,5 @@
 /* Shared colors for compact node indicators and quarter-hour history bars. */
-.probe-dot, .probe-bar, .probe-state-icon { --probe-color: var(--color-faint); }
+.probe-dot, .probe-bar, .probe-state-icon, .probe-split > span { --probe-color: var(--color-faint); }
 [data-status="green"] { --probe-color: #1bbf96; }
 [data-status="yellow"] { --probe-color: #e5ac36; }
 [data-status="red"] { --probe-color: #ed6573; }
@@ -12,3 +12,74 @@
 .probe-bar:hover, .probe-bar:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; position: relative; z-index: 1; }
 .probe-components > summary::-webkit-details-marker { display: none; }
 @media (max-width: 640px) { .probe-history { gap: 1px; } .probe-bar { height: 28px; border-radius: 1px; } }
+
+/* ---- 管理端 ---- */
+
+/* Status pill: the dot colors themselves are too light for text, so each gets a darker ink. */
+.probe-pill {
+    display: inline-flex; align-items: center; gap: .375rem; white-space: nowrap;
+    padding: .125rem .5rem; border-radius: 999px; font-size: .75rem; font-weight: 500;
+    background: var(--probe-pill-bg); color: var(--probe-pill-fg);
+}
+.probe-pill[data-status="green"] { --probe-pill-bg: #e7f8f0; --probe-pill-fg: #107a57; }
+.probe-pill[data-status="yellow"] { --probe-pill-bg: #fdf1dc; --probe-pill-fg: #8a5a00; }
+.probe-pill[data-status="red"] { --probe-pill-bg: #feeceb; --probe-pill-fg: #b42318; }
+.probe-pill[data-status="gray"] { --probe-pill-bg: var(--color-tile); --probe-pill-fg: var(--color-body); }
+[data-theme="dark"] .probe-pill[data-status="green"] { --probe-pill-bg: #10291d; --probe-pill-fg: #4ad6a4; }
+[data-theme="dark"] .probe-pill[data-status="yellow"] { --probe-pill-bg: #2d2210; --probe-pill-fg: #e8b65a; }
+[data-theme="dark"] .probe-pill[data-status="red"] { --probe-pill-bg: #2f1715; --probe-pill-fg: #f58a86; }
+
+/* Carrier code chip stays neutral, so status colors never compete with carrier identity. */
+.probe-code {
+    display: inline-flex; align-items: center; flex-shrink: 0; height: 1.375rem; padding: 0 .5rem;
+    border-radius: .375rem; background: var(--color-tile); color: var(--color-body);
+    font-size: .75rem; font-weight: 600; letter-spacing: .04em;
+}
+
+/* One bar per carrier, segments sized by how many nodes report each status. */
+.probe-split { display: flex; gap: 2px; height: .5rem; border-radius: 999px; overflow: hidden; background: var(--color-tile); }
+.probe-split > span { display: block; min-width: 0; background: var(--probe-color); }
+.probe-split > span[data-status="gray"] { opacity: .35; }
+
+.probe-seg {
+    display: inline-flex; align-items: center; justify-content: center; gap: .3rem; white-space: nowrap;
+    height: 2rem; padding: 0 .875rem; border: 0; border-radius: 999px; background: transparent;
+    color: var(--color-body); font-size: .8125rem; cursor: pointer; transition: color .15s ease;
+}
+.probe-seg.is-on { background: var(--color-card); color: var(--color-ink); font-weight: 600; box-shadow: 0 1px 2px rgb(25 28 34 / .12); }
+
+.probe-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 2.75rem; height: 2.75rem; border: 0; border-radius: 999px; background: transparent;
+    color: var(--color-body); font-size: 1.0625rem; cursor: pointer; transition: background-color .15s ease, color .15s ease;
+}
+.probe-icon-btn:hover { background: var(--color-tile); color: var(--color-ink); }
+.probe-icon-btn:disabled { background: transparent; color: var(--color-faint); cursor: not-allowed; }
+
+/* 44px hit area around a 36px track, so the switch stays tappable in a dense table. */
+.probe-switch { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; cursor: pointer; }
+.probe-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.probe-switch-track {
+    display: inline-flex; align-items: center; width: 2.25rem; height: 1.375rem; padding: 2px;
+    border-radius: 999px; background: var(--color-hairline); transition: background-color .15s ease;
+}
+.probe-switch-thumb { width: 1.125rem; height: 1.125rem; border-radius: 50%; background: #fff; transition: transform .15s var(--ease-out); }
+.probe-switch input:checked + .probe-switch-track { background: var(--color-primary); }
+.probe-switch input:checked + .probe-switch-track .probe-switch-thumb { transform: translateX(.875rem); }
+.probe-switch input:focus-visible + .probe-switch-track { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.probe-chip {
+    display: inline-flex; align-items: center; gap: .45rem; height: 2.375rem; padding: 0 .875rem;
+    border: 1px solid var(--color-hairline); border-radius: 999px;
+    color: var(--color-body); font-size: .9375rem; cursor: pointer; transition: border-color .15s ease, background-color .15s ease;
+}
+.probe-chip input { width: 1rem; height: 1rem; accent-color: var(--color-primary); }
+.probe-chip:has(input:checked) { border-color: var(--color-primary); background: var(--color-primary-tint); color: var(--color-primary); }
+
+.probe-radio {
+    position: relative; flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center;
+    height: 2.375rem; border-radius: 999px; color: var(--color-body); font-size: .9375rem; cursor: pointer;
+}
+.probe-radio input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.probe-radio:has(input:checked) { background: var(--color-card); color: var(--color-ink); font-weight: 600; box-shadow: 0 1px 2px rgb(25 28 34 / .12); }
+.probe-radio:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
