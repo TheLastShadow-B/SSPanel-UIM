@@ -5,7 +5,7 @@ declare(strict_types=1);
 // Dedicated profile for clash.md / Hako. Contains no user credentials.
 // MRS sources: https://github.com/MetaCubeX/meta-rules-dat
 // Ads use the smaller category-ads-all set, not Loyalsoldier's complete reject list.
-// DNS uses domestic resolvers for China domains; other queries go through Default Proxy.
+// DNS uses direct domestic resolvers for China/direct traffic; other queries go through Global.
 // Keep mixed explicitly: omitting the stack selects gVisor in the Apple client.
 return [
     'mode' => 'rule',
@@ -38,8 +38,8 @@ return [
             'time1.cloud.tencent.com',
         ],
         'nameserver' => [
-            'tls://8.8.4.4#Default Proxy',
-            'tls://1.1.1.1#Default Proxy',
+            'tls://8.8.4.4#Global',
+            'tls://1.1.1.1#Global',
         ],
         'default-nameserver' => [
             '223.5.5.5',
@@ -49,10 +49,15 @@ return [
             'https://doh.pub/dns-query',
             '223.5.5.5',
         ],
+        'direct-nameserver' => [
+            'https://223.5.5.5/dns-query#DIRECT',
+            'https://doh.pub/dns-query#DIRECT',
+        ],
+        'direct-nameserver-follow-policy' => true,
         'nameserver-policy' => [
             'rule-set:site-cn' => [
-                'https://223.5.5.5/dns-query',
-                'https://doh.pub/dns-query',
+                'https://223.5.5.5/dns-query#DIRECT',
+                'https://doh.pub/dns-query#DIRECT',
             ],
             '+.lan' => 'system',
             '+.local' => 'system',

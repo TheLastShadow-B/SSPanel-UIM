@@ -23,9 +23,13 @@ or send a user's token to a conversion service.
 - **Ads use MetaCubeX category-ads-all, a smaller set than the former Loyalsoldier
   reject list. They are not equivalent in coverage.** Restoring full coverage
   requires publishing a genuine compiled MRS resource and changing its provider.
-- China domains use domestic DNS. Other DNS queries use Google/Cloudflare DoT
-  through Default Proxy. Node-domain DNS stays independent. This differs from the
-  desktop fallback-filter policy; proxy failure can also affect remote DNS.
+- China domains and direct outbound connections use domestic DoH via DIRECT.
+  Direct outbound DNS follows nameserver-policy, preserving local-domain policies.
+  Other DNS queries use Google/Cloudflare DoT through Global, independent of the
+  DIRECT/REJECT choices in Default Proxy. Node-domain DNS stays independent.
+  DNS respects routing rules unless an explicit resolver exit overrides them.
+  This differs from the desktop fallback-filter policy; proxy failure can still
+  affect remote DNS.
 - Preserve `tun.stack: mixed`, Fake-IP and stored selections. Logging is warning;
   sniffing is disabled and DNS cache is capped at 1024 entries. These latter
   values are implementation choices for this profile, not mandated by the docs.
