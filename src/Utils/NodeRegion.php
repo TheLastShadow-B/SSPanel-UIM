@@ -77,7 +77,7 @@ final class NodeRegion
                 $groups[$code] = [
                     'code' => $code,
                     'name' => self::REGIONS[$code][0] ?? '其他地区',
-                    'flag' => $code === 'OTHER' ? '' : self::flag($code),
+                    'flag' => $code === 'OTHER' ? '' : self::flag($code === 'TW' ? 'CN' : $code),
                     'servers' => [],
                     'online' => 0,
                 ];
