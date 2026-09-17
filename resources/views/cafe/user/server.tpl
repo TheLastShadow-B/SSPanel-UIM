@@ -92,9 +92,9 @@
                                 </div>
                                 <a href="/user/server/{$server['id']}" data-probe-node="{$server['id']}" class="mt-3 inline-flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" aria-label="查看 {$server['name']|escape} 的回国检测详情">
                                     {foreach $server['probe_status'] as $carrier}
-                                        <span data-probe-carrier="{$carrier['carrier']}" class="text-body inline-flex items-center gap-1.5" title="去往{$carrier['name']}：{$carrier['label']}">
+                                        <span data-probe-carrier="{$carrier['carrier']}" class="text-body inline-flex items-center gap-1.5" title="{$carrier['name']}：{$carrier['label']}">
                                             <span class="probe-dot" data-status="{$carrier['status']}" aria-hidden="true"></span>
-                                            去往{$carrier['name']}<span class="sr-only">：{$carrier['label']}</span>
+                                            {$carrier['name']}<span class="sr-only">：{$carrier['label']}</span>
                                         </span>
                                     {/foreach}
                                 </a>

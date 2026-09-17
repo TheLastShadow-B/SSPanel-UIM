@@ -7,6 +7,7 @@ namespace App\Utils;
 final class TcpProbeStatus
 {
     public const CARRIERS = ['telecom' => '电信', 'unicom' => '联通', 'mobile' => '移动'];
+    public const DISPLAY_NAMES = ['telecom' => 'CT', 'mobile' => 'CM', 'unicom' => 'CU'];
     public const LABELS = ['green' => '正常', 'yellow' => '波动 / 延迟偏高', 'red' => '连接中断', 'gray' => '暂无有效数据'];
 
     public static function median(array $values): ?float
@@ -68,7 +69,7 @@ final class TcpProbeStatus
     public static function current(?array $round, int $now): array
     {
         $rows = [];
-        foreach (self::CARRIERS as $carrier => $name) {
+        foreach (self::DISPLAY_NAMES as $carrier => $name) {
             $state = $round['states'][$carrier] ?? null;
             $status = $round && $now - $round['measured_at'] <= 180 ? ($state['status'] ?? 'gray') : 'gray';
             $rows[$carrier] = [

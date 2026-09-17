@@ -9,14 +9,14 @@
 </div>
 <div class="space-y-4">
 {foreach $probe['carriers'] as $carrier}
-    <section class="c-card-pad" aria-label="去往{$carrier['name']}的检测状态" x-data="{ selected: '' }">
+    <section class="c-card-pad" aria-label="{$carrier['name']} 检测状态" x-data="{ selected: '' }">
         <details class="probe-components" data-carrier="{$carrier['carrier']}">
             <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
                 <span class="inline-flex flex-wrap items-center gap-3">
                     <span class="probe-state-icon" data-status="{$carrier['status']}" aria-label="{$carrier['label']}">
                         <span aria-hidden="true">{if $carrier['status'] === 'green'}✓{elseif $carrier['status'] === 'yellow'}!{elseif $carrier['status'] === 'red'}×{else}−{/if}</span>
                     </span>
-                    <span class="text-base font-semibold">去往{$carrier['name']}</span>
+                    <span class="text-base font-semibold">{$carrier['name']}</span>
                     <span class="text-faint inline-flex items-center gap-1 text-sm">{count($carrier['targets'])} 个目标 <i class="ti ti-chevron-down text-xs" aria-hidden="true"></i></span>
                 </span>
                 <span class="text-faint text-sm tabular-nums">{$carrier['history']['uptime']} 可用率</span>
@@ -30,7 +30,7 @@
                 {foreachelse}<p class="text-faint py-3 text-sm">尚未配置测试目标</p>{/foreach}
             </div>
         </details>
-        <div class="probe-history mt-5" role="group" aria-label="去往{$carrier['name']}的历史，每格 15 分钟">
+        <div class="probe-history mt-5" role="group" aria-label="{$carrier['name']} 历史状态，每格 15 分钟">
             {foreach $carrier['history']['buckets'] as $bucket}
                 <button type="button" class="probe-bar" data-status="{$bucket['status']}" title="{$bucket['label']|escape}" aria-label="{$bucket['label']|escape}" @click="selected = $el.title" @focus="selected = $el.title" @mouseenter="selected = $el.title"></button>
             {/foreach}
