@@ -21,6 +21,7 @@ return [
         'enable' => true,
         'ipv6' => true,
         'prefer-h3' => false,
+        'respect-rules' => true,
         'enhanced-mode' => 'fake-ip',
         'fake-ip-range' => '198.18.0.1/16',
         'fake-ip-filter' => [
