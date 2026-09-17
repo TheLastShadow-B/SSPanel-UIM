@@ -10,6 +10,7 @@ declare(strict_types=1);
 return [
     'mode' => 'rule',
     'unified-delay' => true,
+    'tcp-concurrent' => true,
     'ipv6' => true,
     'log-level' => 'warning',
     'profile' => [
