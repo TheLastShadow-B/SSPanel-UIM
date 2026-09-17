@@ -50,7 +50,7 @@
             </div>
             <nav class="node-jumps mt-3 flex gap-2 overflow-x-auto" aria-label="跳转到地区">
                 {foreach $server_groups as $group}
-                    <a href="#region-{$group['code']}" class="node-jump">{if $group['flag']}<span aria-hidden="true">{$group['flag']}</span>{/if}{$group['name']}<span class="text-faint tabular-nums">{count($group['servers'])}</span></a>
+                    <a href="#region-{$group['code']}" class="node-jump" @click="reveal('{$group['code']}')">{if $group['flag']}<span aria-hidden="true">{$group['flag']}</span>{/if}{$group['name']}<span class="text-faint tabular-nums">{count($group['servers'])}</span></a>
                 {/foreach}
             </nav>
             <div class="c-card mt-3 space-y-3 p-4" aria-label="线路总览">
@@ -67,14 +67,17 @@
 
     <div class="space-y-4">
         {foreach $server_groups as $group}
-            <section id="region-{$group['code']}" class="c-card scroll-mt-4 overflow-hidden" aria-labelledby="region-title-{$group['code']}">
-                <div class="flex items-center gap-3.5 px-5 py-4">
-                    <span class="bg-tile flex size-10 shrink-0 items-center justify-center rounded-xl text-xl leading-none" aria-hidden="true">{if $group['flag']}{$group['flag']}{else}<i class="ti ti-world text-body"></i>{/if}</span>
-                    <div class="min-w-0 flex-1">
-                        <h3 id="region-title-{$group['code']}" class="text-base">{$group['name']}</h3>
-                        <p class="text-faint mt-0.5 text-xs">{count($group['servers'])} 个节点 · {if $group['online'] === count($group['servers'])}全部在线{else}{$group['online']} 个在线{/if}</p>
-                    </div>
-                </div>
+            <section id="region-{$group['code']}" class="t-acc c-card scroll-mt-4 overflow-hidden" data-open="true" :data-open="String(isOpen('{$group['code']}'))" aria-labelledby="region-title-{$group['code']}">
+                <h3>
+                    <button type="button" id="region-title-{$group['code']}" class="node-region-head" aria-controls="region-nodes-{$group['code']}" aria-expanded="true" :aria-expanded="String(isOpen('{$group['code']}'))" @click="toggle('{$group['code']}')">
+                        <span class="node-region-flag" aria-hidden="true">{if $group['flag']}{$group['flag']}{else}<i class="ti ti-world text-body"></i>{/if}</span>
+                        <span class="node-region-name">{$group['name']}</span>
+                        <span class="node-region-meta">{count($group['servers'])} 个节点 · {if $group['online'] === count($group['servers'])}全部在线{else}{$group['online']} 个在线{/if}</span>
+                        <i class="t-acc-chevron ti ti-chevron-down" aria-hidden="true"></i>
+                    </button>
+                </h3>
+                <div id="region-nodes-{$group['code']}" class="t-acc-panel" aria-hidden="false" :inert="!isOpen('{$group['code']}')" :aria-hidden="String(!isOpen('{$group['code']}'))">
+                <div class="t-acc-panel-inner">
                 <div class="node-head hidden md:flex" aria-hidden="true">
                     <span class="min-w-0 flex-1">节点</span>
                     {foreach $carrier_tally as $carrier}<span class="node-col" data-col="{$carrier['carrier']}">{$carrier['name']}</span>{/foreach}
@@ -122,6 +125,8 @@
                             <span class="node-chev hidden md:flex" aria-hidden="true"><i class="ti ti-chevron-right"></i></span>
                         </div>
                     {/foreach}
+                </div>
+                </div>
                 </div>
             </section>
         {/foreach}

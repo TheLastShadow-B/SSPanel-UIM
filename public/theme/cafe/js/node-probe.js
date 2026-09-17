@@ -46,14 +46,23 @@
 
     window.cafeNodeList = () => ({
         picked: '',
+        collapsed: [],
         names: { telecom: '电信', unicom: '联通', mobile: '移动' },
         init() {
             try {
                 const saved = localStorage.getItem('cafe.nodeCarrier');
                 if (saved && saved in this.names) this.picked = saved;
-            } catch (_) { /* storage unavailable: stay on 全部 */ }
+                const regions = JSON.parse(localStorage.getItem('cafe.nodeRegions') || '[]');
+                if (Array.isArray(regions)) this.collapsed = regions.filter(code => typeof code === 'string');
+            } catch (_) { /* storage unavailable: everything open, 全部 selected */ }
             this.$nextTick(sortRows);
         },
+        isOpen(code) { return !this.collapsed.includes(code); },
+        toggle(code) {
+            this.collapsed = this.isOpen(code) ? [...this.collapsed, code] : this.collapsed.filter(c => c !== code);
+            try { localStorage.setItem('cafe.nodeRegions', JSON.stringify(this.collapsed)); } catch (_) { /* ignore */ }
+        },
+        reveal(code) { if (!this.isOpen(code)) this.toggle(code); },
         select(carrier) {
             this.picked = carrier;
             try { localStorage.setItem('cafe.nodeCarrier', carrier); } catch (_) { /* ignore */ }
