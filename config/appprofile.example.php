@@ -252,6 +252,8 @@ $_ENV['Clash_Group_Config'] = [
         'DOMAIN-SUFFIX,x.ai,AI Services',
         'DOMAIN-SUFFIX,wifiman.com,Default Proxy',
         'GEOSITE,google,Default Proxy',
+        // GitHub is included in microsoft; match it first to keep its exit independent.
+        'GEOSITE,github,Default Proxy',
         'GEOSITE,apple,Microsoft & Apple',
         'GEOSITE,microsoft,Microsoft & Apple',
         'GEOSITE,category-entertainment,Stream',
