@@ -23,8 +23,8 @@
     {
       "name": "CMFA",
       "description": "支持分应用代理的 Android 客户端",
-      "format": "clash",
-      "importUrl": "clash://install-config?url={sub}/clash&name={name}",
+      "format": "cmfa",
+      "importUrl": "clash://install-config?url={sub}/cmfa&name={name}",
       "platforms": {
         "Android": {
           "ext": "apk",
