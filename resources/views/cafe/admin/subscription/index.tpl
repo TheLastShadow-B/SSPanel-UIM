@@ -13,7 +13,7 @@
     </div>
 
     <div class="table-card overflow-x-auto">
-        <table>
+        <table data-column-storage="cafe.admin.subscription.index.columns.v1" data-column-widths="114,114,240,160,130,220,160,170" data-column-minimums="114,114,140,110,100,160,110,170" data-fixed-last>
             <thead>
             <tr>
                 <th>订阅 ID</th>

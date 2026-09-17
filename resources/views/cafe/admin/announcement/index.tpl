@@ -16,7 +16,7 @@
     </div>
 
     <div class="table-card overflow-x-auto">
-        <table>
+        <table data-column-storage="cafe.admin.announcement.index.columns.v1" data-column-widths="100,160,100,220,320,170" data-column-minimums="80,110,80,160,160,170" data-fixed-last>
             <thead>
             <tr>
                 <th>ID</th>

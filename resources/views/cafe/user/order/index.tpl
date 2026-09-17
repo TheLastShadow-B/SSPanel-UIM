@@ -13,7 +13,7 @@
     </div>
 
     <div class="table-card overflow-x-auto">
-        <table>
+        <table data-column-storage="cafe.user.order.index.columns.v1" data-column-widths="114,240,160,130,160,220,170" data-column-minimums="114,140,110,80,110,160,170" data-fixed-last>
             <thead>
             <tr>
                 <th>订单 ID</th>

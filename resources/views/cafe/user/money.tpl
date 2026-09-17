@@ -34,7 +34,7 @@
             <h3 class="text-base">变动记录</h3>
         </div>
         <div class="table-card overflow-x-auto">
-            <table>
+            <table data-column-storage="cafe.user.money.columns.v1" data-column-widths="114,130,130,130,320,220" data-column-minimums="114,86,86,100,160,160">
                 <thead>
                 <tr>
                     <th>事件 ID</th>
@@ -78,9 +78,9 @@
 
     {* ============ 充值模态 ============ *}
     <template x-teleport="body">
-        <div x-show="showTopup" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showTopup" x-cloak {include file='shell/motion_backdrop.tpl'} class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="showTopup = false"></div>
-            <div class="c-card modal-pop relative w-full max-w-sm p-6 shadow-xl" @keydown.escape.window="showTopup = false">
+            <div x-show="showTopup" {include file='shell/motion_modal.tpl'} class="c-card t-modal is-open relative w-full max-w-sm p-6 shadow-xl" @keydown.escape.window="showTopup = false">
                 <h3 class="mb-1 text-base">余额充值</h3>
                 <p class="text-faint mb-4 text-xs">充值订单创建后前往账单页完成支付</p>
                 <input id="topup_amount" type="number" step="10" min="1" class="field-input mb-5"
@@ -102,9 +102,9 @@
 
     {* ============ 礼品卡模态 ============ *}
     <template x-teleport="body">
-        <div x-show="showGiftcard" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showGiftcard" x-cloak {include file='shell/motion_backdrop.tpl'} class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="showGiftcard = false"></div>
-            <div class="c-card modal-pop relative w-full max-w-sm p-6 shadow-xl" @keydown.escape.window="showGiftcard = false">
+            <div x-show="showGiftcard" {include file='shell/motion_modal.tpl'} class="c-card t-modal is-open relative w-full max-w-sm p-6 shadow-xl" @keydown.escape.window="showGiftcard = false">
                 <h3 class="mb-1 text-base">兑换礼品卡</h3>
                 <p class="text-faint mb-4 text-xs">兑换成功后金额自动计入余额</p>
                 <input id="giftcard" type="text" class="field-input mb-5"

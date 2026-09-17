@@ -14,6 +14,7 @@
     <script src="/theme/cafe/js/htmx.min.js"></script>
     <script src="/theme/cafe/js/clipboard.min.js"></script>
     <script defer src="/theme/cafe/js/alpine.min.js"></script>
+    <script defer src="/theme/cafe/js/column-resize.js?v={$config['assets_version']}"></script>
 </head>
 
 <body class="bg-canvas min-h-screen">
@@ -74,138 +75,162 @@
                 概况
             </a>
 
-            <button class="side-caption" @click="toggle('users')">
-                用户与节点
-                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.users && '-rotate-90'"></i>
-            </button>
-            <div x-show="g.users" class="flex flex-col gap-0.5">
-                <a href="/admin/user" class="side-link {if ($nav|default:'') === 'users'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-users"></i></span>
-                    用户
-                </a>
-                <a href="/admin/node" class="side-link {if ($nav|default:'') === 'nodes'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-server-2"></i></span>
-                    节点
-                </a>
+            <div class="t-acc" :data-open="String(g.users)">
+                <button class="side-caption t-acc-head" @click="toggle('users')" :aria-expanded="g.users" aria-controls="nav-users">
+                    用户与节点
+                    <i class="t-acc-chevron ti ti-chevron-down text-xs" aria-hidden="true"></i>
+                </button>
+                <div id="nav-users" class="t-acc-panel" :inert="!g.users">
+                    <div class="t-acc-panel-inner flex flex-col gap-0.5">
+                        <a href="/admin/user" class="side-link {if ($nav|default:'') === 'users'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-users"></i></span>
+                            用户
+                        </a>
+                        <a href="/admin/node" class="side-link {if ($nav|default:'') === 'nodes'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-server-2"></i></span>
+                            节点
+                        </a>
+                    </div>
+                </div>
             </div>
 
-            <button class="side-caption" @click="toggle('finance')">
-                财务
-                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.finance && '-rotate-90'"></i>
-            </button>
-            <div x-show="g.finance" class="flex flex-col gap-0.5">
-                <a href="/admin/product" class="side-link {if ($nav|default:'') === 'product'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-list-details"></i></span>
-                    商品
-                </a>
-                <a href="/admin/subscription" class="side-link {if ($nav|default:'') === 'subscription'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-refresh"></i></span>
-                    订阅管理
-                </a>
-                <a href="/admin/order" class="side-link {if ($nav|default:'') === 'order'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-receipt"></i></span>
-                    订单
-                </a>
-                <a href="/admin/invoice" class="side-link {if ($nav|default:'') === 'invoice'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-file-dollar"></i></span>
-                    账单
-                </a>
-                <a href="/admin/coupon" class="side-link {if ($nav|default:'') === 'coupon'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-ticket"></i></span>
-                    优惠码
-                </a>
-                <a href="/admin/giftcard" class="side-link {if ($nav|default:'') === 'giftcard'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-gift-card"></i></span>
-                    礼品卡
-                </a>
+            <div class="t-acc" :data-open="String(g.finance)">
+                <button class="side-caption t-acc-head" @click="toggle('finance')" :aria-expanded="g.finance" aria-controls="nav-finance">
+                    财务
+                    <i class="t-acc-chevron ti ti-chevron-down text-xs" aria-hidden="true"></i>
+                </button>
+                <div id="nav-finance" class="t-acc-panel" :inert="!g.finance">
+                    <div class="t-acc-panel-inner flex flex-col gap-0.5">
+                        <a href="/admin/product" class="side-link {if ($nav|default:'') === 'product'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-list-details"></i></span>
+                            商品
+                        </a>
+                        <a href="/admin/subscription" class="side-link {if ($nav|default:'') === 'subscription'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-refresh"></i></span>
+                            订阅管理
+                        </a>
+                        <a href="/admin/order" class="side-link {if ($nav|default:'') === 'order'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-receipt"></i></span>
+                            订单
+                        </a>
+                        <a href="/admin/invoice" class="side-link {if ($nav|default:'') === 'invoice'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-file-dollar"></i></span>
+                            账单
+                        </a>
+                        <a href="/admin/coupon" class="side-link {if ($nav|default:'') === 'coupon'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-ticket"></i></span>
+                            优惠码
+                        </a>
+                        <a href="/admin/giftcard" class="side-link {if ($nav|default:'') === 'giftcard'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-gift-card"></i></span>
+                            礼品卡
+                        </a>
+                    </div>
+                </div>
             </div>
 
-            <button class="side-caption" @click="toggle('ops')">
-                运营
-                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.ops && '-rotate-90'"></i>
-            </button>
-            <div x-show="g.ops" class="flex flex-col gap-0.5">
-                <a href="/admin/announcement" class="side-link {if ($nav|default:'') === 'announcement'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-speakerphone"></i></span>
-                    公告
-                </a>
-                <a href="/admin/ticket" class="side-link {if ($nav|default:'') === 'ticket'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-messages"></i></span>
-                    工单
-                </a>
-                <a href="/admin/docs" class="side-link {if ($nav|default:'') === 'docs'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-notes"></i></span>
-                    文档
-                </a>
+            <div class="t-acc" :data-open="String(g.ops)">
+                <button class="side-caption t-acc-head" @click="toggle('ops')" :aria-expanded="g.ops" aria-controls="nav-ops">
+                    运营
+                    <i class="t-acc-chevron ti ti-chevron-down text-xs" aria-hidden="true"></i>
+                </button>
+                <div id="nav-ops" class="t-acc-panel" :inert="!g.ops">
+                    <div class="t-acc-panel-inner flex flex-col gap-0.5">
+                        <a href="/admin/announcement" class="side-link {if ($nav|default:'') === 'announcement'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-speakerphone"></i></span>
+                            公告
+                        </a>
+                        <a href="/admin/ticket" class="side-link {if ($nav|default:'') === 'ticket'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-messages"></i></span>
+                            工单
+                        </a>
+                        <a href="/admin/docs" class="side-link {if ($nav|default:'') === 'docs'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-notes"></i></span>
+                            文档
+                        </a>
+                    </div>
+                </div>
             </div>
 
-            <button class="side-caption" @click="toggle('audit')">
-                审计
-                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.audit && '-rotate-90'"></i>
-            </button>
-            <div x-show="g.audit" class="flex flex-col gap-0.5">
-                <a href="/admin/detect" class="side-link {if ($nav|default:'') === 'detect'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-barrier-block"></i></span>
-                    审计规则
-                </a>
-                <a href="/admin/detect/log" class="side-link {if ($nav|default:'') === 'detect-log'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-file-search"></i></span>
-                    碰撞记录
-                </a>
-                <a href="/admin/detect/ban" class="side-link {if ($nav|default:'') === 'detect-ban'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-ban"></i></span>
-                    封禁记录
-                </a>
+            <div class="t-acc" :data-open="String(g.audit)">
+                <button class="side-caption t-acc-head" @click="toggle('audit')" :aria-expanded="g.audit" aria-controls="nav-audit">
+                    审计
+                    <i class="t-acc-chevron ti ti-chevron-down text-xs" aria-hidden="true"></i>
+                </button>
+                <div id="nav-audit" class="t-acc-panel" :inert="!g.audit">
+                    <div class="t-acc-panel-inner flex flex-col gap-0.5">
+                        <a href="/admin/detect" class="side-link {if ($nav|default:'') === 'detect'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-barrier-block"></i></span>
+                            审计规则
+                        </a>
+                        <a href="/admin/detect/log" class="side-link {if ($nav|default:'') === 'detect-log'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-file-search"></i></span>
+                            碰撞记录
+                        </a>
+                        <a href="/admin/detect/ban" class="side-link {if ($nav|default:'') === 'detect-ban'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-ban"></i></span>
+                            封禁记录
+                        </a>
+                    </div>
+                </div>
             </div>
 
-            <button class="side-caption" @click="toggle('logs')">
-                日志
-                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.logs && '-rotate-90'"></i>
-            </button>
-            <div x-show="g.logs" class="flex flex-col gap-0.5">
-                <a href="/admin/login" class="side-link {if ($nav|default:'') === 'log-login'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-login"></i></span>
-                    登录日志
-                </a>
-                <a href="/admin/subscribe" class="side-link {if ($nav|default:'') === 'log-subscribe'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-rss"></i></span>
-                    订阅日志
-                </a>
-                <a href="/admin/payback" class="side-link {if ($nav|default:'') === 'log-payback'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-friends"></i></span>
-                    返利日志
-                </a>
-                <a href="/admin/money" class="side-link {if ($nav|default:'') === 'log-money'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-coin"></i></span>
-                    余额日志
-                </a>
-                <a href="/admin/gateway" class="side-link {if ($nav|default:'') === 'log-gateway'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-building-bank"></i></span>
-                    支付网关
-                </a>
-                <a href="/admin/online" class="side-link {if ($nav|default:'') === 'log-online'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-router"></i></span>
-                    在线 IP
-                </a>
-                <a href="/admin/syslog" class="side-link {if ($nav|default:'') === 'syslog'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-terminal-2"></i></span>
-                    系统日志
-                </a>
+            <div class="t-acc" :data-open="String(g.logs)">
+                <button class="side-caption t-acc-head" @click="toggle('logs')" :aria-expanded="g.logs" aria-controls="nav-logs">
+                    日志
+                    <i class="t-acc-chevron ti ti-chevron-down text-xs" aria-hidden="true"></i>
+                </button>
+                <div id="nav-logs" class="t-acc-panel" :inert="!g.logs">
+                    <div class="t-acc-panel-inner flex flex-col gap-0.5">
+                        <a href="/admin/login" class="side-link {if ($nav|default:'') === 'log-login'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-login"></i></span>
+                            登录日志
+                        </a>
+                        <a href="/admin/subscribe" class="side-link {if ($nav|default:'') === 'log-subscribe'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-rss"></i></span>
+                            订阅日志
+                        </a>
+                        <a href="/admin/payback" class="side-link {if ($nav|default:'') === 'log-payback'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-friends"></i></span>
+                            返利日志
+                        </a>
+                        <a href="/admin/money" class="side-link {if ($nav|default:'') === 'log-money'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-coin"></i></span>
+                            余额日志
+                        </a>
+                        <a href="/admin/gateway" class="side-link {if ($nav|default:'') === 'log-gateway'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-building-bank"></i></span>
+                            支付网关
+                        </a>
+                        <a href="/admin/online" class="side-link {if ($nav|default:'') === 'log-online'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-router"></i></span>
+                            在线 IP
+                        </a>
+                        <a href="/admin/syslog" class="side-link {if ($nav|default:'') === 'syslog'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-terminal-2"></i></span>
+                            系统日志
+                        </a>
+                    </div>
+                </div>
             </div>
 
-            <button class="side-caption" @click="toggle('system')">
-                系统
-                <i class="ti ti-chevron-down text-xs transition-transform" :class="!g.system && '-rotate-90'"></i>
-            </button>
-            <div x-show="g.system" class="flex flex-col gap-0.5">
-                <a href="/admin/setting/billing" class="side-link {if ($nav|default:'') === 'setting'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-adjustments"></i></span>
-                    面板设置
-                </a>
-                <a href="/admin/system" class="side-link {if ($nav|default:'') === 'system'}active{/if}">
-                    <span class="side-ico"><i class="ti ti-tool"></i></span>
-                    系统信息
-                </a>
+            <div class="t-acc" :data-open="String(g.system)">
+                <button class="side-caption t-acc-head" @click="toggle('system')" :aria-expanded="g.system" aria-controls="nav-system">
+                    系统
+                    <i class="t-acc-chevron ti ti-chevron-down text-xs" aria-hidden="true"></i>
+                </button>
+                <div id="nav-system" class="t-acc-panel" :inert="!g.system">
+                    <div class="t-acc-panel-inner flex flex-col gap-0.5">
+                        <a href="/admin/setting/billing" class="side-link {if ($nav|default:'') === 'setting'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-adjustments"></i></span>
+                            面板设置
+                        </a>
+                        <a href="/admin/system" class="side-link {if ($nav|default:'') === 'system'}active{/if}">
+                            <span class="side-ico"><i class="ti ti-tool"></i></span>
+                            系统信息
+                        </a>
+                    </div>
+                </div>
             </div>
         </nav>
 
@@ -223,7 +248,7 @@
 
     {* ============ 内容列 ============ *}
     <div class="lg:pl-64">
-        <div class="mx-auto max-w-7xl px-4 pt-4 pb-10 sm:px-6 lg:px-8">
+        <div class="cafe-page mx-auto max-w-7xl px-4 pt-4 pb-10 sm:px-6 lg:px-8">
 
             <div class="mb-5 flex items-center justify-between gap-3">
                 <button class="btn-secondary btn-sm !size-9 !rounded-xl !p-0 text-base lg:invisible"
@@ -239,16 +264,16 @@
                         <i class="ti {if $user->is_dark_mode}ti-sun{else}ti-moon{/if}"></i>
                     </button>
 
-                    <div x-data="{ open: false }" class="relative">
-                        <button @click="open = !open" class="hover:bg-tile flex items-center gap-2.5 rounded-full p-1 pr-3 transition-colors">
+                    <div x-data="{ open: false }" class="relative" @keydown.escape.window="open = false">
+                        <button @click="open = !open" :aria-expanded="open" class="hover:bg-tile flex items-center gap-2.5 rounded-full p-1 pr-3 transition-colors">
                             <span class="size-8 rounded-full bg-cover bg-center"
                                   style="background-image: url({$user->avatar})"></span>
                             <span class="text-ink hidden text-sm font-medium sm:block">{$user->user_name}</span>
                             <i class="ti ti-chevron-down text-faint text-xs"></i>
                         </button>
                         <div x-show="open" x-cloak @click.outside="open = false"
-                             x-transition.origin.top.right
-                             class="c-card absolute right-0 z-20 mt-2 w-56 p-2 shadow-lg">
+                             {include file='shell/motion_dropdown.tpl'} data-origin="top-right"
+                             class="t-dropdown is-open c-card absolute right-0 z-20 mt-2 w-56 p-2 shadow-lg">
                             <div class="border-hairline border-b px-3 pt-1 pb-2.5">
                                 <div class="text-ink truncate text-sm font-medium">{$user->email}</div>
                                 <div class="text-faint mt-0.5 text-xs">管理员</div>

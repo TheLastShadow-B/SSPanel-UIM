@@ -55,8 +55,8 @@
 
         <div class="c-card-pad">
             <h3 class="mb-3 text-base">账单明细</h3>
-            <div class="table-card border-hairline overflow-hidden rounded-(--radius-tile) border">
-                <table>
+            <div class="table-card border-hairline overflow-x-auto rounded-(--radius-tile) border">
+                <table data-column-storage="cafe.user.invoice.view.columns.v1" data-column-widths="240,130" data-column-minimums="140,80">
                     <thead>
                     <tr>
                         <th>名称</th>
@@ -93,7 +93,7 @@
                 {/if}
 
                 {if $invoice->type !== 'topup'}
-                    <div x-show="paytab === 'balance'">
+                    <div data-cafe-panel x-show="paytab === 'balance'">
                         <div class="stat-tile mb-4 !text-left">
                             <div class="stat-label !mt-0">当前账户余额</div>
                             <div class="stat-value">¥ {$user->money}</div>
@@ -109,7 +109,7 @@
                     </div>
                 {/if}
                 {if count($payments) > 0}
-                    <div x-show="paytab === 'gateway'" {if $invoice->type !== 'topup'}x-cloak{/if} class="flex flex-col gap-3">
+                    <div data-cafe-panel x-show="paytab === 'gateway'" {if $invoice->type !== 'topup'}x-cloak{/if} class="flex flex-col gap-3">
                         {foreach from=$payments item=payment}
                             <div>
                                 {$payment_name = $payment::_name()}

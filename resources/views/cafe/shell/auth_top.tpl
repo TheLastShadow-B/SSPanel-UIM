@@ -40,7 +40,7 @@
 
     {* ============ 右侧表单区 ============ *}
     <div class="flex flex-1 items-center justify-center px-5 py-10">
-        <div class="w-full max-w-sm">
+        <div class="cafe-auth-enter w-full max-w-sm">
             <div class="mb-8 lg:hidden">
                 <img src="/images/uim-logo-round_48x48.png" alt="logo" class="size-11 rounded-xl">
             </div>

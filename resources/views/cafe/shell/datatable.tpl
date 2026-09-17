@@ -3,6 +3,15 @@
    cafeServerTable(url, key, columns):DataTables 服务端分页协议(draw/start/length/search)。 *}
 {literal}
 <script>
+    // 两种分页组件共享状态徽章配色。
+    function cafeBadgeClass(text) {
+        const s = String(text);
+        if (s.includes('待') || s.includes('处理中')) return 'badge-warning';
+        if (s.includes('已支付') || s.includes('完成') || s.includes('激活') || s.includes('有效')) return 'badge-success';
+        if (s.includes('取消') || s.includes('失效') || s.includes('过期') || s.includes('退款')) return 'badge-neutral';
+        return 'badge-neutral';
+    }
+
     function cafeServerTable(url, dataKey, columns) {
         return {
             rows: [],
@@ -15,6 +24,7 @@
             sortCol: 0,
             sortDir: 'desc',
             _timer: null,
+            badgeClass: cafeBadgeClass,
             init() { this.fetchPage(); },
             get pageCount() {
                 return Math.max(1, Math.ceil(this.filtered / this.perPage));
@@ -129,14 +139,7 @@
                     showToast('请求失败', 'danger');
                 }
             },
-            // 状态徽章配色启发式
-            badgeClass(text) {
-                const s = String(text);
-                if (s.includes('待') || s.includes('处理中')) return 'badge-warning';
-                if (s.includes('已支付') || s.includes('完成') || s.includes('激活') || s.includes('有效')) return 'badge-success';
-                if (s.includes('取消') || s.includes('失效') || s.includes('过期') || s.includes('退款')) return 'badge-neutral';
-                return 'badge-neutral';
-            }
+            badgeClass: cafeBadgeClass
         };
     }
 </script>

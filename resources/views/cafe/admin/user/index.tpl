@@ -20,7 +20,7 @@
         </div>
 
         <div class="table-card overflow-x-auto">
-            <table>
+            <table data-column-storage="cafe.admin.user.index.columns.v1" data-column-widths="100,260,130,100,170,160,160,220,235" data-column-minimums="80,160,80,86,170,110,110,160,235" data-fixed-last>
                 <thead>
                 <tr>
                     <th>ID</th>
@@ -89,9 +89,9 @@
 
     {* ============ 创建用户模态 ============ *}
     <template x-teleport="body">
-        <div x-show="showCreate" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showCreate" x-cloak {include file='shell/motion_backdrop.tpl'} class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="showCreate = false"></div>
-            <div class="c-card modal-pop relative w-full max-w-md p-6 shadow-xl" @keydown.escape.window="showCreate = false">
+            <div x-show="showCreate" {include file='shell/motion_modal.tpl'} class="c-card t-modal is-open relative w-full max-w-md p-6 shadow-xl" @keydown.escape.window="showCreate = false">
                 <h3 class="mb-4 text-base">添加用户</h3>
                 {foreach $details['create_dialog'] as $from}
                     <div class="mb-3">

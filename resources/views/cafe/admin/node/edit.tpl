@@ -39,6 +39,16 @@
             <input id="name" type="text" class="field-input" value="{$node->name}">
         </div>
         <div class="mb-3">
+            <label class="field-label" for="country">国家 / 地区</label>
+            <select id="country" class="field-input" aria-describedby="country-hint">
+                <option value="">自动识别（按节点名称）</option>
+                {foreach $country_options as $country_code => $country_name}
+                    <option value="{$country_code}" {if ($node->country|default:'') === $country_code}selected{/if}>{$country_code} · {$country_name}</option>
+                {/foreach}
+            </select>
+            <p id="country-hint" class="text-faint mt-1.5 text-xs">用于节点状态页分组，手动选择优先于名称识别。</p>
+        </div>
+        <div class="mb-3">
             <label class="field-label" for="server">连接地址</label>
             <input id="server" type="text" class="field-input" value="{$node->server}">
         </div>

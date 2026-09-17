@@ -52,9 +52,9 @@
 
     {* ============ 创建工单模态 ============ *}
     <template x-teleport="body">
-        <div x-show="showCreate" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showCreate" x-cloak {include file='shell/motion_backdrop.tpl'} class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="showCreate = false"></div>
-            <div class="c-card modal-pop relative w-full max-w-lg p-6 shadow-xl" @keydown.escape.window="showCreate = false">
+            <div x-show="showCreate" {include file='shell/motion_modal.tpl'} class="c-card t-modal is-open relative w-full max-w-lg p-6 shadow-xl" @keydown.escape.window="showCreate = false">
                 <h3 class="mb-4 text-base">创建工单</h3>
                 <div class="mb-3">
                     <label class="field-label" for="ticket-type">工单类型</label>

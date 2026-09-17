@@ -34,8 +34,8 @@
 
     <div class="c-card-pad">
         <h3 class="mb-3 text-base">账单明细</h3>
-        <div class="table-card border-hairline overflow-hidden rounded-(--radius-tile) border">
-            <table>
+        <div class="table-card border-hairline overflow-x-auto rounded-(--radius-tile) border">
+            <table data-column-storage="cafe.admin.invoice.view.columns.v1" data-column-widths="240,130" data-column-minimums="140,80">
                 <thead>
                 <tr>
                     <th>名称</th>

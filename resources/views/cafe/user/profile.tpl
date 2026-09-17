@@ -33,7 +33,7 @@
             <h3 class="text-base">最近 10 次订阅记录</h3>
         </div>
         <div class="table-card overflow-x-auto">
-            <table>
+            <table data-column-storage="cafe.user.profile.1.columns.v1" data-column-widths="160,320,230,230,220" data-column-minimums="110,160,140,140,160">
                 <thead>
                 <tr>
                     <th>类型</th>
@@ -68,7 +68,7 @@
                 <h3 class="text-base">最近 10 次成功登录</h3>
             </div>
             <div class="table-card overflow-x-auto">
-                <table>
+                <table data-column-storage="cafe.user.profile.2.columns.v1" data-column-widths="230,230,220" data-column-minimums="140,140,160">
                     <thead>
                     <tr>
                         <th>IP</th>
@@ -96,7 +96,7 @@
             <h3 class="text-base">当前在线 IP</h3>
         </div>
         <div class="table-card overflow-x-auto">
-            <table>
+            <table data-column-storage="cafe.user.profile.3.columns.v1" data-column-widths="230,230,240,220" data-column-minimums="140,140,140,160">
                 <thead>
                 <tr>
                     <th>IP</th>

@@ -46,7 +46,7 @@
         <h3 class="text-base">返利记录</h3>
     </div>
     <div class="table-card overflow-x-auto">
-        <table>
+        <table data-column-storage="cafe.user.invite.columns.v1" data-column-widths="114,240,130,220" data-column-minimums="114,140,100,160">
             <thead>
             <tr>
                 <th>记录 ID</th>

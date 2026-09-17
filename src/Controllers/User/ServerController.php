@@ -6,6 +6,7 @@ namespace App\Controllers\User;
 
 use App\Controllers\BaseController;
 use App\Services\Subscribe;
+use App\Utils\NodeRegion;
 use App\Utils\Tools;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -26,6 +27,7 @@ final class ServerController extends BaseController
             $node_list[] = [
                 'id' => $node->id,
                 'name' => $node->name,
+                'country' => $node->country ?? '',
                 'class' => (int) $node->node_class,
                 'color' => $node->color,
                 'connection_type' => $node->connection_type,
@@ -42,7 +44,7 @@ final class ServerController extends BaseController
 
         return $response->write(
             $this->view()
-                ->assign('servers', $node_list)
+                ->assign('server_groups', NodeRegion::group($node_list))
                 ->fetch('user/server.tpl')
         );
     }

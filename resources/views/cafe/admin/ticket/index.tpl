@@ -16,7 +16,7 @@
     </div>
 
     <div class="table-card overflow-x-auto">
-        <table>
+        <table data-column-storage="cafe.admin.ticket.index.columns.v1" data-column-widths="100,320,160,160,100,220,235" data-column-minimums="100,160,110,110,100,160,235" data-fixed-last>
             <thead>
             <tr>
                 <th>工单ID</th>

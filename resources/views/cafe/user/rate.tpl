@@ -10,16 +10,16 @@
     <p class="text-faint mt-1 text-sm">查看节点的每小时流量倍率</p>
 </div>
 
-<div class="c-card-pad" x-data="{ open: false }">
+<div class="c-card-pad" x-data="{ open: false }" @keydown.escape.window="open = false">
     <div class="mb-5 flex items-center justify-between gap-3">
         <h3 class="text-base">倍率图表</h3>
         <div class="relative">
-            <button class="btn-secondary btn-sm" @click="open = !open">
+            <button class="btn-secondary btn-sm" @click="open = !open" :aria-expanded="open">
                 <span id="dropdown-toggle">{$node_list[0]['name']}</span>
                 <i class="ti ti-chevron-down"></i>
             </button>
-            <div x-show="open" x-cloak @click.outside="open = false"
-                 class="c-card absolute right-0 z-20 mt-2 max-h-72 w-56 overflow-y-auto p-2 shadow-lg">
+            <div x-show="open" x-cloak {include file='shell/motion_dropdown.tpl'} data-origin="top-right" @click.outside="open = false"
+                 class="t-dropdown is-open c-card absolute right-0 z-20 mt-2 max-h-72 w-56 overflow-y-auto p-2 shadow-lg">
                 {foreach $node_list as $node}
                     <a class="side-link cursor-pointer" @click="open = false"
                        hx-post="/user/rate" hx-swap="none"

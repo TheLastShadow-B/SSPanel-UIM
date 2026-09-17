@@ -20,7 +20,7 @@
     </div>
 
     {* ================ 资料 ================ *}
-    <div x-show="tab === 'profile'" class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+    <div data-cafe-panel x-show="tab === 'profile'" class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div class="c-card-pad">
             <h3 class="mb-1 text-base">登录邮箱</h3>
             <p class="text-faint mb-4 text-xs">当前邮箱：<span class="text-body font-medium" id="email">{$user->email}</span></p>
@@ -126,7 +126,7 @@
     </div>
 
     {* ================ 登录安全 ================ *}
-    <div x-show="tab === 'security'" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+    <div data-cafe-panel x-show="tab === 'security'" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div class="c-card-pad">
             <h3 class="mb-4 text-base">修改登录密码</h3>
             <div class="mb-3">
@@ -236,7 +236,7 @@
     </div>
 
     {* ================ 连接与订阅 ================ *}
-    <div x-show="tab === 'usage'" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+    <div data-cafe-panel x-show="tab === 'usage'" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div class="c-card-pad">
             <h3 class="mb-1 text-base">更换加密方式</h3>
             <p class="text-faint mb-4 text-xs">不同客户端支持的加密方式可能不同，请参考客户端支持列表设置</p>
@@ -292,7 +292,7 @@
     </div>
 
     {* ================ 通知与外观 ================ *}
-    <div x-show="tab === 'other'" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+    <div data-cafe-panel x-show="tab === 'other'" x-cloak class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div class="c-card-pad">
             <h3 class="mb-4 text-base">每日流量报告</h3>
             <div class="flex items-center gap-2">
@@ -375,9 +375,9 @@
 
     {* ================ TOTP 模态 ================ *}
     <template x-teleport="body">
-        <div x-show="showTotp" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showTotp" x-cloak {include file='shell/motion_backdrop.tpl'} class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40"></div>
-            <div class="c-card modal-pop relative w-full max-w-sm p-6 text-center shadow-xl">
+            <div x-show="showTotp" {include file='shell/motion_modal.tpl'} class="c-card t-modal is-open relative w-full max-w-sm p-6 text-center shadow-xl">
                 <h3 class="mb-2 text-base">设置 TOTP</h3>
                 <p class="text-faint mb-4 text-xs">请使用 Google Authenticator 或 Authy 扫描下面的二维码</p>
                 <div class="mb-4 flex justify-center">
@@ -398,9 +398,9 @@
     {* ================ 删除账户模态 ================ *}
     {if $config['enable_kill']}
         <template x-teleport="body">
-            <div x-show="showKill" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div x-show="showKill" x-cloak {include file='shell/motion_backdrop.tpl'} class="fixed inset-0 z-50 flex items-center justify-center p-4">
                 <div class="absolute inset-0 bg-black/40" @click="showKill = false"></div>
-                <div class="c-card modal-pop relative w-full max-w-sm p-6 text-center shadow-xl">
+                <div x-show="showKill" {include file='shell/motion_modal.tpl'} class="c-card t-modal is-open relative w-full max-w-sm p-6 text-center shadow-xl">
                     <span class="bg-danger-tint text-danger mx-auto mb-4 flex size-12 items-center justify-center rounded-full text-xl">
                         <i class="ti ti-alert-circle"></i>
                     </span>

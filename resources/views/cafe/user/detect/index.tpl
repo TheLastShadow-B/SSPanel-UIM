@@ -15,7 +15,7 @@
 
 <div class="c-card">
     <div class="table-card overflow-x-auto">
-        <table>
+        <table data-column-storage="cafe.user.detect.index.columns.v1" data-column-widths="100,240,320,320,230" data-column-minimums="80,140,160,160,210">
             <thead>
             <tr>
                 <th>ID</th>

@@ -16,9 +16,9 @@
     </div>
 
     {* ---------------- 订阅套餐 ---------------- *}
-    <div x-show="tab === 'subscription'" class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+    <div data-cafe-panel x-show="tab === 'subscription'" class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {foreach $subscriptions as $sub}
-            <div class="c-card hover:border-primary flex flex-col p-6 transition-colors">
+            <div class="c-card cafe-hover-card hover:border-primary flex flex-col p-6 transition-colors">
                 <div class="text-faint text-xs font-medium tracking-wide uppercase">{$sub->name}</div>
                 <div class="mt-3 mb-1 flex items-baseline gap-1">
                     <span class="text-ink text-3xl font-semibold tracking-tight">¥ {$sub->price}</span>
@@ -67,9 +67,9 @@
     </div>
 
     {* ---------------- 流量包 ---------------- *}
-    <div x-show="tab === 'bandwidth'" x-cloak class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+    <div data-cafe-panel x-show="tab === 'bandwidth'" x-cloak class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {foreach $bandwidths as $bandwidth}
-            <div class="c-card hover:border-primary flex flex-col p-6 transition-colors">
+            <div class="c-card cafe-hover-card hover:border-primary flex flex-col p-6 transition-colors">
                 <div class="text-faint text-xs font-medium tracking-wide uppercase">{$bandwidth->name}</div>
                 <div class="mt-3 mb-4 flex items-baseline gap-1">
                     <span class="text-ink text-3xl font-semibold tracking-tight">¥ {$bandwidth->price}</span>

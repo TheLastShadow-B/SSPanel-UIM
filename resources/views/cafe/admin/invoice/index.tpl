@@ -16,7 +16,7 @@
     </div>
 
     <div class="table-card overflow-x-auto">
-        <table>
+        <table data-column-storage="cafe.admin.invoice.index.columns.v1" data-column-widths="100,100,100,130,160,220,220,110" data-column-minimums="100,80,80,80,110,160,160,110" data-fixed-last>
             <thead>
             <tr>
                 <th>账单ID</th>

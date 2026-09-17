@@ -14,6 +14,7 @@
     <script src="/theme/cafe/js/htmx.min.js"></script>
     <script src="/theme/cafe/js/clipboard.min.js"></script>
     <script defer src="/theme/cafe/js/alpine.min.js"></script>
+    <script defer src="/theme/cafe/js/column-resize.js?v={$config['assets_version']}"></script>
 </head>
 
 <body class="bg-canvas min-h-screen">
@@ -104,7 +105,7 @@
 
     {* ============ 内容列 ============ *}
     <div class="lg:pl-64">
-        <div class="mx-auto max-w-6xl px-4 pt-4 pb-10 sm:px-6 lg:px-8">
+        <div class="cafe-page mx-auto max-w-6xl px-4 pt-4 pb-10 sm:px-6 lg:px-8">
 
             {* 顶栏:移动端汉堡 + 右侧控件 *}
             <div class="mb-5 flex items-center justify-between gap-3">
@@ -121,16 +122,16 @@
                         <i class="ti {if $user->is_dark_mode}ti-sun{else}ti-moon{/if}"></i>
                     </button>
 
-                    <div x-data="{ open: false }" class="relative">
-                        <button @click="open = !open" class="hover:bg-tile flex items-center gap-2.5 rounded-full p-1 pr-3 transition-colors">
+                    <div x-data="{ open: false }" class="relative" @keydown.escape.window="open = false">
+                        <button @click="open = !open" :aria-expanded="open" class="hover:bg-tile flex items-center gap-2.5 rounded-full p-1 pr-3 transition-colors">
                             <span class="size-8 rounded-full bg-cover bg-center"
                                   style="background-image: url({$user->avatar})"></span>
                             <span class="text-ink hidden text-sm font-medium sm:block">{$user->user_name}</span>
                             <i class="ti ti-chevron-down text-faint text-xs"></i>
                         </button>
                         <div x-show="open" x-cloak @click.outside="open = false"
-                             x-transition.origin.top.right
-                             class="c-card absolute right-0 z-20 mt-2 w-56 p-2 shadow-lg">
+                             {include file='shell/motion_dropdown.tpl'} data-origin="top-right"
+                             class="t-dropdown is-open c-card absolute right-0 z-20 mt-2 w-56 p-2 shadow-lg">
                             <div class="border-hairline border-b px-3 pt-1 pb-2.5">
                                 <div class="text-ink truncate text-sm font-medium">{$user->email}</div>
                                 <div class="text-faint mt-0.5 text-xs">UID {$user->id}</div>

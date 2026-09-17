@@ -9,6 +9,7 @@ use App\Models\Config;
 use App\Models\Node;
 use App\Services\I18n;
 use App\Services\Notification;
+use App\Utils\NodeRegion;
 use App\Utils\Tools;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Http\Message\ResponseInterface;
@@ -45,6 +46,7 @@ final class NodeController extends BaseController
 
     private static array $update_field = [
         'name',
+        'country',
         'server',
         'traffic_rate',
         'is_dynamic_rate',
@@ -85,6 +87,7 @@ final class NodeController extends BaseController
         return $response->write(
             $this->view()
                 ->assign('update_field', self::$update_field)
+                ->assign('country_options', NodeRegion::COUNTRIES)
                 ->fetch('admin/node/create.tpl')
         );
     }
@@ -96,6 +99,14 @@ final class NodeController extends BaseController
     {
         $node = new Node();
 
+        $country = NodeRegion::normalizeCountry($request->getParam('country', $node->country ?? ''));
+        if ($country === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '请选择有效的国家 / 地区',
+            ]);
+        }
+        $node->country = $country;
         $node->name = $request->getParam('name');
         $node->node_group = $request->getParam('node_group');
         $node->server = trim($request->getParam('server'));
@@ -179,6 +190,7 @@ final class NodeController extends BaseController
             $this->view()
                 ->assign('node', $node)
                 ->assign('update_field', self::$update_field)
+                ->assign('country_options', NodeRegion::COUNTRIES)
                 ->fetch('admin/node/edit.tpl')
         );
     }
@@ -190,6 +202,14 @@ final class NodeController extends BaseController
     {
         $node = (new Node())->find($args['id']);
 
+        $country = NodeRegion::normalizeCountry($request->getParam('country', $node->country ?? ''));
+        if ($country === null) {
+            return $response->withJson([
+                'ret' => 0,
+                'msg' => '请选择有效的国家 / 地区',
+            ]);
+        }
+        $node->country = $country;
         $node->name = $request->getParam('name');
         $node->node_group = $request->getParam('node_group') ?? 0;
         $node->server = trim($request->getParam('server'));

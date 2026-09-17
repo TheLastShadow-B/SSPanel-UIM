@@ -18,7 +18,20 @@
     </div>
 
     <div class="table-card overflow-x-auto">
-        <table>
+        <table class="cafe-resizable-table" data-column-storage="cafe.admin.nodes.columns.v1">
+            <colgroup>
+                <col data-column="id" data-width="80" data-min="72">
+                <col data-column="name" data-width="200" data-min="120">
+                <col data-column="server" data-width="240" data-min="140">
+                <col data-column="type" data-width="110" data-min="100">
+                <col data-column="online" data-width="120" data-min="110">
+                <col data-column="sort" data-width="140" data-min="110">
+                <col data-column="rate" data-width="160" data-min="110">
+                <col data-column="group" data-width="140" data-min="130">
+                <col data-column="bandwidth" data-width="210" data-min="190">
+                <col data-column="reset" data-width="100" data-min="90">
+                <col data-column="actions" data-width="230" data-min="230" data-fixed>
+            </colgroup>
             <thead>
             <tr>
                 <th>ID</th>
@@ -38,8 +51,8 @@
             <template x-for="row in paged" :key="row.id">
                 <tr>
                     <td class="text-ink font-medium" x-text="'#' + row.id"></td>
-                    <td class="text-ink max-w-44 truncate font-medium" x-text="row.name"></td>
-                    <td class="max-w-44 truncate font-mono text-xs" x-text="row.server"></td>
+                    <td class="text-ink truncate font-medium" x-text="row.name" :title="row.name"></td>
+                    <td class="truncate font-mono text-xs" x-text="row.server" :title="row.server"></td>
                     <td><span class="badge-neutral" x-text="row.type"></span></td>
                     <td>
                         <span :class="row.online_status === 1 ? 'badge-success' : (row.online_status === -1 ? 'badge-danger' : 'badge-warning')"

@@ -12,7 +12,7 @@
 
 <div class="c-card">
     <div class="table-card overflow-x-auto">
-        <table>
+        <table data-column-storage="cafe.user.detect.log.columns.v1" data-column-widths="114,240,130,320,320,220" data-column-minimums="114,140,80,160,160,160">
             <thead>
             <tr>
                 <th>事件 ID</th>

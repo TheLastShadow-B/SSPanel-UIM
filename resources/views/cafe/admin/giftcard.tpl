@@ -1,6 +1,6 @@
 {include file='shell/admin_header.tpl' nav='giftcard'}
 
-<div x-data="{ showCreate: false }">
+<div x-data="{ showCreate: false }" @cafe:giftcard-created.window="showCreate = false">
 
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -12,14 +12,15 @@
         </button>
     </div>
 
-    <div x-data="cafeTable('/admin/giftcard/ajax', 'giftcards')" class="c-card">
+    <div x-data="cafeTable('/admin/giftcard/ajax', 'giftcards')" class="c-card"
+         @cafe:giftcard-created.window="search = ''; page = 1; loading = true; init()">
         <div class="flex flex-wrap items-center justify-between gap-3 p-5 pb-3">
             <h3 class="text-base">全部礼品卡</h3>
             <input type="search" x-model="search" @input="page = 1" placeholder="搜索卡号…" class="field-input !w-64">
         </div>
 
         <div class="table-card overflow-x-auto">
-            <table>
+            <table data-column-storage="cafe.admin.giftcard.columns.v1" data-column-widths="100,240,130,160,220,220,100,110" data-column-minimums="80,160,80,110,160,160,100,110" data-fixed-last>
                 <thead>
                 <tr>
                     <th>ID</th>
@@ -74,9 +75,9 @@
 
     {* ============ 生成礼品卡模态 ============ *}
     <template x-teleport="body">
-        <div x-show="showCreate" x-cloak x-transition.opacity.duration.150ms class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div x-show="showCreate" x-cloak {include file='shell/motion_backdrop.tpl'} class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/40" @click="showCreate = false"></div>
-            <div class="c-card modal-pop relative w-full max-w-md p-6 shadow-xl" @keydown.escape.window="showCreate = false">
+            <div x-show="showCreate" {include file='shell/motion_modal.tpl'} class="c-card t-modal is-open relative w-full max-w-md p-6 shadow-xl" @keydown.escape.window="showCreate = false">
                 <h3 class="mb-4 text-base">生成礼品卡</h3>
                 {foreach $details['create_dialog'] as $from}
                     <div class="mb-3">
@@ -94,8 +95,9 @@
                 {/foreach}
                 <div class="mt-5 flex justify-end gap-2">
                     <button class="btn-secondary btn-sm" @click="showCreate = false">取消</button>
-                    <button class="btn-primary btn-sm" @click="showCreate = false"
+                    <button class="btn-primary btn-sm" hx-disabled-elt="this"
                             hx-post="/admin/giftcard" hx-swap="none"
+                            hx-on::after-request="afterGiftCardCreate(event)"
                             hx-vals='js:{
                                 {foreach $details['create_dialog'] as $from}
                                 {$from['id']}: document.getElementById("{$from['id']}").value,
@@ -109,5 +111,20 @@
     </template>
 
 </div>
+
+{literal}
+<script>
+    function afterGiftCardCreate(event) {
+        if (!event.detail.successful) return;
+        try {
+            const result = JSON.parse(event.detail.xhr.responseText);
+            if (result.ret === 1) {
+                // 弹窗被 teleport 到 body，使用窗口事件通知原位置的列表刷新。
+                window.dispatchEvent(new Event('cafe:giftcard-created'));
+            }
+        } catch (e) { /* 非 JSON 响应交给通用 toast 处理。 */ }
+    }
+</script>
+{/literal}
 
 {include file='shell/admin_footer.tpl'}

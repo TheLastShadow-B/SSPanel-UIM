@@ -6,6 +6,7 @@
  * =================================================================== */
 
 @import "tailwindcss";
+@import "./motion.css";
 
 @source "../../views/cafe";
 
@@ -345,6 +346,65 @@
         @apply bg-card sticky right-0;
     }
 
+    /* 列表列宽：colgroup 同步表头与数据行，仅固定真正的操作列。 */
+    .table-card .cafe-resizable-table {
+        table-layout: fixed;
+    }
+    .cafe-resizable-table thead th {
+        position: relative;
+    }
+    .cafe-resizable-table tbody td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        overflow-wrap: anywhere;
+    }
+    .cafe-resizable-table .truncate {
+        /* Existing max-w-* utilities must not cap content after a column grows. */
+        max-width: none !important;
+    }
+    .table-card .cafe-resizable-table:not([data-fixed-last]) tr > :last-child,
+    .table-card .cafe-resizable-table td[colspan] {
+        position: static;
+    }
+    .cafe-resizable-table[data-fixed-last] thead th:last-child {
+        position: sticky;
+        z-index: 2;
+    }
+    .cafe-column-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        padding: 0.5rem 1.25rem 0.75rem;
+    }
+    .cafe-column-handle {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 12px;
+        cursor: col-resize;
+        touch-action: none;
+        user-select: none;
+        outline: none;
+        z-index: 1;
+    }
+    .cafe-column-handle::after {
+        content: '';
+        position: absolute;
+        top: 25%;
+        bottom: 25%;
+        left: 5px;
+        width: 2px;
+        border-radius: 2px;
+        background: var(--color-hairline);
+    }
+    .cafe-column-handle:hover::after,
+    .cafe-column-handle:focus-visible::after,
+    .cafe-column-handle.is-resizing::after {
+        top: 15%;
+        bottom: 15%;
+        background: var(--color-primary);
+    }
+
     /* ---- JSONEditor(节点自定义配置):圆角与裁剪放在编辑器自身,
             容器若裁剪会切掉编辑器边框;边框色贴合主题发丝线 ---- */
     #custom_config .jsoneditor {
@@ -394,33 +454,24 @@
         filter: none;
     }
 
-    /* ---- 模态卡入场缩放:wrapper 由 x-transition 负责淡入,
-            卡片用 @starting-style 补一点从 96% 的放大(旧浏览器降级为纯淡入) ---- */
-    .modal-pop {
-        transition: transform 200ms var(--ease-out);
-        @starting-style {
-            transform: scale(0.96);
-        }
-    }
-
     /* ---- hx-confirm 确认模态进出场 ---- */
     #cafe-confirm {
         opacity: 0;
-        transition: opacity 120ms var(--ease-out);
+        transition: opacity var(--modal-close-dur) var(--modal-ease);
     }
     #cafe-confirm.is-open {
         opacity: 1;
-        transition-duration: 150ms;
+        transition-duration: var(--modal-open-dur);
     }
     #cafe-confirm > div {
         opacity: 0;
         transform: scale(0.96);
-        transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
+        transition: opacity var(--modal-close-dur) var(--modal-ease), transform var(--modal-close-dur) var(--modal-ease);
     }
     #cafe-confirm.is-open > div {
         opacity: 1;
         transform: scale(1);
-        transition-duration: 200ms;
+        transition-duration: var(--modal-open-dur);
     }
 
     /* ---- toast:按内容自适应宽度,过长换行;进出均走顶部边缘 ---- */
@@ -436,6 +487,12 @@
     }
 }
 
+html.cafe-column-dragging,
+html.cafe-column-dragging * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
 /* ---- 无障碍:系统偏好减少动效时,砍掉位移/缩放/循环动画,保留加载指示 ---- */
 @media (prefers-reduced-motion: reduce) {
     *,
@@ -444,6 +501,8 @@
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
+        transition-delay: 0s !important;
+        animation-delay: 0s !important;
     }
     /* 旋转加载圈是理解性动画:保留,转速放慢 */
     .animate-spin {

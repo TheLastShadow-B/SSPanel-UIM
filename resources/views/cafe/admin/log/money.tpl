@@ -16,7 +16,7 @@
     </div>
 
     <div class="table-card overflow-x-auto">
-        <table>
+        <table data-column-storage="cafe.admin.log.money.columns.v1" data-column-widths="100,100,130,130,130,320,220" data-column-minimums="100,80,86,86,100,160,160">
             <thead>
             <tr>
                 <th>事件ID</th>

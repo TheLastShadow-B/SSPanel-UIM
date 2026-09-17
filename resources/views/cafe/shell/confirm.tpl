@@ -31,7 +31,8 @@
             cafeConfirmHideTimer = setTimeout(function () {
                 overlay.classList.add('hidden');
                 overlay.classList.remove('flex');
-            }, 120);
+            }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 :
+                parseFloat(getComputedStyle(overlay).getPropertyValue('--modal-close-dur')) || 150);
         };
 
         document.getElementById('cafe-confirm-msg').textContent = evt.detail.question;
