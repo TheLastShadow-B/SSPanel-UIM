@@ -66,12 +66,12 @@ final class TcpProbeStatus
         return $states;
     }
 
-    public static function current(?array $round, int $now): array
+    public static function current(?array $round, int $now, int $staleAfter = 180): array
     {
         $rows = [];
         foreach (self::DISPLAY_NAMES as $carrier => $name) {
             $state = $round['states'][$carrier] ?? null;
-            $status = $round && $now - $round['measured_at'] <= 180 ? ($state['status'] ?? 'gray') : 'gray';
+            $status = $round && $now - $round['measured_at'] <= $staleAfter ? ($state['status'] ?? 'gray') : 'gray';
             $rows[$carrier] = [
                 'carrier' => $carrier, 'name' => $name, 'status' => $status,
                 'label' => self::LABELS[$status], 'latency_ms' => $status === 'gray' ? null : ($state['latency_ms'] ?? null),
@@ -85,13 +85,24 @@ final class TcpProbeStatus
     {
         $start = intdiv($now, 900) * 900 - 95 * 900;
         $groups = [];
-        $valid = $available = 0;
-        foreach ($rounds as $round) {
+        $valid = $available = $coveredSeconds = 0;
+        foreach ($rounds as $index => $round) {
             $state = $round['states'][$carrier] ?? null;
             if ($round['measured_at'] < $start || $round['measured_at'] > $now || ! $state || $state['attempts'] === 0) {
                 continue;
             }
-            $groups[intdiv($round['measured_at'] - $start, 900)][] = $state;
+            // Distribute a scheduled round across every history bucket it covers.
+            // Stop at the next round so config changes cannot double-count coverage.
+            $from = intdiv($round['measured_at'], 60) * 60;
+            $until = min($from + ($state['interval_seconds'] ?? 60), (intdiv($now, 60) + 1) * 60);
+            if (isset($rounds[$index + 1])) {
+                $until = min($until, intdiv($rounds[$index + 1]['measured_at'], 60) * 60);
+            }
+            for ($i = max(0, intdiv($from - $start, 900)); $i < 96 && $start + $i * 900 < $until; $i++) {
+                $state['coverage_seconds'] = max(0, min($until, $start + ($i + 1) * 900) - max($from, $start + $i * 900));
+                $coveredSeconds += $state['coverage_seconds'];
+                $groups[$i][] = $state;
+            }
             $valid++;
             $available += $state['success'] > 0 ? 1 : 0;
         }
@@ -102,7 +113,7 @@ final class TcpProbeStatus
             $expected = max(1, (int) ceil(($to - $from) / 60));
             $samples = $groups[$i] ?? [];
             $colors = array_column($samples, 'status');
-            $coverage = min(100, (int) round(count($samples) / $expected * 100));
+            $coverage = min(100, (int) round((array_sum(array_column($samples, 'coverage_seconds')) / 60) / $expected * 100));
             $status = in_array('red', $colors, true) ? 'red' : (in_array('yellow', $colors, true) ? 'yellow' : (
                 $coverage >= 80 && ! in_array('gray', $colors, true) && $samples !== [] ? 'green' : 'gray'
             ));
@@ -116,7 +127,7 @@ final class TcpProbeStatus
         return [
             'buckets' => $buckets,
             'uptime' => $valid ? round($available / $valid * 100, 2) . '%' : '—',
-            'coverage' => min(100, round($valid / max(1, ceil(($now - $start) / 60)) * 100, 1)),
+            'coverage' => min(100, round(($coveredSeconds / 60) / max(1, ceil(($now - $start) / 60)) * 100, 1)),
             'start' => date('m-d H:i', $start), 'end' => date('m-d H:i', $now),
         ];
     }

@@ -19,6 +19,12 @@ final class TcpProbe
         return DB::table('tcp_probe_target')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
     }
 
+    /** Six workers, up to ten seconds per target, with time reserved for API calls. */
+    public static function interval(int $targetCount): int
+    {
+        return max(60, (int) ceil((ceil($targetCount / 6) * 10 + 15) / 60) * 60);
+    }
+
     public static function config(int $nodeId, ?array $targets = null, ?object $probe = null): array
     {
         $targets ??= self::targets();
@@ -26,7 +32,7 @@ final class TcpProbe
         $config = [
             'enabled' => (bool) ($probe->enabled ?? false),
             'threshold_ms' => (int) ($probe->threshold_ms ?? 250),
-            'interval_seconds' => 60, 'timeout_ms' => 3000, 'attempts' => 3,
+            'interval_seconds' => self::interval(count($targets)), 'timeout_ms' => 3000, 'attempts' => 3,
             'targets' => $targets,
         ];
         $config['config_hash'] = hash('sha256', json_encode($config, JSON_THROW_ON_ERROR));
@@ -47,7 +53,7 @@ final class TcpProbe
             throw new InvalidArgumentException('检测配置已更新，请重新获取配置');
         }
         $time = $body['measured_at'] ?? null;
-        if (! is_int($time) || $time < $now - 120 || $time > $now + 30) {
+        if (! is_int($time) || $time < $now - max(120, $config['interval_seconds'] + 30) || $time > $now + 30) {
             throw new InvalidArgumentException('检测时间无效，请同步节点时钟');
         }
         $reports = $body['results'] ?? null;
@@ -105,9 +111,13 @@ final class TcpProbe
             if ($previous && $minute <= $previous->minute) {
                 return;
             }
-            $prior = $previous && $previous->config_hash === $config['config_hash'] && $minute === $previous->minute + 1
+            $prior = $previous && $previous->config_hash === $config['config_hash'] && $minute === $previous->minute + intdiv($config['interval_seconds'], 60)
                 ? self::decode($previous)['states'] : [];
             $states = TcpProbeStatus::stabilize(TcpProbeStatus::summarize($results, $config['threshold_ms']), $prior);
+            foreach ($states as &$state) {
+                $state['interval_seconds'] = $config['interval_seconds'];
+            }
+            unset($state);
             DB::table('tcp_probe_round')->insert([
                 'node_id' => $nodeId, 'minute' => $minute, 'measured_at' => $body['measured_at'],
                 'config_hash' => $config['config_hash'],
@@ -129,7 +139,7 @@ final class TcpProbe
         foreach (DB::table('tcp_probe_round')->whereIn('id', $latest)->get() as $round) {
             $probe = $probes->get($round->node_id);
             if ($probe && $probe->enabled && self::config((int) $round->node_id, $targets, $probe)['config_hash'] === $round->config_hash) {
-                $rows[$round->node_id] = TcpProbeStatus::current(self::decode($round), $now);
+                $rows[$round->node_id] = TcpProbeStatus::current(self::decode($round), $now, 3 * self::interval(count($targets)));
             }
         }
         return $rows;
@@ -138,7 +148,7 @@ final class TcpProbe
     public static function detail(int $nodeId, int $now): array
     {
         $rounds = [];
-        $config = ['enabled' => false, 'threshold_ms' => 250];
+        $config = ['enabled' => false, 'threshold_ms' => 250, 'interval_seconds' => 60];
         if (self::installed()) {
             $config = self::config($nodeId);
             $rounds = DB::table('tcp_probe_round')->where('node_id', $nodeId)
@@ -146,8 +156,8 @@ final class TcpProbe
                 ->where('measured_at', '<=', $now)->orderBy('minute')->get()->map(fn ($row) => self::decode($row))->all();
         }
         $latest = $rounds === [] ? null : $rounds[array_key_last($rounds)];
-        $fresh = $latest && $config['enabled'] && $latest['config_hash'] === $config['config_hash'] && $now - $latest['measured_at'] <= 180;
-        $carriers = TcpProbeStatus::current($fresh ? $latest : null, $now);
+        $fresh = $latest && $config['enabled'] && $latest['config_hash'] === $config['config_hash'] && $now - $latest['measured_at'] <= 3 * $config['interval_seconds'];
+        $carriers = TcpProbeStatus::current($fresh ? $latest : null, $now, 3 * $config['interval_seconds']);
         foreach ($carriers as $key => &$carrier) {
             $carrier['history'] = TcpProbeStatus::history($rounds, $key, $now);
             $carrier['targets'] = [];
@@ -173,6 +183,7 @@ final class TcpProbe
         }
         unset($carrier);
         return [
+            'interval_seconds' => $config['interval_seconds'],
             'carriers' => $carriers, 'enabled' => $config['enabled'], 'threshold_ms' => $config['threshold_ms'],
             'updated_at' => $fresh ? date('m-d H:i:s', $latest['measured_at']) : '暂无有效数据',
         ];

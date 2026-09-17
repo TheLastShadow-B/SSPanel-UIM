@@ -25,6 +25,8 @@ beforeEach(function () {
         ['id' => 1, 'carrier' => 'telecom', 'label' => '广东电信', 'ip' => '1.1.1.1', 'port' => 443],
         ['id' => 2, 'carrier' => 'telecom', 'label' => '上海电信', 'ip' => '8.8.8.8', 'port' => 443],
     ]);
+    $this->dynamicMigration = require BASE_PATH . '/db/migrations/2026091702-dynamic_tcp_probe_targets.php';
+    $this->dynamicMigration->up();
     $this->now = 1800000000;
 });
 
@@ -132,12 +134,11 @@ it('preserves outages within history buckets and does not count missing data as 
 });
 
 it('validates public IPv4 configuration and rejects repeated endpoints', function () {
-    $target = ['label' => '广东电信', 'ip' => '1.1.1.1', 'port' => '443'];
-    expect(TcpProbeController::validateTargets([1 => $target])[0]['carrier'])->toBe('telecom');
-    expect(fn () => TcpProbeController::validateTargets([1 => $target, 4 => $target]))->toThrow(InvalidArgumentException::class);
+    $target = ['carrier' => 'telecom', 'label' => '广东电信', 'ip' => '1.1.1.1', 'port' => '443'];
+    expect(TcpProbeController::validateTarget($target)['carrier'])->toBe('telecom');
     foreach (['127.0.0.1', '10.0.0.1', '169.254.169.254', '224.0.0.1', '::1', 'example.com'] as $ip) {
         $target['ip'] = $ip;
-        expect(fn () => TcpProbeController::validateTargets([1 => $target]))->toThrow(InvalidArgumentException::class);
+        expect(fn () => TcpProbeController::validateTarget($target))->toThrow(InvalidArgumentException::class);
     }
 });
 
@@ -163,6 +164,28 @@ it('serves config and accepts JSON through the actual WebAPI handlers', function
     $request = $request->withBody($factory->createStream(str_repeat('a', 32769)));
     expect($controller->report($request, $responses->createResponse(), ['id' => 1])->getStatusCode())->toBe(413);
     expect($controller->report($request, $responses->createResponse(), ['id' => 2])->getStatusCode())->toBe(404);
+});
+
+it('accepts complete large target reports through the WebAPI', function () {
+    $this->database->schema()->create('node', function (Blueprint $table) {
+        $table->increments('id'); $table->integer('type')->default(1);
+    });
+    Node::create(['id' => 1]);
+    DB::table('tcp_probe_target')->delete();
+    for ($i = 1; $i <= 250; $i++) {
+        DB::table('tcp_probe_target')->insert(['id' => $i, 'carrier' => 'telecom', 'label' => 'CT ' . $i, 'ip' => '8.8.4.' . $i, 'port' => 443]);
+    }
+    $config = TcpProbe::config(1);
+    $body = json_encode(['config_hash' => $config['config_hash'], 'measured_at' => time(), 'results' => array_map(
+        fn ($target) => ['target_id' => $target['id'], 'samples' => array_fill(0, 3, ['latency_ms' => 123.456, 'error' => null])], $config['targets'])]);
+    expect(strlen($body))->toBeGreaterThan(32768);
+    $factory = new HttpFactory();
+    $responses = new DecoratedResponseFactory($factory, $factory);
+    $request = (new DecoratedServerRequestFactory($factory))->createServerRequest('POST', '/mod_mu/nodes/1/tcp-probe')
+        ->withHeader('Content-Type', 'application/json')->withBody($factory->createStream($body));
+    $controller = (new ReflectionClass(\App\Controllers\WebAPI\TcpProbeController::class))->newInstanceWithoutConstructor();
+    expect($controller->report($request, $responses->createResponse(), ['id' => 1])->getStatusCode())->toBe(200)
+        ->and(TcpProbe::decode(DB::table('tcp_probe_round')->first())['results'])->toHaveCount(250);
 });
 
 it('rejects detail requests for nodes outside the users visible group', function () {
@@ -195,29 +218,97 @@ it('renders 96 history bars per carrier with escaped target labels', function ()
         ->and($html)->not->toContain('<script>alert(1)</script>')->toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
 });
 
-it('persists admin target edits and node switches, leaving valid config intact on errors', function () {
-    $this->database->schema()->create('node', function (Blueprint $table) { $table->increments('id'); });
-    Node::create(['id' => 1]);
+it('creates edits and deletes independent targets without replacing existing configuration', function () {
     $controller = (new ReflectionClass(TcpProbeController::class))->newInstanceWithoutConstructor();
     $factory = new HttpFactory();
     $requests = new DecoratedServerRequestFactory($factory);
     $responses = new DecoratedResponseFactory($factory, $factory);
-    $request = $requests->createServerRequest('POST', '/admin/node/probe/targets')->withParsedBody([
-        'targets' => [4 => ['label' => '上海联通', 'ip' => '8.8.4.4', 'port' => '443']],
-    ]);
-    expect($controller->saveTargets($request, $responses->createResponse(), [])->getStatusCode())->toBe(200);
+    $request = $requests->createServerRequest('POST', '/admin/node/probe/targets');
+    $original = TcpProbe::targets();
+    // More than three targets for one carrier, and more than nine overall.
+    for ($i = 1; $i <= 30; $i++) {
+        $response = $controller->saveTarget($request->withParsedBody([
+            'carrier' => 'mobile', 'label' => '移动 ' . $i, 'ip' => '8.8.4.' . $i, 'port' => '443',
+        ]), $responses->createResponse(), []);
+        expect($response->getStatusCode())->toBe(200);
+        $id = json_decode((string) $response->getBody(), true)['id'];
+    }
+    expect(TcpProbe::targets())->toHaveCount(32)
+        ->and(array_slice(TcpProbe::targets(), 0, 2))->toBe($original)
+        ->and($id)->toBeGreaterThan(9);
+    $body = ['carrier' => 'unicom', 'label' => '联通', 'ip' => '8.8.4.30', 'port' => '80'];
+    expect($controller->saveTarget($request->withParsedBody($body), $responses->createResponse(), ['id' => $id])->getStatusCode())->toBe(200);
+    expect(DB::table('tcp_probe_target')->where('id', $id)->first()->carrier)->toBe('unicom');
+    $hash = TcpProbe::config(1)['config_hash'];
+    foreach ([['ip' => '127.0.0.1'], ['carrier' => 'other'], ['carrier' => []], ['ip' => ''], ['label' => ''], ['port' => 0], ['ip' => '1.1.1.1', 'port' => '443']] as $invalid) {
+        expect($controller->saveTarget($request->withParsedBody(array_replace($body, $invalid)), $responses->createResponse(), ['id' => $id])->getStatusCode())->toBe(422)
+            ->and(TcpProbe::config(1)['config_hash'])->toBe($hash);
+    }
+    expect($controller->saveTarget($request->withParsedBody($body), $responses->createResponse(), [])->getStatusCode())->toBe(422);
+    expect($controller->deleteTarget($request, $responses->createResponse(), ['id' => $id])->getStatusCode())->toBe(200)
+        ->and(TcpProbe::targets())->toHaveCount(31)
+        ->and($controller->deleteTarget($request, $responses->createResponse(), ['id' => $id])->getStatusCode())->toBe(404)
+        ->and($controller->saveTarget($request->withParsedBody($body), $responses->createResponse(), ['id' => $id])->getStatusCode())->toBe(404);
+    foreach (TcpProbe::targets() as $target) {
+        $controller->deleteTarget($request, $responses->createResponse(), ['id' => $target['id']]);
+    }
+    expect(TcpProbe::targets())->toBe([]);
+    $controller->saveTarget($request->withParsedBody($body), $responses->createResponse(), []);
+    expect(TcpProbe::targets()[0]['id'])->toBeGreaterThan($id);
+});
+
+it('preserves target data and ids during repeatable dynamic migration', function () {
+    $targets = TcpProbe::targets();
+    expect($this->dynamicMigration->up())->toBe(2026091702)
+        ->and(TcpProbe::targets())->toBe($targets);
+    expect($this->dynamicMigration->down())->toBe(2026091701)
+        ->and(TcpProbe::targets())->toBe($targets);
+    $this->dynamicMigration->up();
+    expect(DB::table('tcp_probe_target')->insertGetId(['carrier' => 'mobile', 'label' => 'CM', 'ip' => '8.8.4.4', 'port' => 443]))->toBe(3);
+});
+
+it('uses an adaptive interval for complete reports and status freshness', function () {
+    for ($i = 3; $i <= 32; $i++) {
+        DB::table('tcp_probe_target')->insert(['id' => $i, 'carrier' => 'telecom', 'label' => 'CT ' . $i, 'ip' => '8.8.4.' . $i, 'port' => 443]);
+    }
     $config = TcpProbe::config(1);
-    expect($config['targets'])->toHaveCount(1)->and($config['targets'][0]['carrier'])->toBe('unicom');
-    $bad = $request->withParsedBody(['targets' => [4 => ['label' => 'bad', 'ip' => '127.0.0.1', 'port' => '443']]]);
-    expect($controller->saveTargets($bad, $responses->createResponse(), [])->getStatusCode())->toBe(422)
-        ->and(TcpProbe::config(1)['config_hash'])->toBe($config['config_hash']);
-    $request = $request->withParsedBody(['enabled' => '0', 'threshold_ms' => '300']);
+    expect($config['interval_seconds'])->toBe(120);
+    $results = array_map(fn ($target) => ['target_id' => $target['id'], 'samples' => array_fill(0, 3, ['latency_ms' => 100, 'error' => null])], $config['targets']);
+    foreach ([$this->now, $this->now + 120] as $time) {
+        TcpProbe::report(1, ['config_hash' => $config['config_hash'], 'measured_at' => $time, 'results' => $results], $time + 90);
+    }
+    expect(TcpProbe::current([1], $this->now + 360)[1]['telecom']['status'])->toBe('green')
+        ->and(TcpProbe::detail(1, $this->now + 360)['carriers']['telecom']['status'])->toBe('green')
+        ->and(TcpProbe::current([1], $this->now + 481)[1]['telecom']['status'])->toBe('gray');
+});
+
+it('counts scheduled slow rounds as full history coverage', function () {
+    $now = intdiv($this->now, 900) * 900 + 899;
+    $rounds = [];
+    for ($time = $now - 899; $time < $now; $time += 120) {
+        $rounds[] = ['measured_at' => $time, 'states' => ['telecom' => ['status' => 'green', 'attempts' => 96, 'success' => 96, 'interval_seconds' => 120]]];
+    }
+    expect(TcpProbeStatus::history($rounds, 'telecom', $now)['buckets'][95]['status'])->toBe('green');
+});
+
+it('spreads long detection periods across history buckets without double counting', function () {
+    $now = intdiv($this->now, 900) * 900 + 899;
+    $state = ['status' => 'green', 'attempts' => 3000, 'success' => 3000, 'interval_seconds' => 1800];
+    $rounds = [['measured_at' => $now - 1799, 'states' => ['telecom' => $state]]];
+    $history = TcpProbeStatus::history($rounds, 'telecom', $now);
+    expect($history['buckets'][94]['status'])->toBe('green')->and($history['buckets'][95]['status'])->toBe('green');
+});
+
+it('persists node switches and rejects invalid thresholds', function () {
+    $this->database->schema()->create('node', function (Blueprint $table) { $table->increments('id'); });
+    Node::create(['id' => 1]);
+    $controller = (new ReflectionClass(TcpProbeController::class))->newInstanceWithoutConstructor();
+    $factory = new HttpFactory();
+    $responses = new DecoratedResponseFactory($factory, $factory);
+    $request = (new DecoratedServerRequestFactory($factory))->createServerRequest('POST', '/admin/node/1/probe')->withParsedBody(['enabled' => '0', 'threshold_ms' => '300']);
     expect($controller->saveNode($request, $responses->createResponse(), ['id' => 1])->getStatusCode())->toBe(200)
         ->and(TcpProbe::config(1)['enabled'])->toBeFalse()->and(TcpProbe::config(1)['threshold_ms'])->toBe(300);
     $bad = $request->withParsedBody(['enabled' => '1', 'threshold_ms' => 'invalid']);
     expect($controller->saveNode($bad, $responses->createResponse(), ['id' => 1])->getStatusCode())->toBe(422)
         ->and(TcpProbe::config(1)['enabled'])->toBeFalse();
-    $request = $request->withParsedBody(['targets' => []]);
-    $controller->saveTargets($request, $responses->createResponse(), []);
-    expect(TcpProbe::config(1)['targets'])->toBe([]);
 });

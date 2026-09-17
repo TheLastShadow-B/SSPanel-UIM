@@ -118,11 +118,12 @@ class TestDatabase
 
         if (!$schema->hasTable('tcp_probe_target')) {
             $schema->create('tcp_probe_target', function (Blueprint $table) {
-                $table->unsignedInteger('id')->primary();
+                $table->increments('id');
                 $table->string('carrier', 16);
                 $table->string('label', 80);
                 $table->string('ip', 45);
                 $table->unsignedInteger('port');
+                $table->unique(['ip', 'port']);
             });
         }
         if (!$schema->hasTable('tcp_probe')) {

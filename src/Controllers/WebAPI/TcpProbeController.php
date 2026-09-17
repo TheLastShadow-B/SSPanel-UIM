@@ -28,8 +28,9 @@ final class TcpProbeController extends BaseController
         if (! TcpProbe::installed() || ! Node::where('id', $args['id'])->where('type', 1)->exists()) {
             return $response->withJson(['ret' => 0, 'msg' => '节点不可用'], 404);
         }
-        $raw = $request->getBody()->read(32769);
-        if (strlen($raw) > 32768) {
+        $limit = max(32768, 1024 + count(TcpProbe::targets()) * 1024);
+        $raw = $request->getBody()->read($limit + 1);
+        if (strlen($raw) > $limit) {
             return $response->withJson(['ret' => 0, 'msg' => '报告过大'], 413);
         }
         try {
