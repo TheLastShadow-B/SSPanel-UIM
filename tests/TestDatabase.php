@@ -146,6 +146,10 @@ class TestDatabase
             });
         }
         
+        if (!$schema->hasTable('tcp_probe_source')) {
+            (require BASE_PATH . '/db/migrations/2026091703-add_taier_probe_sync.php')->up();
+        }
+
         if (!$schema->hasTable('user_traffic_log')) {
             $schema->create('user_traffic_log', function (Blueprint $table) {
                 $table->increments('id');
@@ -306,7 +310,7 @@ class TestDatabase
         $capsule = DB::getCapsule();
         $schema = $capsule->schema();
         
-        $tables = ['tcp_probe_round', 'tcp_probe', 'tcp_probe_target', 'user_coupon', 'stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'product', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
+        $tables = ['tcp_probe_source', 'tcp_probe_round', 'tcp_probe', 'tcp_probe_target', 'user_coupon', 'stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'product', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
         
         foreach ($tables as $table) {
             if ($schema->hasTable($table)) {

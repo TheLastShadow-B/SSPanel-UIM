@@ -28,6 +28,8 @@ final class TcpProbe
     public static function config(int $nodeId, ?array $targets = null, ?object $probe = null): array
     {
         $targets ??= self::targets();
+        // Source metadata must not invalidate probes when endpoints are unchanged.
+        $targets = array_map(fn ($target) => array_intersect_key($target, array_flip(['id', 'carrier', 'label', 'ip', 'port'])), $targets);
         $probe ??= DB::table('tcp_probe')->where('node_id', $nodeId)->first();
         $config = [
             'enabled' => (bool) ($probe->enabled ?? false),

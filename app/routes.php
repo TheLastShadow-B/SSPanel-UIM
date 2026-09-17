@@ -159,6 +159,8 @@ return static function (Slim\App $app): void {
         $group->get('/', App\Controllers\AdminController::class . ':index');
         // Node
         $group->get('/node/probe', App\Controllers\Admin\TcpProbeController::class . ':index');
+        $group->post('/node/probe/source', App\Controllers\Admin\TcpProbeController::class . ':saveSource')->add(new App\Middleware\CSRF());
+        $group->post('/node/probe/source/sync', App\Controllers\Admin\TcpProbeController::class . ':syncSource')->add(new App\Middleware\CSRF());
         $group->post('/node/probe/targets', App\Controllers\Admin\TcpProbeController::class . ':saveTarget')->add(new App\Middleware\CSRF());
         $group->post('/node/probe/targets/{id:[0-9]+}', App\Controllers\Admin\TcpProbeController::class . ':saveTarget')->add(new App\Middleware\CSRF());
         $group->delete('/node/probe/targets/{id:[0-9]+}', App\Controllers\Admin\TcpProbeController::class . ':deleteTarget')->add(new App\Middleware\CSRF());

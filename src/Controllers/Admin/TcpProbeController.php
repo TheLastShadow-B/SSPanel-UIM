@@ -9,6 +9,7 @@ use App\Middleware\CSRF;
 use App\Models\Node;
 use App\Services\DB;
 use App\Services\TcpProbe;
+use App\Services\TaierProbeSource;
 use App\Utils\TcpProbeStatus;
 use InvalidArgumentException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -30,25 +31,13 @@ final class TcpProbeController extends BaseController
         ])->all();
         return $response->write($this->view()->assign('installed', $installed)->assign('targets', $targets)
             ->assign('carriers', TcpProbeStatus::DISPLAY_NAMES)->assign('interval_seconds', TcpProbe::interval(count($targets)))
-            ->assign('nodes', $nodes)->assign('csrf_token', CSRF::token())->fetch('admin/node/probe.tpl'));
+            ->assign('taier_installed', TaierProbeSource::installed())->assign('taier', TaierProbeSource::settings())
+            ->assign('taier_cities', array_keys(TaierProbeSource::CITIES))->assign('nodes', $nodes)->assign('csrf_token', CSRF::token())->fetch('admin/node/probe.tpl'));
     }
 
     public static function validateTarget(mixed $target): array
     {
-        if (! is_array($target) || ! is_string($target['ip'] ?? null)
-            || ! is_string($target['label'] ?? null) || ! is_string($target['carrier'] ?? null)
-            || ! isset(TcpProbeStatus::CARRIERS[$target['carrier']])) {
-            throw new InvalidArgumentException('请选择运营商并填写目标信息');
-        }
-        $ip = trim($target['ip']);
-        $label = trim($target['label']);
-        $port = filter_var($target['port'] ?? null, FILTER_VALIDATE_INT);
-        if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)
-            || str_starts_with($ip, '169.254.') || (int) explode('.', $ip)[0] >= 224
-            || $port === false || $port < 1 || $port > 65535 || $label === '' || mb_strlen($label) > 80) {
-            throw new InvalidArgumentException('请填写目标名称、公网 IPv4 和 1–65535 的端口');
-        }
-        return ['carrier' => $target['carrier'], 'label' => $label, 'ip' => $ip, 'port' => $port];
+        return \App\Utils\TcpProbeTarget::validate($target);
     }
 
     public function saveTarget(ServerRequest $request, Response $response, array $args): ResponseInterface
@@ -60,8 +49,14 @@ final class TcpProbeController extends BaseController
         if ($id !== null && ! DB::table('tcp_probe_target')->where('id', $id)->exists()) {
             return $response->withJson(['ret' => 0, 'msg' => '测试目标不存在'], 404);
         }
+        if ($id !== null && self::managed($id)) {
+            return $response->withJson(['ret' => 0, 'msg' => '此目标由泰尔自动维护，请先关闭自动同步再修改'], 409);
+        }
         try {
             $target = self::validateTarget($request->getParams());
+            if (TaierProbeSource::installed()) {
+                $target += ['source' => 'manual', 'source_key' => null, 'source_host_id' => null];
+            }
             $duplicates = DB::table('tcp_probe_target')->where('ip', $target['ip'])->where('port', $target['port']);
             if ($id !== null) {
                 $duplicates->where('id', '!=', $id);
@@ -87,10 +82,38 @@ final class TcpProbeController extends BaseController
         if (! TcpProbe::installed()) {
             return $response->withJson(['ret' => 0, 'msg' => '请先运行数据库迁移'], 503);
         }
+        if (self::managed((int) $args['id'])) {
+            return $response->withJson(['ret' => 0, 'msg' => '此目标由泰尔自动维护，请修改同步地区或关闭自动同步'], 409);
+        }
         if (! DB::table('tcp_probe_target')->where('id', (int) $args['id'])->delete()) {
             return $response->withJson(['ret' => 0, 'msg' => '测试目标不存在'], 404);
         }
         return $response->withJson(['ret' => 1, 'msg' => '测试目标已删除'])->withHeader('HX-Refresh', 'true');
+    }
+
+    private static function managed(int $id): bool
+    {
+        return TaierProbeSource::installed() && TaierProbeSource::settings()['enabled']
+            && DB::table('tcp_probe_target')->where('id', $id)->where('source', 'taier')->exists();
+    }
+
+    public function saveSource(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        if (! TaierProbeSource::installed()) {
+            return $response->withJson(['ret' => 0, 'msg' => '请先运行数据库迁移'], 503);
+        }
+        try {
+            TaierProbeSource::saveSettings($request->getParam('enabled') === '1', $request->getParam('cities', []), $request->getParam('interval_hours'));
+        } catch (InvalidArgumentException $e) {
+            return $response->withJson(['ret' => 0, 'msg' => $e->getMessage()], 422);
+        }
+        return $response->withJson(['ret' => 1, 'msg' => '已保存，定时任务将在五分钟内同步'])->withHeader('HX-Refresh', 'true');
+    }
+
+    public function syncSource(ServerRequest $request, Response $response, array $args): ResponseInterface
+    {
+        $result = (new TaierProbeSource())->sync(true);
+        return $response->withJson($result)->withHeader('HX-Refresh', 'true');
     }
 
     public function saveNode(ServerRequest $request, Response $response, array $args): ResponseInterface
