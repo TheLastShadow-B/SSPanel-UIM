@@ -46,9 +46,7 @@ final class ServerController extends BaseController
         return $response->write(
             $this->view()
                 ->assign('server_groups', NodeRegion::group($node_list))
-                ->assign('carrier_tally', TcpProbeStatus::tally($probe_status))
-                ->assign('node_total', count($node_list))
-                ->assign('node_online', count(array_filter($node_list, static fn ($node) => $node['online'] === 1)))
+                ->assign('carriers', TcpProbeStatus::CARRIERS)
                 ->fetch('user/server.tpl')
         );
     }

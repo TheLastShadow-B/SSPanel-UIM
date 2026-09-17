@@ -84,24 +84,9 @@
 .probe-radio:has(input:checked) { background: var(--color-card); color: var(--color-ink); font-weight: 600; box-shadow: 0 1px 2px rgb(25 28 34 / .12); }
 .probe-radio:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
-/* ---- 用户端节点列表(/user/server):三网各占一列,正常只画点、波动 / 中断用带字胶囊 ---- */
+/* ---- 用户端节点列表(/user/server):三网各占一列,正常只画点、波动 / 中断用带字胶囊;地区可折叠 ---- */
 .probe-dot.is-hollow, .probe-cell[data-status="gray"] > .probe-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--probe-color); }
-.probe-split > span[hidden], [data-tally-item][hidden] { display: none; }
 
-.node-tile {
-    display: flex; flex-direction: column; gap: .625rem; min-height: 6.5rem; padding: 1rem 1.125rem;
-    border: 0; border-radius: var(--radius-tile); background: var(--color-card);
-    box-shadow: inset 0 0 0 1px var(--color-hairline); text-align: left; cursor: pointer; transition: box-shadow .15s ease;
-}
-.node-tile:hover { box-shadow: inset 0 0 0 1px var(--color-faint); }
-.node-tile.is-on { box-shadow: inset 0 0 0 2px var(--color-primary); }
-.node-tile:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.node-tile-check { display: none; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: .75rem; }
-.node-tile.is-on .node-tile-check { display: inline-flex; }
-
-.node-seg-track { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--color-tile); }
-.node-seg { flex: 1 1 0; height: 2.375rem; border: 0; border-radius: 999px; background: transparent; color: var(--color-body); font-size: .875rem; font-weight: 500; cursor: pointer; transition: color .15s ease; }
-.node-seg.is-on { background: var(--color-card); color: var(--color-ink); font-weight: 600; box-shadow: 0 1px 2px rgb(25 28 34 / .12); }
 .node-jumps { scrollbar-width: none; }
 .node-jumps::-webkit-scrollbar { display: none; }
 .node-jump {
@@ -143,20 +128,6 @@
 .node-meta { display: flex; align-items: center; gap: .375rem; margin-left: auto; font-size: .75rem; color: var(--color-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .node-meta-lock { color: var(--color-body); }
 .node-chev { color: var(--color-faint); }
-
-/* 选中一家运营商:该列全部显示文字胶囊并加浅色底,其余两列淡化;行序由 node-probe.js 通过 order 调整 */
-.node-table[data-carrier="telecom"] [data-col]:not([data-col="telecom"]),
-.node-table[data-carrier="unicom"] [data-col]:not([data-col="unicom"]),
-.node-table[data-carrier="mobile"] [data-col]:not([data-col="mobile"]) { opacity: .4; }
-.node-table[data-carrier="telecom"] .probe-cell[data-col="telecom"] > .probe-dot,
-.node-table[data-carrier="unicom"] .probe-cell[data-col="unicom"] > .probe-dot,
-.node-table[data-carrier="mobile"] .probe-cell[data-col="mobile"] > .probe-dot { display: none; }
-.node-table[data-carrier="telecom"] .probe-cell[data-col="telecom"] .probe-tag,
-.node-table[data-carrier="unicom"] .probe-cell[data-col="unicom"] .probe-tag,
-.node-table[data-carrier="mobile"] .probe-cell[data-col="mobile"] .probe-tag { display: inline-flex; }
-.node-table[data-carrier="telecom"] .node-col[data-col="telecom"],
-.node-table[data-carrier="unicom"] .node-col[data-col="unicom"],
-.node-table[data-carrier="mobile"] .node-col[data-col="mobile"] { background: color-mix(in srgb, var(--color-primary) 6%, transparent); color: var(--color-primary); font-weight: 600; }
 
 @media (min-width: 768px) {
     .node-row { flex-wrap: nowrap; gap: 0; min-height: 3.25rem; padding: 0 1.25rem; }

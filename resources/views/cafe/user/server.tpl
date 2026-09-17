@@ -1,10 +1,7 @@
 {include file="shell/header.tpl" nav='server'}
 
-<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
-    <div>
-        <h2 class="text-2xl font-semibold tracking-tight">节点状态</h2>
-        <p class="text-faint mt-1 text-sm">按国家 / 地区查看节点与回国线路状态 · 每分钟自动刷新</p>
-    </div>
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-2xl font-semibold tracking-tight">节点状态</h2>
     <div class="flex gap-2">
         <a href="/user/rate" class="btn-secondary btn-sm"><i class="ti ti-chart-bar"></i> 流量倍率</a>
         <a href="/user/detect" class="btn-secondary btn-sm"><i class="ti ti-shield-search"></i> 审计规则</a>
@@ -12,58 +9,21 @@
 </div>
 
 {if count($server_groups) > 0}
-<div class="node-table" x-data="cafeNodeList()" data-carrier="" :data-carrier="picked">
-
-    <section class="mb-6" aria-label="按运营商查看回国线路">
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs">
-            <p class="text-body" x-text="picked ? '已选择 ' + names[picked] + '：各地区内可用节点排在前面' : '选择你的运营商，只看对你有效的线路'">选择你的运营商，只看对你有效的线路</p>
-            <ul class="text-body flex flex-wrap gap-x-3.5 gap-y-1" aria-label="图例">
-                <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="green" aria-hidden="true"></span>正常</li>
-                <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="yellow" aria-hidden="true"></span>波动</li>
-                <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="red" aria-hidden="true"></span>中断</li>
-                <li class="inline-flex items-center gap-1.5"><span class="probe-dot is-hollow" data-status="gray" aria-hidden="true"></span>无数据</li>
-            </ul>
-        </div>
-
-        {* 桌面端：全部 + 三家运营商磁贴，点选即筛选 *}
-        <div class="hidden grid-cols-2 gap-3 md:grid md:grid-cols-4" role="group" aria-label="选择运营商">
-            <button type="button" class="node-tile is-on" :class="{ 'is-on': picked === '' }" aria-pressed="true" :aria-pressed="String(picked === '')" @click="select('')">
-                <span class="text-ink flex items-center justify-between text-sm font-semibold">全部线路<span class="node-tile-check" aria-hidden="true"><i class="ti ti-check"></i></span></span>
-                <span class="text-ink text-2xl leading-none font-semibold tabular-nums">{$node_online} <span class="text-faint text-sm font-medium">/ {$node_total}</span></span>
-                <span class="text-body text-xs">{if $node_online === $node_total}节点全部在线{else}个节点在线{/if}</span>
-            </button>
-            {foreach $carrier_tally as $carrier}
-                <button type="button" class="node-tile" :class="{ 'is-on': picked === '{$carrier['carrier']}' }" aria-pressed="false" :aria-pressed="String(picked === '{$carrier['carrier']}')" @click="select('{$carrier['carrier']}')">
-                    <span class="text-ink flex items-center justify-between text-sm font-semibold">{$carrier['name']}<span class="node-tile-check" aria-hidden="true"><i class="ti ti-check"></i></span></span>
-                    {include file="shell/node_tally.tpl" carrier=$carrier}
-                </button>
+<div class="node-table" x-data="cafeNodeList()">
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs">
+        {* 移动端：地区跳转（目标已折叠时先展开） *}
+        <nav class="node-jumps flex gap-2 overflow-x-auto md:hidden" aria-label="跳转到地区">
+            {foreach $server_groups as $group}
+                <a href="#region-{$group['code']}" class="node-jump" @click="reveal('{$group['code']}')">{if $group['flag']}<span aria-hidden="true">{$group['flag']}</span>{/if}{$group['name']}<span class="text-faint tabular-nums">{count($group['servers'])}</span></a>
             {/foreach}
-        </div>
-
-        {* 移动端：分段控件 + 地区跳转 + 汇总卡 *}
-        <div class="md:hidden">
-            <div class="node-seg-track" role="group" aria-label="选择运营商">
-                <button type="button" class="node-seg is-on" :class="{ 'is-on': picked === '' }" aria-pressed="true" :aria-pressed="String(picked === '')" @click="select('')">全部</button>
-                {foreach $carrier_tally as $carrier}
-                    <button type="button" class="node-seg" :class="{ 'is-on': picked === '{$carrier['carrier']}' }" aria-pressed="false" :aria-pressed="String(picked === '{$carrier['carrier']}')" @click="select('{$carrier['carrier']}')">{$carrier['name']}</button>
-                {/foreach}
-            </div>
-            <nav class="node-jumps mt-3 flex gap-2 overflow-x-auto" aria-label="跳转到地区">
-                {foreach $server_groups as $group}
-                    <a href="#region-{$group['code']}" class="node-jump" @click="reveal('{$group['code']}')">{if $group['flag']}<span aria-hidden="true">{$group['flag']}</span>{/if}{$group['name']}<span class="text-faint tabular-nums">{count($group['servers'])}</span></a>
-                {/foreach}
-            </nav>
-            <div class="c-card mt-3 space-y-3 p-4" aria-label="线路总览">
-                <p class="text-ink text-sm font-semibold tabular-nums">{$node_online} / {$node_total} {if $node_online === $node_total}节点全部在线{else}个节点在线{/if}</p>
-                {foreach $carrier_tally as $carrier}
-                    <div class="space-y-1.5">
-                        <p class="text-ink text-xs font-semibold">{$carrier['name']}</p>
-                        {include file="shell/node_tally.tpl" carrier=$carrier}
-                    </div>
-                {/foreach}
-            </div>
-        </div>
-    </section>
+        </nav>
+        <ul class="text-body ml-auto flex flex-wrap gap-x-3.5 gap-y-1" aria-label="图例">
+            <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="green" aria-hidden="true"></span>正常</li>
+            <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="yellow" aria-hidden="true"></span>波动</li>
+            <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="red" aria-hidden="true"></span>中断</li>
+            <li class="inline-flex items-center gap-1.5"><span class="probe-dot is-hollow" data-status="gray" aria-hidden="true"></span>无数据</li>
+        </ul>
+    </div>
 
     <div class="space-y-4">
         {foreach $server_groups as $group}
@@ -72,7 +32,7 @@
                     <button type="button" id="region-title-{$group['code']}" class="node-region-head" aria-controls="region-nodes-{$group['code']}" aria-expanded="true" :aria-expanded="String(isOpen('{$group['code']}'))" @click="toggle('{$group['code']}')">
                         <span class="node-region-flag" aria-hidden="true">{if $group['flag']}{$group['flag']}{else}<i class="ti ti-world text-body"></i>{/if}</span>
                         <span class="node-region-name">{$group['name']}</span>
-                        <span class="node-region-meta">{count($group['servers'])} 个节点 · {if $group['online'] === count($group['servers'])}全部在线{else}{$group['online']} 个在线{/if}</span>
+                        <span class="node-region-meta tabular-nums">{$group['online']}/{count($group['servers'])}</span>
                         <i class="t-acc-chevron ti ti-chevron-down" aria-hidden="true"></i>
                     </button>
                 </h3>
@@ -80,7 +40,7 @@
                 <div class="t-acc-panel-inner">
                 <div class="node-head hidden md:flex" aria-hidden="true">
                     <span class="min-w-0 flex-1">节点</span>
-                    {foreach $carrier_tally as $carrier}<span class="node-col" data-col="{$carrier['carrier']}">{$carrier['name']}</span>{/foreach}
+                    {foreach $carriers as $code => $name}<span class="node-col">{$name}</span>{/foreach}
                     <span class="node-rate">倍率</span>
                     <span class="node-users">在线人数</span>
                     <span class="node-chev"></span>
@@ -100,10 +60,10 @@
                                 <i class="ti ti-chevron-right text-faint ml-auto md:hidden" aria-hidden="true"></i>
                             </div>
                             <div class="node-carriers">
-                                {foreach $carrier_tally as $carrier}
-                                    {$probe = $server['probe_status'][$carrier['carrier']]}
-                                    <span class="node-col probe-cell" data-col="{$carrier['carrier']}" data-probe-carrier="{$carrier['carrier']}" data-probe-name="{$carrier['name']}" data-status="{$probe['status']}" title="{$carrier['name']}：{$probe['label']}">
-                                        <span class="node-col-label md:hidden">{$carrier['name']}</span>
+                                {foreach $carriers as $code => $name}
+                                    {$probe = $server['probe_status'][$code]}
+                                    <span class="node-col probe-cell" data-probe-carrier="{$code}" data-probe-name="{$name}" data-status="{$probe['status']}" title="{$name}：{$probe['label']}">
+                                        <span class="node-col-label md:hidden">{$name}</span>
                                         <span class="probe-dot" aria-hidden="true"></span>
                                         <span class="probe-pill probe-tag" data-status="{$probe['status']}" data-probe-label>{if $probe['status'] === 'green'}正常{elseif $probe['status'] === 'yellow'}波动{elseif $probe['status'] === 'red'}中断{else}无数据{/if}</span>
                                         <span class="sr-only" data-probe-sr>：{$probe['label']}</span>
