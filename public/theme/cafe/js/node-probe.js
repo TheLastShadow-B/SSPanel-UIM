@@ -1,4 +1,4 @@
-/* Refresh probe colors in place; the list also remembers which regions the user collapsed. */
+/* Refresh probe colors in place (正常 / 波动 / 中断 only); the list also remembers which regions the user collapsed. */
 (() => {
     let lastSuccess = Date.now();
     let pending = false;
@@ -16,22 +16,13 @@
             detail.querySelectorAll('details').forEach(el => { el.open = opened.includes(el.dataset.carrier); });
         });
         setInterval(() => {
-            if (Date.now() - lastSuccess <= 180000) return;
-            document.getElementById('probe-refresh-error').hidden = false;
-            detail.querySelectorAll('.probe-state-icon').forEach(el => {
-                el.dataset.status = 'gray';
-                el.setAttribute('aria-label', '暂无有效数据');
-                el.querySelector('span').textContent = '−';
-            });
-            detail.querySelectorAll('.probe-components .probe-dot').forEach(el => { el.dataset.status = 'gray'; });
-            detail.querySelectorAll('[data-target-state]').forEach(el => { el.textContent = '暂无有效数据'; });
-            detail.querySelectorAll('[data-target-metric]').forEach(el => { el.textContent = '—'; });
+            document.getElementById('probe-refresh-error').hidden = Date.now() - lastSuccess <= 180000;
         }, 30000);
         return;
     }
 
     /* ---- 列表页 ---- */
-    const SHORT = { green: '正常', yellow: '波动', red: '中断', gray: '无数据' };
+    const SHORT = { green: '正常', yellow: '波动', red: '中断' };
 
     window.cafeNodeList = () => ({
         collapsed: [],
@@ -53,8 +44,8 @@
         document.querySelectorAll('[data-probe-node]').forEach(node => {
             node.querySelectorAll('[data-probe-carrier]').forEach(cell => {
                 const result = data?.[node.dataset.probeNode]?.[cell.dataset.probeCarrier];
-                const status = ['green', 'yellow', 'red', 'gray'].includes(result?.status) ? result.status : 'gray';
-                const label = result?.label || '暂无有效数据';
+                const status = ['green', 'yellow', 'red'].includes(result?.status) ? result.status : 'red';
+                const label = result?.label || '连接中断';
                 cell.dataset.status = status;
                 cell.title = cell.dataset.probeName + '：' + label;
                 const tag = cell.querySelector('[data-probe-label]');
@@ -75,7 +66,7 @@
             paint(body.data);
             lastSuccess = Date.now();
         } catch (_) {
-            if (Date.now() - lastSuccess > 180000) paint(null);
+            /* keep the last successful reading */
         } finally {
             pending = false;
         }

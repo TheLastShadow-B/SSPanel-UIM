@@ -58,7 +58,8 @@ it('migrates repeatedly and reverses without touching node schema', function () 
     expect($this->migration->up())->toBe(2026091701)
         ->and(DB::table('tcp_probe')->count())->toBe(1);
     expect($this->migration->down())->toBe(2026091700)->and(TcpProbe::installed())->toBeFalse();
-    expect(TcpProbe::current([1], $this->now)[1]['telecom']['status'])->toBe('gray');
+    // Without any probe data the user page shows 中断, never a separate "no data" state.
+    expect(TcpProbe::current([1], $this->now)[1]['telecom']['status'])->toBe('red');
 });
 
 it('confirms green, yellow, red and recovery without flapping', function () {
@@ -69,7 +70,8 @@ it('confirms green, yellow, red and recovery without flapping', function () {
         $now += 60;
         return $status;
     };
-    expect($send(120, 150))->toBe('gray')
+    // The first, still unconfirmed round shows its raw reading instead of a gray placeholder.
+    expect($send(120, 150))->toBe('green')
         ->and($send(120, 150))->toBe('green')
         ->and($send(120, 350))->toBe('green')
         ->and($send(120, 350))->toBe('yellow')
@@ -96,16 +98,20 @@ it('ignores retry and out of order reports and resets streaks after missing roun
     TcpProbe::report(1, tcpReport($this->now - 60), $this->now);
     expect(DB::table('tcp_probe_round')->count())->toBe(1);
     TcpProbe::report(1, tcpReport($this->now + 120), $this->now + 120);
-    expect(TcpProbe::current([1], $this->now + 120)[1]['telecom']['status'])->toBe('gray');
+    expect(TcpProbe::current([1], $this->now + 120)[1]['telecom']['status'])->toBe('green');
+    // The streak really did reset: one bad round after the gap is shown raw, not held at the old confirmed state.
+    TcpProbe::report(1, tcpReport($this->now + 180, 'timeout', 'timeout'), $this->now + 180);
+    expect(TcpProbe::current([1], $this->now + 180)[1]['telecom']['status'])->toBe('red');
 });
 
 it('expires status and clears current results after target edits or disabling', function () {
     TcpProbe::report(1, tcpReport($this->now - 60), $this->now - 60);
     TcpProbe::report(1, tcpReport($this->now), $this->now);
-    expect(TcpProbe::current([1], $this->now + 181)[1]['telecom']['status'])->toBe('gray');
+    expect(TcpProbe::current([1], $this->now + 181)[1]['telecom']['status'])->toBe('red');
     DB::table('tcp_probe_target')->where('id', 1)->update(['port' => 80]);
-    expect(TcpProbe::current([1], $this->now)[1]['telecom']['status'])->toBe('gray')
-        ->and(TcpProbe::detail(1, $this->now)['carriers']['telecom']['targets'][0]['status'])->toBe('gray');
+    expect(TcpProbe::current([1], $this->now)[1]['telecom']['status'])->toBe('red')
+        ->and(TcpProbe::detail(1, $this->now)['carriers']['telecom']['targets'][0]['status'])->toBe('red')
+        ->and(TcpProbe::detail(1, $this->now)['updated_at'])->toBe(date('m-d H:i:s', $this->now));
     DB::table('tcp_probe')->update(['enabled' => false]);
     expect(fn () => TcpProbe::report(1, tcpReport($this->now + 60), $this->now + 60))->toThrow(InvalidArgumentException::class);
 });
@@ -359,7 +365,7 @@ it('uses an adaptive interval for complete reports and status freshness', functi
     }
     expect(TcpProbe::current([1], $this->now + 360)[1]['telecom']['status'])->toBe('green')
         ->and(TcpProbe::detail(1, $this->now + 360)['carriers']['telecom']['status'])->toBe('green')
-        ->and(TcpProbe::current([1], $this->now + 481)[1]['telecom']['status'])->toBe('gray');
+        ->and(TcpProbe::current([1], $this->now + 481)[1]['telecom']['status'])->toBe('red');
 });
 
 it('counts scheduled slow rounds as full history coverage', function () {

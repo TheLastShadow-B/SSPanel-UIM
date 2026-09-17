@@ -85,7 +85,6 @@
 .probe-radio:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* ---- 用户端节点列表(/user/server):三网各占一列,正常只画点、波动 / 中断用带字胶囊;地区可折叠 ---- */
-.probe-dot.is-hollow, .probe-cell[data-status="gray"] > .probe-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--probe-color); }
 
 .node-jumps { scrollbar-width: none; }
 .node-jumps::-webkit-scrollbar { display: none; }
@@ -96,9 +95,9 @@
 
 .node-chip { display: inline-flex; flex-shrink: 0; align-items: center; height: 1.25rem; padding: 0 .4375rem; border-radius: .375rem; background: var(--color-tile); color: var(--color-body); font-size: .6875rem; font-weight: 600; letter-spacing: .03em; white-space: nowrap; }
 .node-chip.is-v6 { background: transparent; box-shadow: inset 0 0 0 1px var(--color-hairline); color: var(--color-faint); font-weight: 500; }
-.node-state { display: inline-block; flex-shrink: 0; width: .5rem; height: .5rem; border-radius: 50%; background: var(--color-warning); }
+/* 节点心跳:只有在线 / 离线两种,从未上报心跳也算离线 */
+.node-state { display: inline-block; flex-shrink: 0; width: .5rem; height: .5rem; border-radius: 50%; background: var(--color-danger); }
 .node-state[data-online="1"] { background: var(--color-success); }
-.node-state[data-online="-1"] { background: var(--color-danger); }
 
 /* 地区头部:一行,点击折叠;动效复用 motion.css 的 .t-acc */
 .node-region-head { display: flex; width: 100%; align-items: center; gap: .625rem; padding: .75rem 1rem .75rem 1.25rem; border: 0; background: transparent; text-align: left; cursor: pointer; transition: background-color .15s ease; }

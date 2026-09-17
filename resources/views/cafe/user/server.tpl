@@ -21,7 +21,6 @@
             <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="green" aria-hidden="true"></span>正常</li>
             <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="yellow" aria-hidden="true"></span>波动</li>
             <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="red" aria-hidden="true"></span>中断</li>
-            <li class="inline-flex items-center gap-1.5"><span class="probe-dot is-hollow" data-status="gray" aria-hidden="true"></span>无数据</li>
         </ul>
     </div>
 
@@ -52,7 +51,7 @@
                                 {if $server['locked']}
                                     <i class="ti ti-lock text-faint shrink-0" aria-hidden="true"></i><span class="sr-only">需要更高等级</span>
                                 {else}
-                                    <span class="node-state" data-online="{$server['online']}" aria-hidden="true"></span><span class="sr-only">{if $server['online'] === 1}在线{elseif $server['online'] === -1}离线{else}暂无数据{/if}</span>
+                                    <span class="node-state" data-online="{$server['online']}" aria-hidden="true"></span><span class="sr-only">{if $server['online'] === 1}在线{else}离线{/if}</span>
                                 {/if}
                                 <a href="/user/server/{$server['id']}" class="node-link {if $server['locked']}text-body{else}text-ink{/if}" aria-label="查看 {$server['name']|escape} 详情">{$server['display_name']|escape}</a>
                                 <span class="node-chip">{$server['proto']}</span>
@@ -65,7 +64,7 @@
                                     <span class="node-col probe-cell" data-probe-carrier="{$code}" data-probe-name="{$name}" data-status="{$probe['status']}" title="{$name}：{$probe['label']}">
                                         <span class="node-col-label md:hidden">{$name}</span>
                                         <span class="probe-dot" aria-hidden="true"></span>
-                                        <span class="probe-pill probe-tag" data-status="{$probe['status']}" data-probe-label>{if $probe['status'] === 'green'}正常{elseif $probe['status'] === 'yellow'}波动{elseif $probe['status'] === 'red'}中断{else}无数据{/if}</span>
+                                        <span class="probe-pill probe-tag" data-status="{$probe['status']}" data-probe-label>{if $probe['status'] === 'green'}正常{elseif $probe['status'] === 'yellow'}波动{else}中断{/if}</span>
                                         <span class="sr-only" data-probe-sr>：{$probe['label']}</span>
                                     </span>
                                 {/foreach}

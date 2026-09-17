@@ -3,7 +3,7 @@
         <span class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="green"></span>正常</span>
         <span class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="yellow"></span>波动 / 高延迟</span>
         <span class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="red"></span>中断</span>
-        <span class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="gray"></span>无数据</span>
+        <span class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="gray"></span>无记录</span>
     </div>
     <span class="text-faint">最近检测：{$probe['updated_at']}</span>
 </div>
@@ -40,4 +40,4 @@
     </section>
 {/foreach}
 </div>
-<p class="text-faint mt-5 text-xs leading-relaxed">检测周期：{$probe['interval_seconds']} 秒。黄色延迟阈值：{$probe['threshold_ms']} ms。可用率按有检测数据的轮次计算，至少一个目标连通即为可用；无数据不计入。历史格保留已确认的最严重状态，正常数据覆盖不足 80% 时显示灰色。TCP 建连耗时包含往返路径，不代表下载速度。</p>
+<p class="text-faint mt-5 text-xs leading-relaxed">检测周期：{$probe['interval_seconds']} 秒。黄色延迟阈值：{$probe['threshold_ms']} ms。可用率按有检测数据的轮次计算，至少一个目标连通即为可用；无记录的轮次不计入。历史格保留已确认的最严重状态，正常数据覆盖不足 80% 时显示灰色。TCP 建连耗时包含往返路径，不代表下载速度。</p>

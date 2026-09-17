@@ -284,6 +284,9 @@ final class TcpProbe
                 }
                 $state = $result ? TcpProbeStatus::summarize([$result], $config['threshold_ms'])[$key] : null;
                 $status = $state['raw'] ?? 'gray';
+                if ($status === 'gray') {
+                    $status = 'red'; // the user page has no "no data" state
+                }
                 $carrier['targets'][] = [
                     'label' => $target['label'], 'status' => $status, 'status_label' => TcpProbeStatus::LABELS[$status],
                     'latency_ms' => $state['latency_ms'] ?? null,
@@ -295,7 +298,7 @@ final class TcpProbe
         return [
             'interval_seconds' => $config['interval_seconds'],
             'carriers' => $carriers, 'enabled' => $config['enabled'], 'threshold_ms' => $config['threshold_ms'],
-            'updated_at' => $fresh ? date('m-d H:i:s', $latest['measured_at']) : '暂无有效数据',
+            'updated_at' => $latest ? date('m-d H:i:s', $latest['measured_at']) : '—',
         ];
     }
 

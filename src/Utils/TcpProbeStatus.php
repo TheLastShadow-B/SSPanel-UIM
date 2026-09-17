@@ -66,15 +66,27 @@ final class TcpProbeStatus
         return $states;
     }
 
+    /**
+     * Current per-carrier state for the user pages. There is no "no data" state here:
+     * a missing or stale report means the node is unreachable and reads as 中断, and a
+     * fresh but not yet confirmed round shows its raw reading instead of a placeholder.
+     */
     public static function current(?array $round, int $now, int $staleAfter = 180): array
     {
         $rows = [];
+        $fresh = $round !== null && $now - $round['measured_at'] <= $staleAfter;
         foreach (self::DISPLAY_NAMES as $carrier => $name) {
-            $state = $round['states'][$carrier] ?? null;
-            $status = $round && $now - $round['measured_at'] <= $staleAfter ? ($state['status'] ?? 'gray') : 'gray';
+            $state = $fresh ? ($round['states'][$carrier] ?? null) : null;
+            $status = $state['status'] ?? 'gray';
+            if ($status === 'gray') {
+                $status = $state['raw'] ?? 'gray';
+            }
+            if ($status === 'gray') {
+                $status = 'red';
+            }
             $rows[$carrier] = [
                 'carrier' => $carrier, 'name' => $name, 'status' => $status,
-                'label' => self::LABELS[$status], 'latency_ms' => $status === 'gray' ? null : ($state['latency_ms'] ?? null),
+                'label' => self::LABELS[$status], 'latency_ms' => $state['latency_ms'] ?? null,
             ];
         }
         return $rows;

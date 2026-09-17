@@ -16,6 +16,7 @@ it('lists every node with three carrier columns, regions collapsible but open by
         ->not->toContain('node-tile')
         ->not->toContain('node-seg')
         ->not->toContain('每分钟自动刷新')
+        ->not->toContain('无数据')
         ->toContain('data-probe-node=')
         ->toContain('data-probe-carrier=')
         ->toContain("\$server['display_name']")

@@ -7,6 +7,6 @@
 <div id="node-probe-status" hx-get="/user/server/{$node->id}/status" hx-trigger="every 60s" hx-swap="innerHTML">
     {include file='user/server_probe.tpl'}
 </div>
-<p id="probe-refresh-error" class="text-faint mt-3 text-xs" role="status" hidden>暂时无法更新状态，当前状态已标为无数据。历史记录保留上次读取结果。</p>
+<p id="probe-refresh-error" class="text-faint mt-3 text-xs" role="status" hidden>暂时无法更新状态，页面显示的是上次成功读取的结果。</p>
 <script src="/theme/cafe/js/node-probe.js?v={$config['assets_version']}"></script>
 {include file='shell/footer.tpl'}
