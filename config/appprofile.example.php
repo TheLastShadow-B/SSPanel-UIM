@@ -6,10 +6,11 @@ $_ENV['Clash_Config'] = [
     'mixed-port' => 7890,
     'allow-lan' => false,
     'bind-address' => '*',
-    'mode' => 'Rule',
+    'mode' => 'rule',
     'unified-delay' => true,
+    'tcp-concurrent' => true,
     'ipv6' => true,
-    'log-level' => 'info',
+    'log-level' => 'warning',
     'external-controller' => '127.0.0.1:9090',
     'secret' => 'Burst_XJJ#Clash',
     'profile' => [
@@ -25,9 +26,8 @@ $_ENV['Clash_Config'] = [
       'enable' => false,
       'stack' => 'mixed',
       'auto-route' => true,
-      'auto-redir' => true,
       'auto-detect-interface' => true,
-      'endpoint-independent-nat' => true,
+      'endpoint-independent-nat' => false,
       'dns-hijack' => [
         'any:53',
         'tcp://any:53',
@@ -37,6 +37,7 @@ $_ENV['Clash_Config'] = [
         'enable' => true,
         'ipv6' => true,
         'prefer-h3' => false,
+        'respect-rules' => true,
         'enhanced-mode' => 'fake-ip',
         'fake-ip-range' => '198.18.0.1/16',
         'fake-ip-filter' => [
@@ -52,14 +53,10 @@ $_ENV['Clash_Config'] = [
             '+.time.edu.cn',
             'time1.cloud.tencent.com',
         ],
+        // Keep remote DNS independent of Default Proxy's DIRECT/REJECT choices.
         'nameserver' => [
-            'https://223.5.5.5/dns-query',
-            'https://doh.pub/dns-query',
-            'https://dns.alidns.com/dns-query',
-        ],
-        'fallback' => [
-            'tls://8.8.4.4',
-            'tls://1.1.1.1',
+            'tls://8.8.4.4#Global',
+            'tls://1.1.1.1#Global',
         ],
         'default-nameserver' => [
             '223.5.5.5',
@@ -69,20 +66,24 @@ $_ENV['Clash_Config'] = [
             'https://doh.pub/dns-query',
             '223.5.5.5',
         ],
-        'fallback-filter' => [
-            'geoip' => true,
-            'geoip-code' => 'CN',
-            'geosite' => [
-                'gfw',
+        'direct-nameserver' => [
+            'https://223.5.5.5/dns-query#DIRECT',
+            'https://doh.pub/dns-query#DIRECT',
+        ],
+        'direct-nameserver-follow-policy' => true,
+        'nameserver-policy' => [
+            'geosite:cn' => [
+                'https://223.5.5.5/dns-query#DIRECT',
+                'https://doh.pub/dns-query#DIRECT',
             ],
-            'ipcidr' => [
-                '240.0.0.0/4',
-            ],
+            '+.lan' => 'system',
+            '+.local' => 'system',
         ],
     ],
     'sniffer' => [
             'enable' => true,
             'parse-pure-ip' => true,
+            'override-destination' => false,
             'sniff' => [
                 'HTTP' => [
                     'ports' => [80],
@@ -116,6 +117,7 @@ $_ENV['Clash_Group_Config'] = [
         [
             'name' => 'Global',
             'type' => 'select',
+            'include-all-proxies' => true,
             'proxies' => [
                 'HK',
                 'US',
@@ -128,24 +130,28 @@ $_ENV['Clash_Group_Config'] = [
             'type' => 'select',
             'include-all' => true,
             'filter' => 'JP',
+            'empty-fallback' => 'REJECT',
         ],
         [
             'name' => 'HK',
             'type' => 'select',
             'include-all' => true,
             'filter' => 'HK',
+            'empty-fallback' => 'REJECT',
         ],
         [
             'name' => 'US',
             'type' => 'select',
             'include-all' => true,
             'filter' => 'US',
+            'empty-fallback' => 'REJECT',
         ],
         [
             'name' => 'TW',
             'type' => 'select',
             'include-all' => true,
             'filter' => 'TW',
+            'empty-fallback' => 'REJECT',
         ],
         [
             'name' => 'AI Services',
@@ -214,6 +220,7 @@ $_ENV['Clash_Group_Config'] = [
         ],
     ],
     'rules' => [
+        'DOMAIN-SUFFIX,lan,DIRECT',
         'DOMAIN-SUFFIX,local,DIRECT',
         'DOMAIN-SUFFIX,arpa,DIRECT',
         'GEOIP,private,DIRECT,no-resolve',
@@ -256,8 +263,15 @@ $_ENV['Clash_Group_Config'] = [
         'GEOSITE,github,Default Proxy',
         'GEOSITE,apple,Microsoft & Apple',
         'GEOSITE,microsoft,Microsoft & Apple',
-        'GEOSITE,category-entertainment,Stream',
+        // Match game downloads before the broader entertainment category.
+        'GEOSITE,steam@cn,Steam Download',
+        'GEOSITE,category-game-platforms-download@cn,DIRECT',
+        'DOMAIN-SUFFIX,steamcontent.com,Steam Download',
+        'DOMAIN-SUFFIX,steamserver.net,Steam Download',
+        'DOMAIN,steampipe.akamaized.net,Steam Download',
+        'DOMAIN,steam.apac.qtlglb.com,Steam Download',
         'GEOSITE,category-game-platforms-download,Steam Download',
+        'GEOSITE,category-entertainment,Stream',
         'GEOSITE,cn,DIRECT',
         'GEOIP,CN,DIRECT',
         'MATCH,Final Match',

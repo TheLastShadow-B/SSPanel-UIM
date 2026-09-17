@@ -1,0 +1,89 @@
+--- a/config/appprofile.php
++++ b/config/appprofile.php
+@@ -8,6 +8,7 @@
+     'bind-address' => '*',
+-    'mode' => 'Rule',
++    'mode' => 'rule',
+     'unified-delay' => true,
++    'tcp-concurrent' => true,
+     'ipv6' => true,
+-    'log-level' => 'info',
++    'log-level' => 'warning',
+     'external-controller' => '127.0.0.1:9090',
+@@ -27,5 +28,4 @@
+       'auto-route' => true,
+-      'auto-redir' => true,
+       'auto-detect-interface' => true,
+-      'endpoint-independent-nat' => true,
++      'endpoint-independent-nat' => false,
+       'dns-hijack' => [
+@@ -39,2 +39,3 @@
+         'prefer-h3' => false,
++        'respect-rules' => true,
+         'enhanced-mode' => 'fake-ip',
+@@ -54,10 +55,6 @@
+         ],
++        // Keep remote DNS independent of Default Proxy's DIRECT/REJECT choices.
+         'nameserver' => [
+-            'https://223.5.5.5/dns-query',
+-            'https://doh.pub/dns-query',
+-            'https://dns.alidns.com/dns-query',
+-        ],
+-        'fallback' => [
+-            'tls://8.8.4.4',
+-            'tls://1.1.1.1',
++            'tls://8.8.4.4#Global',
++            'tls://1.1.1.1#Global',
+         ],
+@@ -71,11 +68,14 @@
+         ],
+-        'fallback-filter' => [
+-            'geoip' => true,
+-            'geoip-code' => 'CN',
+-            'geosite' => [
+-                'gfw',
+-            ],
+-            'ipcidr' => [
+-                '240.0.0.0/4',
+-            ],
++        'direct-nameserver' => [
++            'https://223.5.5.5/dns-query#DIRECT',
++            'https://doh.pub/dns-query#DIRECT',
++        ],
++        'direct-nameserver-follow-policy' => true,
++        'nameserver-policy' => [
++            'geosite:cn' => [
++                'https://223.5.5.5/dns-query#DIRECT',
++                'https://doh.pub/dns-query#DIRECT',
++            ],
++            '+.lan' => 'system',
++            '+.local' => 'system',
+         ],
+@@ -85,2 +85,3 @@
+             'parse-pure-ip' => true,
++            'override-destination' => false,
+             'sniff' => [
+@@ -118,2 +119,3 @@
+             'type' => 'select',
++            'include-all-proxies' => true,
+             'proxies' => [
+@@ -130,2 +132,3 @@
+             'filter' => 'JP',
++            'empty-fallback' => 'REJECT',
+         ],
+@@ -136,2 +139,3 @@
+             'filter' => 'HK',
++            'empty-fallback' => 'REJECT',
+         ],
+@@ -142,2 +146,3 @@
+             'filter' => 'US',
++            'empty-fallback' => 'REJECT',
+         ],
+@@ -148,2 +153,3 @@
+             'filter' => 'TW',
++            'empty-fallback' => 'REJECT',
+         ],
+@@ -228,2 +234,3 @@
+     'rules' => [
++        'DOMAIN-SUFFIX,lan,DIRECT',
+         'DOMAIN-SUFFIX,local,DIRECT',

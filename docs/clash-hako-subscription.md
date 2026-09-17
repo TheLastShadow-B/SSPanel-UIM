@@ -28,8 +28,7 @@ or send a user's token to a conversion service.
   Other DNS queries use Google/Cloudflare DoT through Global, independent of the
   DIRECT/REJECT choices in Default Proxy. Node-domain DNS stays independent.
   DNS respects routing rules unless an explicit resolver exit overrides them.
-  This differs from the desktop fallback-filter policy; proxy failure can still
-  affect remote DNS.
+  Proxy failure can still affect remote DNS.
 - Preserve `tun.stack: mixed`, Fake-IP and stored selections. Logging is warning;
   sniffing is disabled and DNS cache is capped at 1024 entries. These latter
   values are implementation choices for this profile, not mandated by the docs.
