@@ -27,7 +27,8 @@ final class TaierProbeSource
 
     public static function installed(): bool
     {
-        return DB::getCapsule()->schema()->hasTable('tcp_probe_source');
+        // The newest column stands for the whole feature: a half-migrated table must not be written to.
+        return DB::getCapsule()->schema()->hasColumn('tcp_probe_source', 'last_status');
     }
 
     public static function settings(): array
@@ -36,7 +37,7 @@ final class TaierProbeSource
         $data = $row ? (array) $row : [
             'enabled' => false, 'cities' => '["北京","上海","广州"]', 'interval_hours' => 6,
             'last_attempt' => 0, 'last_success' => 0, 'next_sync_at' => 0,
-            'last_message' => '尚未同步', 'lock_until' => 0,
+            'last_message' => '尚未同步', 'last_status' => 'none', 'lock_until' => 0,
         ];
         $data['cities'] = json_decode($data['cities'], true, 8, JSON_THROW_ON_ERROR);
         return $data;
@@ -235,7 +236,7 @@ final class TaierProbeSource
                 $message = '同步成功：' . count($kept) . ' 个自动目标' . ($skipped ? '，跳过 ' . $skipped . ' 个重复的手动目标' : '');
                 DB::table('tcp_probe_source')->where('id', 1)->update([
                     'last_success' => $now, 'next_sync_at' => $now + $source->interval_hours * 3600,
-                    'last_message' => $message, 'lock_token' => null, 'lock_until' => 0,
+                    'last_message' => $message, 'last_status' => 'ok', 'lock_token' => null, 'lock_until' => 0,
                 ]);
                 return ['ret' => 1, 'msg' => $message];
             });
@@ -244,7 +245,7 @@ final class TaierProbeSource
             $message = $e instanceof RuntimeException && ! $e instanceof \GuzzleHttp\Exception\GuzzleException
                 && ! $e instanceof \Illuminate\Database\QueryException ? $e->getMessage() : '泰尔同步失败，已保留原配置';
             DB::table('tcp_probe_source')->where('id', 1)->where('lock_token', $token)->update([
-                'next_sync_at' => $now + 900, 'last_message' => mb_substr($message, 0, 255),
+                'next_sync_at' => $now + 900, 'last_message' => mb_substr($message, 0, 255), 'last_status' => 'failed',
                 'lock_token' => null, 'lock_until' => 0,
             ]);
             return ['ret' => 0, 'msg' => $message];

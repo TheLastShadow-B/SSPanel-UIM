@@ -55,7 +55,7 @@ final class TcpProbeController extends BaseController
             ->assign('managed', count(array_filter($targets, static fn ($target) => $target['managed'])))
             ->assign('node_enabled', count(array_filter($nodes, static fn ($node) => $node['enabled'])))
             ->assign('taier_installed', TaierProbeSource::installed())->assign('taier', $taier)
-            ->assign('taier_status', $taier['last_success'] === 0 ? 'gray' : ($taier['last_attempt'] > $taier['last_success'] ? 'red' : 'green'))
+            ->assign('taier_status', self::taierStatus($taier))
             ->assign('taier_cities', array_keys(TaierProbeSource::CITIES))->assign('nodes', $nodes)
             ->assign('csrf_token', CSRF::token())->fetch('admin/node/probe.tpl'));
     }
@@ -70,6 +70,12 @@ final class TcpProbeController extends BaseController
         return $seconds < 3600 ? intdiv($seconds, 60) . ' 分钟前' : intdiv($seconds, 3600) . ' 小时前';
     }
 
+    /** last_status is written by sync() together with last_message, so dot and text always come from the same attempt. */
+    public static function taierStatus(array $taier): string
+    {
+        return ['ok' => 'green', 'failed' => 'red'][$taier['last_status'] ?? 'none'] ?? 'gray';
+    }
+
     public static function validateTarget(mixed $target): array
     {
         return \App\Utils\TcpProbeTarget::validate($target);
@@ -80,10 +86,11 @@ final class TcpProbeController extends BaseController
         if (! TcpProbe::installed()) {
             return $response->withJson(['ret' => 0, 'msg' => '请先运行数据库迁移'], 503);
         }
-        // The drawer posts to one endpoint and carries the id as a field; the route arg still wins.
-        $id = $args['id'] ?? $request->getParam('id');
-        $id = ($id === null || $id === '') ? null : (int) $id;
-        if ($id !== null && ! DB::table('tcp_probe_target')->where('id', $id)->exists()) {
+        // The drawer posts to one endpoint and carries the id as a form field; the route arg still wins.
+        // Never read it from the query string, and never cast blindly: id[]= would become 1.
+        $raw = $args['id'] ?? $request->getParsedBodyParam('id');
+        $id = ($raw === null || $raw === '') ? null : filter_var($raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($id === false || ($id !== null && ! DB::table('tcp_probe_target')->where('id', $id)->exists())) {
             return $response->withJson(['ret' => 0, 'msg' => '测试目标不存在'], 404);
         }
         if ($id !== null && self::managed($id)) {
@@ -150,22 +157,10 @@ final class TcpProbeController extends BaseController
     public function syncSource(ServerRequest $request, Response $response, array $args): ResponseInterface
     {
         $result = (new TaierProbeSource())->sync(true);
+        if ($result['ret'] !== 1) {
+            return $response->withJson($result, 409);
+        }
         return $response->withJson($result)->withHeader('HX-Refresh', 'true');
-    }
-
-    public function saveNode(ServerRequest $request, Response $response, array $args): ResponseInterface
-    {
-        if (! TcpProbe::installed() || ! Node::where('id', $args['id'])->exists()) {
-            return $response->withJson(['ret' => 0, 'msg' => '节点不存在或数据库尚未迁移'], 404);
-        }
-        $threshold = filter_var($request->getParam('threshold_ms'), FILTER_VALIDATE_INT);
-        if ($threshold === false || $threshold < 1 || $threshold > 3000) {
-            return $response->withJson(['ret' => 0, 'msg' => '延迟阈值必须为 1–3000 ms'], 422);
-        }
-        DB::table('tcp_probe')->updateOrInsert(['node_id' => (int) $args['id']], [
-            'enabled' => $request->getParam('enabled') === '1', 'threshold_ms' => $threshold,
-        ]);
-        return $response->withJson(['ret' => 1, 'msg' => '节点检测设置已保存']);
     }
 
     /** The whole node table saves at once, so one round trip covers every edited row. */
@@ -176,18 +171,24 @@ final class TcpProbeController extends BaseController
         }
         $thresholds = $request->getParam('threshold_ms');
         $switches = $request->getParam('enabled', []);
-        if (! is_array($thresholds) || $thresholds === [] || ! is_array($switches)) {
+        // PHP turns canonical numeric keys into ints; anything else (enabled[01]) is not a node id.
+        $canonical = static fn (array $fields): bool => array_keys($fields) === array_filter(array_keys($fields), 'is_int');
+        if (! is_array($thresholds) || $thresholds === [] || ! is_array($switches) || ! $canonical($thresholds) || ! $canonical($switches)) {
             return $response->withJson(['ret' => 0, 'msg' => '提交内容格式错误'], 422);
         }
-        $ids = array_map('intval', array_keys($thresholds));
-        if (Node::whereIn('id', $ids)->count() !== count($ids)) {
-            return $response->withJson(['ret' => 0, 'msg' => '节点已变动，请刷新后重试'], 404);
+        // max_input_vars truncates a large form from the tail without failing the request, so the
+        // form ends with a node_count sentinel; every node must be present and the count must match.
+        $expected = Node::count();
+        $ids = array_keys($thresholds);
+        if (filter_var($request->getParam('node_count'), FILTER_VALIDATE_INT) !== $expected
+            || count($ids) !== $expected || Node::whereIn('id', $ids)->count() !== $expected) {
+            return $response->withJson(['ret' => 0, 'msg' => '节点列表已变动或提交不完整，请刷新后重试'], 409);
         }
         $rows = [];
         foreach ($ids as $id) {
             $threshold = filter_var($thresholds[$id], FILTER_VALIDATE_INT);
             if ($threshold === false || $threshold < 1 || $threshold > 3000) {
-                return $response->withJson(['ret' => 0, 'msg' => '延迟阈值必须为 1–3000 ms'], 422);
+                return $response->withJson(['ret' => 0, 'msg' => '节点 #' . $id . ' 的延迟阈值必须为 1–3000 ms'], 422);
             }
             $rows[$id] = ['enabled' => ($switches[$id] ?? '0') === '1', 'threshold_ms' => $threshold];
         }

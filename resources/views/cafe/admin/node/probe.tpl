@@ -6,9 +6,9 @@
         <p class="text-body mt-1 text-sm">由节点上的 XrayR 执行，配置保存后自动下发 · 每轮每个目标 3 次，单次超时 3 秒</p>
     </div>
     {if $installed}
-        <span class="probe-pill !text-sm" data-status="{if $overview['reporting']}green{else}gray{/if}">
-            <span class="probe-dot" data-status="{if $overview['reporting']}green{else}gray{/if}"></span>
-            {if $overview['reporting']}{$overview['reporting']} 个节点在上报 · {$updated}{else}暂无节点上报{/if}
+        <span class="probe-pill !text-sm" data-status="{$overview['status']}">
+            <span class="probe-dot" data-status="{$overview['status']}"></span>
+            {if $overview['reporting']}{$overview['reporting']} / {$overview['enabled']} 个节点在上报 · {$updated}{else}暂无节点上报{/if}
         </span>
     {/if}
 </div>
@@ -39,7 +39,7 @@
                 </span>
             </div>
             <div class="mt-3 flex items-baseline gap-1.5">
-                <span class="text-ink text-2xl font-semibold tracking-tight tabular-nums">{if $c['latency_ms'] !== null}{$c['latency_ms']|string_format:"%d"}{else}—{/if}</span>
+                <span class="text-ink text-2xl font-semibold tracking-tight tabular-nums">{if $c['latency_ms'] !== null}{$c['latency_ms']|round}{else}—{/if}</span>
                 <span class="text-faint text-xs">{if $c['latency_ms'] !== null}ms 中位延迟{else}暂无有效数据{/if}</span>
             </div>
             <div class="probe-split mt-3" role="img"
@@ -119,7 +119,7 @@
                     <span class="probe-pill" data-status="{$target['status']}">
                         <span class="probe-dot" data-status="{$target['status']}"></span>{$target['status_label']}
                     </span>
-                    <p class="text-faint mt-0.5 text-xs tabular-nums">{if $target['latency_ms'] !== null}{$target['latency_ms']|string_format:"%d"} ms · {/if}{$target['reach']} 节点</p>
+                    <p class="text-faint mt-0.5 text-xs tabular-nums">{if $target['latency_ms'] !== null}{$target['latency_ms']|round} ms · {/if}{$target['reach']} 节点</p>
                 </div>
                 <div class="flex w-24 shrink-0 justify-end">
                     {if $target['managed'] && $taier['enabled']}
@@ -131,7 +131,7 @@
                                 data-id="{$target['id']}" data-carrier="{$target['carrier']}" data-label="{$target['label']|escape}"
                                 data-ip="{$target['ip']|escape}" data-port="{$target['port']}"><i class="ti ti-pencil" aria-hidden="true"></i></button>
                         <button type="button" class="probe-icon-btn" aria-label="删除 {$target['label']|escape}"
-                                hx-delete="/admin/node/probe/targets/{$target['id']}" hx-params="none"
+                                hx-delete="/admin/node/probe/targets/{$target['id']}" hx-swap="none" hx-params="none"
                                 hx-confirm="确定删除「{$target['label']|escape}」？"
                                 hx-headers='{ldelim}"X-CSRF-Token":"{$csrf_token}"{rdelim}'><i class="ti ti-trash" aria-hidden="true"></i></button>
                     {/if}
@@ -153,10 +153,10 @@
 
     {* ---- 新建 / 编辑抽屉 ---- *}
     <template x-teleport="body">
-        <div x-show="open" x-cloak class="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-labelledby="probe-drawer-title">
-            <div class="absolute inset-0 bg-black/40" x-show="open" x-transition.opacity.duration.250ms @click="open = false"></div>
+        <div x-show="open" x-cloak class="fixed inset-0 z-50 flex justify-end" role="dialog" aria-labelledby="probe-drawer-title">
+            <div class="absolute inset-0 bg-black/40" x-show="open" x-transition.opacity.duration.250ms @click="close()"></div>
             <div class="bg-card border-hairline relative flex h-full w-full max-w-md flex-col border-l shadow-xl"
-                 x-show="open" @keydown.escape.window="open = false"
+                 x-show="open" @keydown.escape.window="close()"
                  x-transition:enter="transition duration-300 ease-drawer" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
                  x-transition:leave="transition duration-200 ease-drawer" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
                 <form class="flex h-full flex-col" hx-post="/admin/node/probe/targets" hx-swap="none"
@@ -166,14 +166,14 @@
                             <h3 id="probe-drawer-title" class="text-base font-semibold" x-text="form.id ? '编辑测试目标' : '新建测试目标'">新建测试目标</h3>
                             <p class="text-faint mt-1 text-xs">保存后在下一轮检测生效</p>
                         </div>
-                        <button type="button" class="probe-icon-btn -mt-1 -mr-2" aria-label="关闭" @click="open = false"><i class="ti ti-x" aria-hidden="true"></i></button>
+                        <button type="button" class="probe-icon-btn -mt-1 -mr-2" aria-label="关闭" @click="close()"><i class="ti ti-x" aria-hidden="true"></i></button>
                     </div>
                     <div class="flex-1 overflow-y-auto p-5">
                         <input type="hidden" name="id" x-model="form.id">
                         {include file='admin/node/probe_target_fields.tpl'}
                     </div>
                     <div class="border-hairline flex gap-2 border-t p-5">
-                        <button type="button" class="btn-secondary flex-1" @click="open = false">取消</button>
+                        <button type="button" class="btn-secondary flex-1" @click="close()">取消</button>
                         <button type="submit" class="btn-primary flex-[2]" x-text="form.id ? '保存修改' : '创建目标'">创建目标</button>
                     </div>
                 </form>
@@ -184,7 +184,7 @@
 
 {* ============ 节点开关与阈值 ============ *}
 <section class="c-card-pad" x-data="probeNodes()">
-    <form hx-post="/admin/node/probe/nodes" hx-swap="none" hx-disabled-elt="find button[type=submit]"
+    <form hx-post="/admin/node/probe/nodes" hx-swap="none" novalidate hx-disabled-elt="find button[type=submit]"
           hx-headers='{ldelim}"X-CSRF-Token":"{$csrf_token}"{rdelim}' @change="recount()" @input="recount()">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -200,7 +200,7 @@
         <label class="relative mt-4 flex items-center sm:max-w-xs">
             <span class="sr-only">搜索节点</span>
             <i class="ti ti-search text-faint absolute left-3 text-base" aria-hidden="true"></i>
-            <input type="search" class="field-input pl-9" placeholder="搜索节点名称或 ID" x-model="q">
+            <input type="search" class="field-input pl-9" placeholder="搜索节点名称或 ID" x-model="q" @keydown.enter.prevent>
         </label>
 
         <div class="border-hairline text-faint mt-4 flex items-center gap-3 border-b pb-2 text-xs">
@@ -250,6 +250,8 @@
         </div>
 
         {if $nodes}
+            {* Last field on purpose: PHP truncates oversized forms from the tail, so a missing count means a truncated save. *}
+            <input type="hidden" name="node_count" value="{count($nodes)}">
             <div class="border-hairline mt-3 flex items-center justify-between gap-3 border-t pt-3">
                 <p class="text-faint text-xs" x-show="!changed">共 {count($nodes)} 个节点</p>
                 <p class="text-ink inline-flex items-center gap-2 text-sm" x-show="changed" x-cloak>
@@ -269,7 +271,7 @@
 
 {* ============ TaierSpeedtest 自动同步 ============ *}
 {if $taier_installed}
-<section class="c-card-pad" x-data="{ enabled: {if $taier['enabled']}true{else}false{/if} }">
+<section class="c-card-pad">
     <form hx-post="/admin/node/probe/source" hx-swap="none" hx-disabled-elt="find button[type=submit]"
           hx-headers='{ldelim}"X-CSRF-Token":"{$csrf_token}"{rdelim}'>
         <div class="flex items-center justify-between gap-3">
@@ -277,7 +279,7 @@
             <input type="hidden" name="enabled" value="0">
             <label class="probe-switch shrink-0">
                 <span class="sr-only">TaierSpeedtest 目标自动同步</span>
-                <input type="checkbox" name="enabled" value="1" x-model="enabled">
+                <input type="checkbox" name="enabled" value="1" {if $taier['enabled']}checked{/if}>
                 <span class="probe-switch-track"><span class="probe-switch-thumb"></span></span>
             </label>
         </div>
@@ -322,7 +324,7 @@
 
     <form class="mt-2" hx-post="/admin/node/probe/source/sync" hx-swap="none" hx-disabled-elt="find button"
           hx-headers='{ldelim}"X-CSRF-Token":"{$csrf_token}"{rdelim}'>
-        <button type="submit" class="btn-secondary w-full" :disabled="!enabled"><i class="ti ti-refresh" aria-hidden="true"></i> 立即同步</button>
+        <button type="submit" class="btn-secondary w-full" {if !$taier['enabled']}disabled title="开启并保存自动同步后可用"{/if}><i class="ti ti-refresh" aria-hidden="true"></i> 立即同步</button>
         <span class="htmx-indicator text-faint mt-2 block text-center text-xs" role="status">正在获取目标…</span>
     </form>
 </section>
@@ -381,14 +383,23 @@
             },
             create() {
                 this.form = { id: '', carrier: 'telecom', label: '', ip: '', port: 443 };
-                this.open = true;
+                this.show();
             },
             edit(el) {
                 this.form = {
                     id: el.dataset.id, carrier: el.dataset.carrier,
                     label: el.dataset.label, ip: el.dataset.ip, port: el.dataset.port,
                 };
+                this.show();
+            },
+            show() {
+                this.opener = document.activeElement;
                 this.open = true;
+                this.$nextTick(() => document.getElementById('probe-target-label')?.focus());
+            },
+            close() {
+                this.open = false;
+                if (this.opener && typeof this.opener.focus === 'function') this.opener.focus();
             },
         };
     }
@@ -398,6 +409,9 @@
         return {
             q: '',
             changed: 0,
+            init() {
+                this.recount();   // Firefox 等浏览器刷新后会静默恢复表单值,不触发 change
+            },
             fields() {
                 return Array.from(this.$root.querySelectorAll('[data-initial]'));
             },

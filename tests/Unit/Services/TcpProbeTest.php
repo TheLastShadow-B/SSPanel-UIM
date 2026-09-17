@@ -35,14 +35,23 @@ afterEach(function () {
     if ($this->resolver) { Node::setConnectionResolver($this->resolver); } else { Node::unsetConnectionResolver(); }
 });
 
-function tcpReport(int $time, mixed $first = 120, mixed $second = 150): array
+/** A scalar repeats for all three samples; an array lists the three samples explicitly. */
+function tcpReport(int $time, mixed $first = 120, mixed $second = 150, int $node = 1): array
 {
     $results = [];
     foreach ([1 => $first, 2 => $second] as $id => $value) {
-        $results[] = ['target_id' => $id, 'samples' => array_fill(0, 3,
-            ['latency_ms' => is_numeric($value) ? $value : null, 'error' => is_numeric($value) ? null : $value])];
+        $results[] = ['target_id' => $id, 'samples' => array_map(
+            static fn ($s) => ['latency_ms' => is_numeric($s) ? $s : null, 'error' => is_numeric($s) ? null : $s],
+            is_array($value) ? $value : array_fill(0, 3, $value))];
     }
-    return ['config_hash' => TcpProbe::config(1)['config_hash'], 'measured_at' => $time, 'results' => $results];
+    return ['config_hash' => TcpProbe::config($node)['config_hash'], 'measured_at' => $time, 'results' => $results];
+}
+
+function tcpNodeTable(): void
+{
+    test()->database->schema()->create('node', function (Blueprint $table) {
+        $table->increments('id'); $table->string('name')->default('');
+    });
 }
 
 it('migrates repeatedly and reverses without touching node schema', function () {
@@ -254,8 +263,11 @@ it('rolls every enabled node up into the admin overview and renders every row', 
     $smarty->setForceCompile(true);
     $targets = array_map(static fn ($target) => $target + [
         'status' => $overview['targets'][$target['id']]['status'], 'status_label' => $overview['targets'][$target['id']]['label'],
-        'latency_ms' => $overview['targets'][$target['id']]['latency_ms'], 'reach' => '1 / 2', 'managed' => false,
+        'latency_ms' => $overview['targets'][$target['id']]['latency_ms'],
+        'reach' => $overview['targets'][$target['id']]['ok'] . ' / ' . $overview['targets'][$target['id']]['total'], 'managed' => false,
     ], TcpProbe::targets());
+    // Medians carry two decimals; the console must round them, not truncate (250.5 is over a 250 threshold).
+    $overview['carriers']['telecom']['latency_ms'] = 250.5;
     $nodes = [
         ['id' => 1, 'name' => '香港 01', 'enabled' => true, 'threshold_ms' => 250,
             'states' => $overview['nodes'][1]['states'], 'state_labels' => ['telecom' => '正常'], 'reported' => '0 秒前'],
@@ -272,6 +284,13 @@ it('rolls every enabled node up into the admin overview and renders every row', 
 
     expect($html)->toContain('data-nav="node-probe"')->toContain('TaierSpeedtest')
         ->toContain('name="threshold_ms[2]"')->toContain('name="enabled[1]"')
+        ->toContain('>251</span>')->toContain('2 / 2 个节点在上报')
+        // The node form must reach the server even when a search-hidden row is invalid, must not submit on Enter
+        // in its search box, and must carry a trailing sentinel so a request truncated by max_input_vars is detectable.
+        ->toContain('hx-post="/admin/node/probe/nodes" hx-swap="none" novalidate')
+        ->toContain('placeholder="搜索节点名称或 ID" x-model="q" @keydown.enter.prevent')
+        ->toContain('<input type="hidden" name="node_count" value="2">')
+        ->toContain('hx-delete="/admin/node/probe/targets/1" hx-swap="none"')
         // Every row renders; the list scrolls instead of truncating.
         ->and(substr_count($html, 'data-probe-target data-carrier'))->toBe(2)
         ->and(substr_count($html, 'data-probe-node data-search'))->toBe(2)
@@ -360,16 +379,143 @@ it('spreads long detection periods across history buckets without double countin
     expect($history['buckets'][94]['status'])->toBe('green')->and($history['buckets'][95]['status'])->toBe('green');
 });
 
-it('persists node switches and rejects invalid thresholds', function () {
-    $this->database->schema()->create('node', function (Blueprint $table) { $table->increments('id'); });
-    Node::create(['id' => 1]);
+it('saves the whole node table only when every node arrived intact', function () {
+    tcpNodeTable();
+    Node::create(['id' => 1]); Node::create(['id' => 2]);
     $controller = (new ReflectionClass(TcpProbeController::class))->newInstanceWithoutConstructor();
     $factory = new HttpFactory();
     $responses = new DecoratedResponseFactory($factory, $factory);
-    $request = (new DecoratedServerRequestFactory($factory))->createServerRequest('POST', '/admin/node/1/probe')->withParsedBody(['enabled' => '0', 'threshold_ms' => '300']);
-    expect($controller->saveNode($request, $responses->createResponse(), ['id' => 1])->getStatusCode())->toBe(200)
-        ->and(TcpProbe::config(1)['enabled'])->toBeFalse()->and(TcpProbe::config(1)['threshold_ms'])->toBe(300);
-    $bad = $request->withParsedBody(['enabled' => '1', 'threshold_ms' => 'invalid']);
-    expect($controller->saveNode($bad, $responses->createResponse(), ['id' => 1])->getStatusCode())->toBe(422)
-        ->and(TcpProbe::config(1)['enabled'])->toBeFalse();
+    $request = (new DecoratedServerRequestFactory($factory))->createServerRequest('POST', '/admin/node/probe/nodes');
+    $post = fn (array $body) => $controller->saveNodes($request->withParsedBody($body), $responses->createResponse(), []);
+    $full = ['threshold_ms' => [1 => '300', 2 => '250'], 'enabled' => [1 => '0', 2 => '1'], 'node_count' => '2'];
+    expect($post($full)->getStatusCode())->toBe(200)
+        ->and(TcpProbe::config(1)['enabled'])->toBeFalse()->and(TcpProbe::config(1)['threshold_ms'])->toBe(300)
+        ->and(TcpProbe::config(2)['enabled'])->toBeTrue();
+    // PHP drops fields past max_input_vars from the tail, so a truncated request loses the sentinel first;
+    // a page rendered before a node was added or removed carries the wrong count.
+    foreach ([['node_count' => null], ['node_count' => '1'], ['threshold_ms' => [1 => '200']]] as $partial) {
+        expect($post(array_replace($full, $partial))->getStatusCode())->toBe(409);
+    }
+    // Non-canonical keys such as enabled[01] must be refused rather than mapped onto another node.
+    foreach ([['threshold_ms' => ['01' => '200', 2 => '250']], ['enabled' => ['01' => '1', 2 => '1']]] as $crafted) {
+        expect($post(array_replace($full, $crafted))->getStatusCode())->toBe(422);
+    }
+    $response = $post(array_replace($full, ['threshold_ms' => [1 => '300', 2 => '0']]));
+    expect($response->getStatusCode())->toBe(422)
+        ->and(json_decode((string) $response->getBody(), true)['msg'])->toContain('#2')
+        ->and(TcpProbe::config(1)['threshold_ms'])->toBe(300)->and(TcpProbe::config(2)['enabled'])->toBeTrue();
+    expect($post(['threshold_ms' => [1 => '300', 2 => '250'], 'node_count' => '2'])->getStatusCode())->toBe(200)
+        ->and(TcpProbe::config(2)['enabled'])->toBeFalse();
+});
+
+it('takes the target id from the route or the form body only', function () {
+    $controller = (new ReflectionClass(TcpProbeController::class))->newInstanceWithoutConstructor();
+    $factory = new HttpFactory();
+    $responses = new DecoratedResponseFactory($factory, $factory);
+    $request = (new DecoratedServerRequestFactory($factory))->createServerRequest('POST', '/admin/node/probe/targets');
+    $body = ['carrier' => 'mobile', 'label' => '注入', 'ip' => '9.9.9.9', 'port' => '443'];
+    $save = fn (\Psr\Http\Message\ServerRequestInterface $request) => $controller->saveTarget($request, $responses->createResponse(), []);
+    // An array id must not cast to 1, and a query-string id must not select a row either.
+    expect($save($request->withParsedBody($body + ['id' => ['']]))->getStatusCode())->toBe(404)
+        ->and($save($request->withQueryParams(['id' => '1'])->withParsedBody($body))->getStatusCode())->toBe(200)
+        ->and(DB::table('tcp_probe_target')->where('id', 1)->first()->label)->toBe('广东电信')
+        ->and(TcpProbe::targets())->toHaveCount(3);
+    foreach (['0', '-1', 'abc'] as $bad) {
+        expect($save($request->withParsedBody($body + ['id' => $bad]))->getStatusCode())->toBe(404);
+    }
+    expect($save($request->withParsedBody(array_replace($body, ['id' => '2', 'ip' => '9.9.9.10'])))->getStatusCode())->toBe(200)
+        ->and(DB::table('tcp_probe_target')->where('id', 2)->first()->ip)->toBe('9.9.9.10')
+        ->and(TcpProbe::targets())->toHaveCount(3);
+});
+
+it('counts a node still on an outdated config as alive but without valid data', function () {
+    tcpNodeTable();
+    Node::create(['id' => 1]); Node::create(['id' => 2]);
+    DB::table('tcp_probe')->insert(['node_id' => 2, 'enabled' => true, 'threshold_ms' => 250]);
+    foreach ([$this->now - 60, $this->now] as $at) {
+        TcpProbe::report(1, tcpReport($at), $at);
+        TcpProbe::report(2, tcpReport($at), $at);
+    }
+    // Node 2's config hash changes; it keeps reporting on the old one until it fetches the new config.
+    DB::table('tcp_probe')->where('node_id', 2)->update(['threshold_ms' => 300]);
+    $overview = TcpProbe::overview($this->now);
+    expect($overview['reporting'])->toBe(2)
+        ->and($overview['measured_at'])->toBe($this->now)
+        ->and($overview['nodes'][2]['measured_at'])->toBe($this->now)
+        ->and($overview['nodes'][2]['states'])->toBe(['telecom' => 'gray', 'unicom' => 'gray', 'mobile' => 'gray'])
+        ->and($overview['carriers']['telecom']['counts'])->toBe(['green' => 1, 'yellow' => 0, 'red' => 0, 'gray' => 1])
+        ->and($overview['carriers']['telecom']['latency_ms'])->toBe(135.0)
+        ->and([$overview['targets'][1]['ok'], $overview['targets'][1]['total']])->toBe([1, 1]);
+});
+
+it('keeps unconfirmed latency and deleted nodes out of the overview and grades the header', function () {
+    tcpNodeTable();
+    Node::create(['id' => 1]); Node::create(['id' => 2]);
+    DB::table('tcp_probe')->insert([
+        ['node_id' => 2, 'enabled' => true, 'threshold_ms' => 250],
+        ['node_id' => 3, 'enabled' => true, 'threshold_ms' => 250],
+    ]);
+    foreach ([$this->now - 60, $this->now] as $at) {
+        TcpProbe::report(1, tcpReport($at), $at);
+        TcpProbe::report(3, tcpReport($at), $at);
+    }
+    // Node 2's first round is still unconfirmed gray; node 3 no longer exists in the node table.
+    TcpProbe::report(2, tcpReport($this->now, 1000, 1000), $this->now);
+    $overview = TcpProbe::overview($this->now);
+    expect($overview['reporting'])->toBe(2)->and($overview['enabled'])->toBe(2)
+        ->and($overview['nodes'])->not->toHaveKey(3)
+        ->and($overview['carriers']['telecom']['counts'])->toBe(['green' => 1, 'yellow' => 0, 'red' => 0, 'gray' => 1])
+        ->and($overview['carriers']['telecom']['latency_ms'])->toBe(135.0)
+        ->and($overview['targets'][1]['total'])->toBe(2)
+        ->and($overview['status'])->toBe('green');
+    // An enabled node that has gone silent degrades the header even while every carrier is fine.
+    Node::create(['id' => 4]);
+    DB::table('tcp_probe')->insert(['node_id' => 4, 'enabled' => true, 'threshold_ms' => 250]);
+    expect(TcpProbe::overview($this->now)['status'])->toBe('yellow');
+    foreach ([60, 120, 180] as $offset) {
+        TcpProbe::report(1, tcpReport($this->now + $offset, 'timeout', 'timeout'), $this->now + $offset);
+    }
+    expect(TcpProbe::overview($this->now + 180)['status'])->toBe('red')
+        ->and(TcpProbe::overview($this->now + 180)['reporting'])->toBe(2);
+});
+
+it('rates each target per node by the rule the carrier status uses', function () {
+    tcpNodeTable();
+    Node::create(['id' => 1]); Node::create(['id' => 2]);
+    DB::table('tcp_probe')->insert(['node_id' => 2, 'enabled' => true, 'threshold_ms' => 250]);
+    foreach ([$this->now - 60, $this->now] as $at) {
+        TcpProbe::report(1, tcpReport($at, 'timeout', 400), $at);
+        TcpProbe::report(2, tcpReport($at, [200, 'timeout', 'timeout'], 400, 2), $at);
+    }
+    $targets = TcpProbe::overview($this->now)['targets'];
+    // One success out of three is degraded, not healthy; slow but reachable is degraded, never broken.
+    expect([$targets[1]['ok'], $targets[1]['total'], $targets[1]['status'], $targets[1]['latency_ms']])->toBe([0, 2, 'yellow', 200.0])
+        ->and([$targets[2]['ok'], $targets[2]['total'], $targets[2]['status'], $targets[2]['latency_ms']])->toBe([0, 2, 'yellow', 400.0]);
+    foreach ([60, 120] as $offset) {
+        TcpProbe::report(1, tcpReport($this->now + $offset, 'timeout', 100), $this->now + $offset);
+        TcpProbe::report(2, tcpReport($this->now + $offset, 'timeout', 100, 2), $this->now + $offset);
+    }
+    $targets = TcpProbe::overview($this->now + 120)['targets'];
+    expect([$targets[1]['ok'], $targets[1]['total'], $targets[1]['status']])->toBe([0, 2, 'red'])
+        ->and([$targets[2]['ok'], $targets[2]['total'], $targets[2]['status']])->toBe([2, 2, 'green']);
+});
+
+it('maps the persisted Taier verdict onto the status dot', function () {
+    expect(TcpProbeController::taierStatus(['last_status' => 'none']))->toBe('gray')
+        ->and(TcpProbeController::taierStatus(['last_status' => 'ok']))->toBe('green')
+        ->and(TcpProbeController::taierStatus(['last_status' => 'failed']))->toBe('red')
+        ->and(TcpProbeController::taierStatus([]))->toBe('gray');
+});
+
+it('reports a refused manual sync instead of reloading the page', function () {
+    (require BASE_PATH . '/db/migrations/2026091703-add_taier_probe_sync.php')->up();
+    (require BASE_PATH . '/db/migrations/2026091704-add_taier_sync_status.php')->up();
+    $controller = (new ReflectionClass(TcpProbeController::class))->newInstanceWithoutConstructor();
+    $factory = new HttpFactory();
+    $responses = new DecoratedResponseFactory($factory, $factory);
+    $request = (new DecoratedServerRequestFactory($factory))->createServerRequest('POST', '/admin/node/probe/source/sync');
+    $response = $controller->syncSource($request, $responses->createResponse(), []);
+    expect($response->getStatusCode())->toBe(409)
+        ->and($response->hasHeader('HX-Refresh'))->toBeFalse()
+        ->and(json_decode((string) $response->getBody(), true)['ret'])->toBe(0);
 });

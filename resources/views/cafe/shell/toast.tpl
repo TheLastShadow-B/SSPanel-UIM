@@ -1,5 +1,6 @@
 {* toast 通知 + htmx JSON 协议处理(cafe 主题共享部件) *}
-<div id="toast-stack" class="pointer-events-none fixed top-4 right-4 z-50 flex flex-col items-end gap-2"></div>
+{* z-[60]:必须盖过 z-50 的抽屉/模态,否则表单错误的 toast 会被遮住 *}
+<div id="toast-stack" class="pointer-events-none fixed top-4 right-4 z-[60] flex flex-col items-end gap-2"></div>
 
 {literal}
 <script>

@@ -27,6 +27,8 @@ beforeEach(function () {
         $this->migration = require BASE_PATH . '/db/migrations/' . $name . '.php';
         $this->migration->up();
     }
+    $this->statusMigration = require BASE_PATH . '/db/migrations/2026091704-add_taier_sync_status.php';
+    $this->statusMigration->up();
     DB::table('tcp_probe')->insert(['node_id' => 1, 'enabled' => true, 'threshold_ms' => 250]);
     DB::table('tcp_probe_target')->insert(['carrier' => 'telecom', 'label' => '手动', 'ip' => '1.1.1.1', 'port' => 443]);
     TaierProbeSource::saveSettings(true, ['北京', '上海', '广州'], 6);
@@ -197,4 +199,41 @@ it('validates settings and safely migrates existing targets', function () {
     }
     expect($this->migration->down())->toBe(2026091702)->and(TaierProbeSource::installed())->toBeFalse()
         ->and(TcpProbe::targets()[0]['ip'])->toBe('1.1.1.1');
+});
+
+it('records the outcome of each completed attempt so the dot always matches the message', function () {
+    $settings = fn () => TaierProbeSource::settings();
+    expect($settings()['last_status'])->toBe('none')->and(TcpProbeController::taierStatus($settings()))->toBe('gray');
+    expect(taierSource(taierResponses())->sync(true, $this->now)['ret'])->toBe(1)
+        ->and($settings()['last_status'])->toBe('ok')->and(TcpProbeController::taierStatus($settings()))->toBe('green');
+    // Settings saved while a sync is in flight: the result is discarded, and the verdict beside "同步成功" must survive.
+    $responses = taierResponses();
+    $responses[0] = function () {
+        TaierProbeSource::saveSettings(false, ['北京'], 6);
+        return new Response(200, [], '1.1.1.1|[]');
+    };
+    expect(taierSource($responses)->sync(true, $this->now + 60)['ret'])->toBe(0)
+        ->and($settings()['last_attempt'])->toBe($this->now + 60)
+        ->and($settings()['last_message'])->toContain('同步成功')
+        ->and($settings()['last_status'])->toBe('ok')->and(TcpProbeController::taierStatus($settings()))->toBe('green');
+    // A refused claim writes nothing; a completed failure writes its message and verdict together.
+    expect(taierSource([])->sync(true, $this->now + 120)['ret'])->toBe(0)->and($settings()['last_status'])->toBe('ok');
+    TaierProbeSource::saveSettings(true, ['北京'], 6);
+    $responses = taierResponses(array_slice(taierRows(), 0, 3));
+    $responses[2] = new Response(503);
+    expect(taierSource($responses)->sync(true, $this->now + 180)['ret'])->toBe(0)
+        ->and($settings()['last_message'])->toContain('已保留原配置')
+        ->and($settings()['last_status'])->toBe('failed')->and(TcpProbeController::taierStatus($settings()))->toBe('red');
+});
+
+it('adds the status column once and derives it from the timestamps of existing rows', function () {
+    foreach ([[900, 900, 'ok'], [950, 900, 'failed'], [900, 0, 'failed'], [0, 0, 'none']] as [$attempt, $success, $status]) {
+        expect($this->statusMigration->down())->toBe(2026091703)->and(TaierProbeSource::installed())->toBeFalse();
+        DB::table('tcp_probe_source')->update(['last_attempt' => $attempt, 'last_success' => $success]);
+        expect($this->statusMigration->up())->toBe(2026091704)->and(TaierProbeSource::settings()['last_status'])->toBe($status);
+    }
+    // Re-running the migration must not overwrite a verdict written by sync().
+    DB::table('tcp_probe_source')->update(['last_status' => 'ok']);
+    $this->statusMigration->up();
+    expect(TaierProbeSource::settings()['last_status'])->toBe('ok');
 });
