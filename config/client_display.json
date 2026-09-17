@@ -33,6 +33,20 @@
       }
     },
     {
+      "name": "Clash",
+      "description": "适用于 Apple 平台的原生客户端",
+      "format": "calsh-hako",
+      "importUrl": "clash://install-config?url={sub}/calsh-hako&name={name}",
+      "platforms": {
+        "iOS": {
+          "storeUrl": "https://apps.apple.com/app/id6794257189"
+        },
+        "macOS": {
+          "storeUrl": "https://apps.apple.com/app/id6794257189"
+        }
+      }
+    },
+    {
       "name": "Stash",
       "description": "iOS 平台强大的网络工具",
       "format": "stash",

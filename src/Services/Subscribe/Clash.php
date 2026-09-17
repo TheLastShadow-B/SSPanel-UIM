@@ -16,6 +16,11 @@ final class Clash extends Base
 {
     public function getContent($user): string
     {
+        return yaml_emit($this->getConfig($user), YAML_UTF8_ENCODING);
+    }
+
+    public function getConfig($user): array
+    {
         $nodes = [];
         $clash_config = $_ENV['Clash_Config'];
         $clash_group_indexes = $_ENV['Clash_Group_Indexes'];
@@ -249,10 +254,7 @@ final class Clash extends Base
             'proxies' => $nodes,
         ];
 
-        return yaml_emit(
-            array_merge($clash_config, $clash_nodes, $clash_group_config),
-            YAML_UTF8_ENCODING
-        );
+        return array_merge($clash_config, $clash_nodes, $clash_group_config);
     }
 
     /**
