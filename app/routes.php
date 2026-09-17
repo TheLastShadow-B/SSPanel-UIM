@@ -42,6 +42,9 @@ return static function (Slim\App $app): void {
         $group->get('/banned', App\Controllers\UserController::class . ':banned');
         // 节点
         $group->get('/server', App\Controllers\User\ServerController::class . ':index');
+        $group->get('/server/status', App\Controllers\User\ServerController::class . ':summary');
+        $group->get('/server/{id:[0-9]+}', App\Controllers\User\ServerController::class . ':detail');
+        $group->get('/server/{id:[0-9]+}/status', App\Controllers\User\ServerController::class . ':status');
         // 动态倍率
         $group->get('/rate', App\Controllers\User\RateController::class . ':index');
         $group->post('/rate', App\Controllers\User\RateController::class . ':ajax');
@@ -155,6 +158,9 @@ return static function (Slim\App $app): void {
         $group->get('', App\Controllers\AdminController::class . ':index');
         $group->get('/', App\Controllers\AdminController::class . ':index');
         // Node
+        $group->get('/node/probe', App\Controllers\Admin\TcpProbeController::class . ':index');
+        $group->post('/node/probe/targets', App\Controllers\Admin\TcpProbeController::class . ':saveTargets')->add(new App\Middleware\CSRF());
+        $group->post('/node/{id:[0-9]+}/probe', App\Controllers\Admin\TcpProbeController::class . ':saveNode')->add(new App\Middleware\CSRF());
         $group->get('/node', App\Controllers\Admin\NodeController::class . ':index');
         $group->get('/node/create', App\Controllers\Admin\NodeController::class . ':create');
         $group->post('/node', App\Controllers\Admin\NodeController::class . ':add');
@@ -342,6 +348,8 @@ return static function (Slim\App $app): void {
     $app->group('/mod_mu', static function (RouteCollectorProxy $group): void {
         // 节点
         $group->get('/nodes/{id:[0-9]+}/info', App\Controllers\WebAPI\NodeController::class . ':getInfo');
+        $group->get('/nodes/{id:[0-9]+}/tcp-probe', App\Controllers\WebAPI\TcpProbeController::class . ':config');
+        $group->post('/nodes/{id:[0-9]+}/tcp-probe', App\Controllers\WebAPI\TcpProbeController::class . ':report');
         // 用户
         $group->get('/users', App\Controllers\WebAPI\UserController::class . ':index');
         $group->post('/users/traffic', App\Controllers\WebAPI\UserController::class . ':addTraffic');

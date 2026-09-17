@@ -50,6 +50,7 @@ EOL;
 
         // Run node related jobs
         $jobs->updateNodeIp();
+        \App\Services\TcpProbe::cleanup();
 
         if ($_ENV['enable_detect_offline']) {
             $jobs->detectNodeOffline();

@@ -51,7 +51,7 @@
                             <article class="px-5 py-5 sm:px-6" aria-labelledby="node-title-{$server['id']}">
                                 <div class="grid items-center gap-4 xl:grid-cols-2 xl:gap-6">
                                     <div class="min-w-0">
-                                        <h4 id="node-title-{$server['id']}" class="text-sm font-semibold wrap-anywhere">{$server['name']|escape}</h4>
+                                        <h4 id="node-title-{$server['id']}" class="text-sm font-semibold wrap-anywhere"><a class="hover:text-primary focus-visible:outline-primary" href="/user/server/{$server['id']}">{$server['name']|escape} <i class="ti ti-chevron-right text-faint" aria-hidden="true"></i></a></h4>
                                         <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
                                             {if $server['color'] === 'green'}
                                                 <span class="text-success inline-flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>在线</span>
@@ -90,6 +90,14 @@
                                         </div>
                                     </dl>
                                 </div>
+                                <a href="/user/server/{$server['id']}" data-probe-node="{$server['id']}" class="mt-3 inline-flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" aria-label="查看 {$server['name']|escape} 的回国检测详情">
+                                    {foreach $server['probe_status'] as $carrier}
+                                        <span data-probe-carrier="{$carrier['carrier']}" class="text-body inline-flex items-center gap-1.5" title="去往{$carrier['name']}：{$carrier['label']}">
+                                            <span class="probe-dot" data-status="{$carrier['status']}" aria-hidden="true"></span>
+                                            去往{$carrier['name']}<span class="sr-only">：{$carrier['label']}</span>
+                                        </span>
+                                    {/foreach}
+                                </a>
                                 {if $user->class < $server['class']}
                                     <p class="text-body mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                                         <span>需要 LV. {$server['class']} 订阅</span>
@@ -110,4 +118,5 @@
     {/foreach}
 </div>
 
+<script src="/theme/cafe/js/node-probe.js?v={$config['assets_version']}"></script>
 {include file="shell/footer.tpl"}

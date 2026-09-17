@@ -5,9 +5,12 @@
         <h2 class="text-2xl font-semibold tracking-tight">节点</h2>
         <p class="text-faint mt-1 text-sm">系统中所有节点的列表</p>
     </div>
+    <div class="flex gap-2">
+    <a href="/admin/node/probe" class="btn-secondary btn-sm"><i class="ti ti-activity"></i> 回国检测</a>
     <a href="/admin/node/create" class="btn-primary btn-sm">
         <i class="ti ti-plus"></i> 创建节点
     </a>
+    </div>
 </div>
 
 <div x-data="cafeTable('/admin/node/ajax', 'nodes')" class="c-card">

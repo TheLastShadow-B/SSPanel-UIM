@@ -115,6 +115,35 @@ class TestDatabase
                 $table->index('log_time');
             });
         }
+
+        if (!$schema->hasTable('tcp_probe_target')) {
+            $schema->create('tcp_probe_target', function (Blueprint $table) {
+                $table->unsignedInteger('id')->primary();
+                $table->string('carrier', 16);
+                $table->string('label', 80);
+                $table->string('ip', 45);
+                $table->unsignedInteger('port');
+            });
+        }
+        if (!$schema->hasTable('tcp_probe')) {
+            $schema->create('tcp_probe', function (Blueprint $table) {
+                $table->unsignedInteger('node_id')->primary();
+                $table->boolean('enabled')->default(false);
+                $table->unsignedInteger('threshold_ms')->default(250);
+            });
+        }
+        if (!$schema->hasTable('tcp_probe_round')) {
+            $schema->create('tcp_probe_round', function (Blueprint $table) {
+                $table->bigIncrements('id');
+                $table->unsignedInteger('node_id');
+                $table->unsignedInteger('minute');
+                $table->unsignedInteger('measured_at')->index();
+                $table->string('config_hash', 64);
+                $table->text('results');
+                $table->text('states');
+                $table->unique(['node_id', 'minute']);
+            });
+        }
         
         if (!$schema->hasTable('user_traffic_log')) {
             $schema->create('user_traffic_log', function (Blueprint $table) {
@@ -276,7 +305,7 @@ class TestDatabase
         $capsule = DB::getCapsule();
         $schema = $capsule->schema();
         
-        $tables = ['user_coupon', 'stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'product', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
+        $tables = ['tcp_probe_round', 'tcp_probe', 'tcp_probe_target', 'user_coupon', 'stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'product', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
         
         foreach ($tables as $table) {
             if ($schema->hasTable($table)) {

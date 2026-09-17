@@ -1,0 +1,14 @@
+/* Shared colors for compact node indicators and quarter-hour history bars. */
+.probe-dot, .probe-bar, .probe-state-icon { --probe-color: var(--color-faint); }
+[data-status="green"] { --probe-color: #1bbf96; }
+[data-status="yellow"] { --probe-color: #e5ac36; }
+[data-status="red"] { --probe-color: #ed6573; }
+[data-status="gray"] { --probe-color: #a0a5b1; }
+.probe-dot { display: inline-block; width: .5rem; height: .5rem; flex-shrink: 0; border-radius: 50%; background: var(--probe-color); }
+.probe-state-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; color: white; background: var(--probe-color); }
+.probe-history { display: grid; grid-template-columns: repeat(96, minmax(0, 1fr)); gap: 3px; }
+.probe-bar { display: block; width: 100%; min-width: 0; height: 28px; padding: 0; border: 0; border-radius: 2px; background: var(--probe-color); cursor: pointer; }
+.probe-bar[data-status="gray"] { opacity: .35; }
+.probe-bar:hover, .probe-bar:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; position: relative; z-index: 1; }
+.probe-components > summary::-webkit-details-marker { display: none; }
+@media (max-width: 640px) { .probe-history { gap: 1px; } .probe-bar { height: 28px; border-radius: 1px; } }

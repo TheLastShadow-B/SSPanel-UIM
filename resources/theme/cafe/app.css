@@ -7,6 +7,7 @@
 
 @import "tailwindcss";
 @import "./motion.css";
+@import "./probe.css";
 
 @source "../../views/cafe";
 
