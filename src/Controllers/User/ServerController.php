@@ -8,7 +8,7 @@ use App\Controllers\BaseController;
 use App\Services\Subscribe;
 use App\Services\TcpProbe;
 use App\Utils\NodeRegion;
-use App\Utils\Tools;
+use App\Utils\TcpProbeStatus;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
@@ -29,25 +29,26 @@ final class ServerController extends BaseController
             $node_list[] = [
                 'id' => $node->id,
                 'name' => $node->name,
+                'display_name' => $node->displayName(),
                 'country' => $node->country ?? '',
                 'probe_status' => $probe_status[$node->id],
                 'class' => (int) $node->node_class,
-                'color' => $node->color,
+                'locked' => $this->user->class < (int) $node->node_class,
                 'connection_type' => $node->connection_type,
-                'sort' => $node->sort(),
+                'proto' => $node->sortShort(),
                 'online_user' => $node->online_user,
                 'online' => $node->getNodeOnlineStatus(),
                 'traffic_rate' => $node->traffic_rate,
                 'is_dynamic_rate' => $node->is_dynamic_rate,
-                'node_bandwidth' => Tools::autoBytes($node->node_bandwidth),
-                'node_bandwidth_limit' => $node->node_bandwidth_limit === 0 ? '无限制' :
-                    Tools::autoBytes($node->node_bandwidth_limit),
             ];
         }
 
         return $response->write(
             $this->view()
                 ->assign('server_groups', NodeRegion::group($node_list))
+                ->assign('carrier_tally', TcpProbeStatus::tally($probe_status))
+                ->assign('node_total', count($node_list))
+                ->assign('node_online', count(array_filter($node_list, static fn ($node) => $node['online'] === 1)))
                 ->fetch('user/server.tpl')
         );
     }

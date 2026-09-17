@@ -94,6 +94,30 @@ final class Node extends Model
         };
     }
 
+    /** Short protocol label for chips; sort() keeps the full names used elsewhere. */
+    public function sortShort(): string
+    {
+        return match ($this->sort) {
+            0 => 'SS',
+            1 => 'SS2022',
+            2 => 'TUIC',
+            3 => 'WG',
+            11 => 'Vmess',
+            12 => 'VLESS',
+            14 => 'Trojan',
+            15 => 'Hy2',
+            default => '未知',
+        };
+    }
+
+    /** Node name without a leading bracketed tag such as "[Hy2]"; the list shows the protocol as its own chip. */
+    public function displayName(): string
+    {
+        $name = trim((string) $this->name);
+        $stripped = trim((string) preg_replace('/^\[[^\]]*\]\s*/u', '', $name));
+        return $stripped === '' ? $name : $stripped;
+    }
+
     public function isDynamicRate(): string
     {
         return $this->is_dynamic_rate ? '是' : '否';

@@ -1,5 +1,5 @@
 /* Shared colors for compact node indicators and quarter-hour history bars. */
-.probe-dot, .probe-bar, .probe-state-icon, .probe-split > span { --probe-color: var(--color-faint); }
+.probe-dot, .probe-bar, .probe-state-icon, :where(.probe-split > span) { --probe-color: var(--color-faint); }
 [data-status="green"] { --probe-color: #1bbf96; }
 [data-status="yellow"] { --probe-color: #e5ac36; }
 [data-status="red"] { --probe-color: #ed6573; }
@@ -83,3 +83,80 @@
 .probe-radio input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .probe-radio:has(input:checked) { background: var(--color-card); color: var(--color-ink); font-weight: 600; box-shadow: 0 1px 2px rgb(25 28 34 / .12); }
 .probe-radio:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* ---- 用户端节点列表(/user/server):三网各占一列,正常只画点、波动 / 中断用带字胶囊 ---- */
+.probe-dot.is-hollow, .probe-cell[data-status="gray"] > .probe-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--probe-color); }
+.probe-split > span[hidden], [data-tally-item][hidden] { display: none; }
+
+.node-tile {
+    display: flex; flex-direction: column; gap: .625rem; min-height: 6.5rem; padding: 1rem 1.125rem;
+    border: 0; border-radius: var(--radius-tile); background: var(--color-card);
+    box-shadow: inset 0 0 0 1px var(--color-hairline); text-align: left; cursor: pointer; transition: box-shadow .15s ease;
+}
+.node-tile:hover { box-shadow: inset 0 0 0 1px var(--color-faint); }
+.node-tile.is-on { box-shadow: inset 0 0 0 2px var(--color-primary); }
+.node-tile:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.node-tile-check { display: none; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: .75rem; }
+.node-tile.is-on .node-tile-check { display: inline-flex; }
+
+.node-seg-track { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--color-tile); }
+.node-seg { flex: 1 1 0; height: 2.375rem; border: 0; border-radius: 999px; background: transparent; color: var(--color-body); font-size: .875rem; font-weight: 500; cursor: pointer; transition: color .15s ease; }
+.node-seg.is-on { background: var(--color-card); color: var(--color-ink); font-weight: 600; box-shadow: 0 1px 2px rgb(25 28 34 / .12); }
+.node-jumps { scrollbar-width: none; }
+.node-jumps::-webkit-scrollbar { display: none; }
+.node-jump {
+    display: inline-flex; flex-shrink: 0; align-items: center; gap: .375rem; height: 2rem; padding: 0 .75rem; border-radius: 999px;
+    background: var(--color-card); box-shadow: inset 0 0 0 1px var(--color-hairline); color: var(--color-ink); font-size: .8125rem; white-space: nowrap;
+}
+
+.node-chip { display: inline-flex; flex-shrink: 0; align-items: center; height: 1.25rem; padding: 0 .4375rem; border-radius: .375rem; background: var(--color-tile); color: var(--color-body); font-size: .6875rem; font-weight: 600; letter-spacing: .03em; white-space: nowrap; }
+.node-chip.is-v6 { background: transparent; box-shadow: inset 0 0 0 1px var(--color-hairline); color: var(--color-faint); font-weight: 500; }
+.node-state { display: inline-block; flex-shrink: 0; width: .5rem; height: .5rem; border-radius: 50%; background: var(--color-warning); }
+.node-state[data-online="1"] { background: var(--color-success); }
+.node-state[data-online="-1"] { background: var(--color-danger); }
+
+.node-head { align-items: center; height: 2rem; padding: 0 1.25rem; border-top: 1px solid var(--color-hairline); background: color-mix(in srgb, var(--color-tile) 50%, var(--color-card)); font-size: .75rem; color: var(--color-faint); }
+.node-rows { display: flex; flex-direction: column; }
+.node-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding: .75rem 1rem; border-top: 1px solid var(--color-hairline); transition: background-color .15s ease; }
+.node-row:hover { background: var(--color-tile); }
+.node-name { display: flex; flex: 1 1 100%; align-items: center; gap: .5rem; min-width: 0; }
+.node-link { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9375rem; font-weight: 600; }
+/* 整行可点(stretched link);升级订阅链接用 relative z-10 浮在其上 */
+.node-link::after { content: ""; position: absolute; inset: 0; }
+.node-link:focus-visible { outline: none; }
+.node-row:has(.node-link:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.node-carriers { display: flex; align-items: center; gap: .75rem; }
+.probe-cell { display: inline-flex; align-items: center; justify-content: center; gap: .3125rem; font-size: .75rem; color: var(--color-body); }
+.probe-cell > .probe-dot { width: .625rem; height: .625rem; --probe-color: inherit; }
+.probe-cell .probe-tag { display: none; }
+.probe-cell[data-status="yellow"] > .probe-dot, .probe-cell[data-status="red"] > .probe-dot { display: none; }
+.probe-cell[data-status="yellow"] .probe-tag, .probe-cell[data-status="red"] .probe-tag { display: inline-flex; }
+.node-meta { display: flex; align-items: center; gap: .375rem; margin-left: auto; font-size: .75rem; color: var(--color-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.node-meta-lock { color: var(--color-body); }
+.node-chev { color: var(--color-faint); }
+
+/* 选中一家运营商:该列全部显示文字胶囊并加浅色底,其余两列淡化;行序由 node-probe.js 通过 order 调整 */
+.node-table[data-carrier="telecom"] [data-col]:not([data-col="telecom"]),
+.node-table[data-carrier="unicom"] [data-col]:not([data-col="unicom"]),
+.node-table[data-carrier="mobile"] [data-col]:not([data-col="mobile"]) { opacity: .4; }
+.node-table[data-carrier="telecom"] .probe-cell[data-col="telecom"] > .probe-dot,
+.node-table[data-carrier="unicom"] .probe-cell[data-col="unicom"] > .probe-dot,
+.node-table[data-carrier="mobile"] .probe-cell[data-col="mobile"] > .probe-dot { display: none; }
+.node-table[data-carrier="telecom"] .probe-cell[data-col="telecom"] .probe-tag,
+.node-table[data-carrier="unicom"] .probe-cell[data-col="unicom"] .probe-tag,
+.node-table[data-carrier="mobile"] .probe-cell[data-col="mobile"] .probe-tag { display: inline-flex; }
+.node-table[data-carrier="telecom"] .node-col[data-col="telecom"],
+.node-table[data-carrier="unicom"] .node-col[data-col="unicom"],
+.node-table[data-carrier="mobile"] .node-col[data-col="mobile"] { background: color-mix(in srgb, var(--color-primary) 6%, transparent); color: var(--color-primary); font-weight: 600; }
+
+@media (min-width: 768px) {
+    .node-row { flex-wrap: nowrap; gap: 0; min-height: 3.25rem; padding: 0 1.25rem; }
+    .node-name { flex: 1 1 0; }
+    .node-carriers { gap: 0; }
+    .node-col { display: flex; align-self: stretch; align-items: center; justify-content: center; width: 6.5rem; }
+    .node-meta { margin-left: 0; gap: 0; font-size: .8125rem; color: var(--color-ink); }
+    .node-meta-lock { width: 10rem; justify-content: flex-end; gap: .5rem; font-size: .75rem; }
+    .node-rate { width: 4.5rem; text-align: right; }
+    .node-users { width: 5.5rem; text-align: right; }
+    .node-chev { width: 2.25rem; justify-content: flex-end; }
+}

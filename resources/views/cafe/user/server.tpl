@@ -1,9 +1,9 @@
 {include file="shell/header.tpl" nav='server'}
 
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
     <div>
         <h2 class="text-2xl font-semibold tracking-tight">节点状态</h2>
-        <p class="text-faint mt-1 text-sm">按国家 / 地区查看节点在线情况与倍率</p>
+        <p class="text-faint mt-1 text-sm">按国家 / 地区查看节点与回国线路状态 · 每分钟自动刷新</p>
     </div>
     <div class="flex gap-2">
         <a href="/user/rate" class="btn-secondary btn-sm"><i class="ti ti-chart-bar"></i> 流量倍率</a>
@@ -12,111 +12,127 @@
 </div>
 
 {if count($server_groups) > 0}
-    <div class="mb-3 flex flex-wrap items-center justify-between gap-2" x-data>
-        <p class="text-body text-xs">{count($server_groups)} 个国家 / 地区 · 点击展开节点</p>
-        <div class="flex gap-1" x-cloak>
-            <button type="button" class="btn-secondary btn-sm" @click="$dispatch('cafe:regions-toggle', true)">全部展开</button>
-            <button type="button" class="btn-secondary btn-sm" @click="$dispatch('cafe:regions-toggle', false)">全部收起</button>
-        </div>
-    </div>
-{/if}
+<div class="node-table" x-data="cafeNodeList()" data-carrier="" :data-carrier="picked">
 
-<div class="space-y-3">
-    {foreach $server_groups as $group}
-        <section id="region-{$group['code']}" class="t-acc c-card overflow-hidden" aria-labelledby="region-title-{$group['code']}"
-                 x-data="{ open: false }" data-open="false" :data-open="String(open)"
-                 @cafe:regions-toggle.window="open = $event.detail">
-            <h3>
-                <button type="button" id="region-title-{$group['code']}"
-                        class="t-acc-head bg-tile/40 hover:bg-tile focus-visible:outline-primary flex w-full cursor-pointer items-center gap-3 px-5 py-4 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 sm:px-6"
-                        aria-expanded="false" :aria-expanded="open" aria-controls="region-nodes-{$group['code']}" @click="open = !open">
-                    <span class="bg-card border-hairline flex size-10 shrink-0 items-center justify-center rounded-xl border text-xl" aria-hidden="true">
-                        {if $group['flag']}{$group['flag']}{else}<i class="ti ti-world text-body"></i>{/if}
-                    </span>
-                    <span class="min-w-0 flex-1">
-                        <span class="block text-base">{$group['name']}</span>
-                        <span class="text-body mt-0.5 flex items-center gap-2 text-xs font-normal">
-                            <span>{count($group['servers'])} 个节点</span>
-                            <span class="text-faint" aria-hidden="true">/</span>
-                            <span>{$group['online']} 个在线</span>
-                        </span>
-                    </span>
-                    <i class="t-acc-chevron ti ti-chevron-down text-body shrink-0" aria-hidden="true"></i>
+    <section class="mb-6" aria-label="按运营商查看回国线路">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs">
+            <p class="text-body" x-text="picked ? '已选择 ' + names[picked] + '：各地区内可用节点排在前面' : '选择你的运营商，只看对你有效的线路'">选择你的运营商，只看对你有效的线路</p>
+            <ul class="text-body flex flex-wrap gap-x-3.5 gap-y-1" aria-label="图例">
+                <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="green" aria-hidden="true"></span>正常</li>
+                <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="yellow" aria-hidden="true"></span>波动</li>
+                <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="red" aria-hidden="true"></span>中断</li>
+                <li class="inline-flex items-center gap-1.5"><span class="probe-dot is-hollow" data-status="gray" aria-hidden="true"></span>无数据</li>
+            </ul>
+        </div>
+
+        {* 桌面端：全部 + 三家运营商磁贴，点选即筛选 *}
+        <div class="hidden grid-cols-2 gap-3 md:grid md:grid-cols-4" role="group" aria-label="选择运营商">
+            <button type="button" class="node-tile is-on" :class="{ 'is-on': picked === '' }" aria-pressed="true" :aria-pressed="String(picked === '')" @click="select('')">
+                <span class="text-ink flex items-center justify-between text-sm font-semibold">全部线路<span class="node-tile-check" aria-hidden="true"><i class="ti ti-check"></i></span></span>
+                <span class="text-ink text-2xl leading-none font-semibold tabular-nums">{$node_online} <span class="text-faint text-sm font-medium">/ {$node_total}</span></span>
+                <span class="text-body text-xs">{if $node_online === $node_total}节点全部在线{else}个节点在线{/if}</span>
+            </button>
+            {foreach $carrier_tally as $carrier}
+                <button type="button" class="node-tile" :class="{ 'is-on': picked === '{$carrier['carrier']}' }" aria-pressed="false" :aria-pressed="String(picked === '{$carrier['carrier']}')" @click="select('{$carrier['carrier']}')">
+                    <span class="text-ink flex items-center justify-between text-sm font-semibold">{$carrier['name']}<span class="node-tile-check" aria-hidden="true"><i class="ti ti-check"></i></span></span>
+                    {include file="shell/node_tally.tpl" carrier=$carrier}
                 </button>
-            </h3>
-            <div id="region-nodes-{$group['code']}" class="t-acc-panel" inert :inert="!open" aria-hidden="true" :aria-hidden="!open">
-                <div class="t-acc-panel-inner">
-                    <div class="divide-hairline border-hairline divide-y border-t">
-                        {foreach $group['servers'] as $server}
-                            <article class="px-5 py-5 sm:px-6" aria-labelledby="node-title-{$server['id']}">
-                                <div class="grid items-center gap-4 xl:grid-cols-2 xl:gap-6">
-                                    <div class="min-w-0">
-                                        <h4 id="node-title-{$server['id']}" class="text-sm font-semibold wrap-anywhere"><a class="hover:text-primary focus-visible:outline-primary" href="/user/server/{$server['id']}">{$server['name']|escape} <i class="ti ti-chevron-right text-faint" aria-hidden="true"></i></a></h4>
-                                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
-                                            {if $server['color'] === 'green'}
-                                                <span class="text-success inline-flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>在线</span>
-                                            {elseif $server['color'] === 'red'}
-                                                <span class="text-danger inline-flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>离线</span>
-                                            {else}
-                                                <span class="text-warning inline-flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>暂无数据</span>
-                                            {/if}
-                                            <span class="text-body">{$server['sort']|escape}</span>
-                                            {if $server['connection_type'] !== 0}<span class="text-body">IPv6</span>{/if}
-                                            {if $server['class'] === 0}
-                                                <span class="text-body">免费节点</span>
-                                            {else}
-                                                <span class="text-body inline-flex items-center gap-1">
-                                                    {if $user->class < $server['class']}<i class="ti ti-lock" aria-hidden="true"></i>{/if}
-                                                    LV. {$server['class']}
-                                                </span>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                    <dl class="grid grid-cols-[1fr_1fr_1.6fr] gap-3 text-xs">
-                                        <div class="min-w-0">
-                                            <dt class="text-body">流量倍率</dt>
-                                            <dd class="text-ink mt-1.5 font-medium">{if $server['is_dynamic_rate']}动态倍率{else}{$server['traffic_rate']} 倍{/if}</dd>
-                                        </div>
-                                        <div class="min-w-0">
-                                            <dt class="text-body">在线人数</dt>
-                                            <dd class="text-ink mt-1.5 font-medium tabular-nums">{$server['online_user']}</dd>
-                                        </div>
-                                        <div class="min-w-0">
-                                            <dt class="text-body">已用 / 总流量</dt>
-                                            <dd class="text-ink mt-1.5 font-medium tabular-nums">
-                                                <span class="inline-block">{$server['node_bandwidth']}</span>
-                                                <span class="text-body inline-block font-normal whitespace-nowrap"> / {$server['node_bandwidth_limit']}</span>
-                                            </dd>
-                                        </div>
-                                    </dl>
-                                </div>
-                                <a href="/user/server/{$server['id']}" data-probe-node="{$server['id']}" class="mt-3 inline-flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" aria-label="查看 {$server['name']|escape} 的回国检测详情">
-                                    {foreach $server['probe_status'] as $carrier}
-                                        <span data-probe-carrier="{$carrier['carrier']}" class="text-body inline-flex items-center gap-1.5" title="{$carrier['name']}：{$carrier['label']}">
-                                            <span class="probe-dot" data-status="{$carrier['status']}" aria-hidden="true"></span>
-                                            {$carrier['name']}<span class="sr-only">：{$carrier['label']}</span>
-                                        </span>
-                                    {/foreach}
-                                </a>
-                                {if $user->class < $server['class']}
-                                    <p class="text-body mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                                        <span>需要 LV. {$server['class']} 订阅</span>
-                                        <a href="/user/product" class="text-primary inline-flex items-center gap-1 font-medium hover:underline">升级订阅 <i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
-                                    </p>
-                                {/if}
-                            </article>
-                        {/foreach}
+            {/foreach}
+        </div>
+
+        {* 移动端：分段控件 + 地区跳转 + 汇总卡 *}
+        <div class="md:hidden">
+            <div class="node-seg-track" role="group" aria-label="选择运营商">
+                <button type="button" class="node-seg is-on" :class="{ 'is-on': picked === '' }" aria-pressed="true" :aria-pressed="String(picked === '')" @click="select('')">全部</button>
+                {foreach $carrier_tally as $carrier}
+                    <button type="button" class="node-seg" :class="{ 'is-on': picked === '{$carrier['carrier']}' }" aria-pressed="false" :aria-pressed="String(picked === '{$carrier['carrier']}')" @click="select('{$carrier['carrier']}')">{$carrier['name']}</button>
+                {/foreach}
+            </div>
+            <nav class="node-jumps mt-3 flex gap-2 overflow-x-auto" aria-label="跳转到地区">
+                {foreach $server_groups as $group}
+                    <a href="#region-{$group['code']}" class="node-jump">{if $group['flag']}<span aria-hidden="true">{$group['flag']}</span>{/if}{$group['name']}<span class="text-faint tabular-nums">{count($group['servers'])}</span></a>
+                {/foreach}
+            </nav>
+            <div class="c-card mt-3 space-y-3 p-4" aria-label="线路总览">
+                <p class="text-ink text-sm font-semibold tabular-nums">{$node_online} / {$node_total} {if $node_online === $node_total}节点全部在线{else}个节点在线{/if}</p>
+                {foreach $carrier_tally as $carrier}
+                    <div class="space-y-1.5">
+                        <p class="text-ink text-xs font-semibold">{$carrier['name']}</p>
+                        {include file="shell/node_tally.tpl" carrier=$carrier}
+                    </div>
+                {/foreach}
+            </div>
+        </div>
+    </section>
+
+    <div class="space-y-4">
+        {foreach $server_groups as $group}
+            <section id="region-{$group['code']}" class="c-card scroll-mt-4 overflow-hidden" aria-labelledby="region-title-{$group['code']}">
+                <div class="flex items-center gap-3.5 px-5 py-4">
+                    <span class="bg-tile flex size-10 shrink-0 items-center justify-center rounded-xl text-xl leading-none" aria-hidden="true">{if $group['flag']}{$group['flag']}{else}<i class="ti ti-world text-body"></i>{/if}</span>
+                    <div class="min-w-0 flex-1">
+                        <h3 id="region-title-{$group['code']}" class="text-base">{$group['name']}</h3>
+                        <p class="text-faint mt-0.5 text-xs">{count($group['servers'])} 个节点 · {if $group['online'] === count($group['servers'])}全部在线{else}{$group['online']} 个在线{/if}</p>
                     </div>
                 </div>
-            </div>
-        </section>
-    {foreachelse}
-        <div class="c-card-pad text-faint flex flex-col items-center gap-2 py-14 text-sm">
-            <i class="ti ti-server-off text-2xl"></i>
-            暂无节点
-        </div>
-    {/foreach}
+                <div class="node-head hidden md:flex" aria-hidden="true">
+                    <span class="min-w-0 flex-1">节点</span>
+                    {foreach $carrier_tally as $carrier}<span class="node-col" data-col="{$carrier['carrier']}">{$carrier['name']}</span>{/foreach}
+                    <span class="node-rate">倍率</span>
+                    <span class="node-users">在线人数</span>
+                    <span class="node-chev"></span>
+                </div>
+                <div class="node-rows">
+                    {foreach $group['servers'] as $server}
+                        <div class="node-row" data-probe-node="{$server['id']}">
+                            <div class="node-name">
+                                {if $server['locked']}
+                                    <i class="ti ti-lock text-faint shrink-0" aria-hidden="true"></i><span class="sr-only">需要更高等级</span>
+                                {else}
+                                    <span class="node-state" data-online="{$server['online']}" aria-hidden="true"></span><span class="sr-only">{if $server['online'] === 1}在线{elseif $server['online'] === -1}离线{else}暂无数据{/if}</span>
+                                {/if}
+                                <a href="/user/server/{$server['id']}" class="node-link {if $server['locked']}text-body{else}text-ink{/if}" aria-label="查看 {$server['name']|escape} 详情">{$server['display_name']|escape}</a>
+                                <span class="node-chip">{$server['proto']}</span>
+                                {if $server['connection_type'] !== 0}<span class="node-chip is-v6">IPv6</span>{/if}
+                                <i class="ti ti-chevron-right text-faint ml-auto md:hidden" aria-hidden="true"></i>
+                            </div>
+                            <div class="node-carriers">
+                                {foreach $carrier_tally as $carrier}
+                                    {$probe = $server['probe_status'][$carrier['carrier']]}
+                                    <span class="node-col probe-cell" data-col="{$carrier['carrier']}" data-probe-carrier="{$carrier['carrier']}" data-probe-name="{$carrier['name']}" data-status="{$probe['status']}" title="{$carrier['name']}：{$probe['label']}">
+                                        <span class="node-col-label md:hidden">{$carrier['name']}</span>
+                                        <span class="probe-dot" aria-hidden="true"></span>
+                                        <span class="probe-pill probe-tag" data-status="{$probe['status']}" data-probe-label>{if $probe['status'] === 'green'}正常{elseif $probe['status'] === 'yellow'}波动{elseif $probe['status'] === 'red'}中断{else}无数据{/if}</span>
+                                        <span class="sr-only" data-probe-sr>：{$probe['label']}</span>
+                                    </span>
+                                {/foreach}
+                            </div>
+                            {if $server['locked']}
+                                <div class="node-meta node-meta-lock">
+                                    <span class="probe-pill" data-status="gray">需 LV.{$server['class']}</span>
+                                    <a href="/user/product" class="text-primary relative z-10 inline-flex items-center gap-0.5 font-medium hover:underline">升级订阅 <i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+                                </div>
+                            {else}
+                                <div class="node-meta">
+                                    <span class="node-rate">{if $server['is_dynamic_rate']}<span class="node-chip">动态倍率</span>{else}{$server['traffic_rate']} 倍{/if}</span>
+                                    <span class="md:hidden" aria-hidden="true">·</span>
+                                    <span class="node-users">{$server['online_user']}<span class="md:hidden"> 人在线</span></span>
+                                </div>
+                            {/if}
+                            <span class="node-chev hidden md:flex" aria-hidden="true"><i class="ti ti-chevron-right"></i></span>
+                        </div>
+                    {/foreach}
+                </div>
+            </section>
+        {/foreach}
+    </div>
 </div>
+{else}
+    <div class="c-card-pad text-faint flex flex-col items-center gap-2 py-14 text-sm">
+        <i class="ti ti-server-off text-2xl"></i>
+        暂无节点
+    </div>
+{/if}
 
 <script src="/theme/cafe/js/node-probe.js?v={$config['assets_version']}"></script>
 {include file="shell/footer.tpl"}

@@ -80,6 +80,23 @@ final class TcpProbeStatus
         return $rows;
     }
 
+    /** Per-carrier status counts across the nodes a user can see, for the list page tiles. */
+    public static function tally(array $rows): array
+    {
+        $tally = [];
+        foreach (self::CARRIERS as $carrier => $name) {
+            $tally[$carrier] = ['carrier' => $carrier, 'name' => $name, 'green' => 0, 'yellow' => 0, 'red' => 0, 'gray' => 0, 'total' => 0];
+        }
+        foreach ($rows as $node) {
+            foreach (self::CARRIERS as $carrier => $name) {
+                $status = $node[$carrier]['status'] ?? 'gray';
+                $tally[$carrier][isset(self::LABELS[$status]) ? $status : 'gray']++;
+                $tally[$carrier]['total']++;
+            }
+        }
+        return $tally;
+    }
+
     /** 96 quarter-hour buckets, including the current partial bucket. */
     public static function history(array $rounds, string $carrier, int $now): array
     {
