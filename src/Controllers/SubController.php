@@ -30,7 +30,7 @@ final class SubController extends BaseController
     {
         $err_msg = '订阅链接无效';
         $subtype = $args['subtype'];
-        $subtype_list = ['clash', 'stash', 'surge'];
+        $subtype_list = ['clash', 'calsh-hako', 'stash', 'surge'];
 
         if (! $_ENV['Subscribe'] ||
             ! in_array($subtype, $subtype_list) ||
@@ -58,7 +58,7 @@ final class SubController extends BaseController
         $sub_info = Subscribe::getContent($user, $subtype);
 
         $content_type = match ($subtype) {
-            'clash', 'stash' => 'application/yaml',
+            'clash', 'calsh-hako', 'stash' => 'application/yaml',
             default => 'text/plain',
         };
 
