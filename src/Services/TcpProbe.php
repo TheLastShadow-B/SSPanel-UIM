@@ -128,20 +128,34 @@ final class TcpProbe
         });
     }
 
-    /** Batch reads for the list; no per-node history queries. */
+    /** Carriers with at least one target, in display order; the user list only shows these columns. */
+    public static function carriers(): array
+    {
+        if (! self::installed()) {
+            return [];
+        }
+        return array_intersect_key(TcpProbeStatus::CARRIERS, array_flip(array_column(self::targets(), 'carrier')));
+    }
+
+    /** Batch reads for the list; null marks a node that is not being probed at all. */
     public static function current(array $nodeIds, int $now): array
     {
-        $rows = array_fill_keys($nodeIds, TcpProbeStatus::current(null, $now));
+        $rows = array_fill_keys($nodeIds, null);
         if ($nodeIds === [] || ! self::installed()) {
             return $rows;
         }
-        $targets = self::targets();
+        $stale = 3 * self::interval(count(self::targets()));
         $probes = DB::table('tcp_probe')->whereIn('node_id', $nodeIds)->get()->keyBy('node_id');
+        foreach ($nodeIds as $nodeId) {
+            if ($probes->get($nodeId)?->enabled) {
+                $rows[$nodeId] = TcpProbeStatus::current(null, $now, $stale);
+            }
+        }
         $latest = DB::table('tcp_probe_round')->selectRaw('MAX(id)')->whereIn('node_id', $nodeIds)->groupBy('node_id');
         foreach (DB::table('tcp_probe_round')->whereIn('id', $latest)->get() as $round) {
-            $probe = $probes->get($round->node_id);
-            if ($probe && $probe->enabled && self::config((int) $round->node_id, $targets, $probe)['config_hash'] === $round->config_hash) {
-                $rows[$round->node_id] = TcpProbeStatus::current(self::decode($round), $now, 3 * self::interval(count($targets)));
+            // A round recorded before a target edit is still a real measurement while it is fresh by time.
+            if ($rows[$round->node_id] !== null) {
+                $rows[$round->node_id] = TcpProbeStatus::current(self::decode($round), $now, $stale);
             }
         }
         return $rows;
@@ -266,7 +280,7 @@ final class TcpProbe
                 ->where('measured_at', '<=', $now)->orderBy('minute')->get()->map(fn ($row) => self::decode($row))->all();
         }
         $latest = $rounds === [] ? null : $rounds[array_key_last($rounds)];
-        $fresh = $latest && $config['enabled'] && $latest['config_hash'] === $config['config_hash'] && $now - $latest['measured_at'] <= 3 * $config['interval_seconds'];
+        $fresh = $latest && $config['enabled'] && $now - $latest['measured_at'] <= 3 * $config['interval_seconds'];
         $carriers = TcpProbeStatus::current($fresh ? $latest : null, $now, 3 * $config['interval_seconds']);
         foreach ($carriers as $key => &$carrier) {
             $carrier['history'] = TcpProbeStatus::history($rounds, $key, $now);
@@ -282,10 +296,13 @@ final class TcpProbe
                         break;
                     }
                 }
+                if ($fresh && $result === null) {
+                    continue; // added after the last report; it shows up with the next round
+                }
                 $state = $result ? TcpProbeStatus::summarize([$result], $config['threshold_ms'])[$key] : null;
                 $status = $state['raw'] ?? 'gray';
                 if ($status === 'gray') {
-                    $status = 'red'; // the user page has no "no data" state
+                    $status = 'red'; // stale or no successful sample: the user page has no "no data" state
                 }
                 $carrier['targets'][] = [
                     'label' => $target['label'], 'status' => $status, 'status_label' => TcpProbeStatus::LABELS[$status],

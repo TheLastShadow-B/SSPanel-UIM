@@ -42,8 +42,10 @@
 
     function paint(data) {
         document.querySelectorAll('[data-probe-node]').forEach(node => {
+            const current = data?.[node.dataset.probeNode];
+            if (!current) return; // unmonitored (null) or unknown node: keep what the server rendered
             node.querySelectorAll('[data-probe-carrier]').forEach(cell => {
-                const result = data?.[node.dataset.probeNode]?.[cell.dataset.probeCarrier];
+                const result = current[cell.dataset.probeCarrier];
                 const status = ['green', 'yellow', 'red'].includes(result?.status) ? result.status : 'red';
                 const label = result?.label || '连接中断';
                 cell.dataset.status = status;

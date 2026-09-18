@@ -17,11 +17,13 @@
                 <a href="#region-{$group['code']}" class="node-jump" @click="reveal('{$group['code']}')">{if $group['flag']}<span aria-hidden="true">{$group['flag']}</span>{/if}{$group['name']}<span class="text-faint tabular-nums">{count($group['servers'])}</span></a>
             {/foreach}
         </nav>
+        {if $carriers}
         <ul class="text-body ml-auto flex flex-wrap gap-x-3.5 gap-y-1" aria-label="图例">
             <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="green" aria-hidden="true"></span>正常</li>
             <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="yellow" aria-hidden="true"></span>波动</li>
             <li class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="red" aria-hidden="true"></span>中断</li>
         </ul>
+        {/if}
     </div>
 
     <div class="space-y-4">
@@ -58,17 +60,23 @@
                                 {if $server['connection_type'] !== 0}<span class="node-chip is-v6">IPv6</span>{/if}
                                 <i class="ti ti-chevron-right text-faint ml-auto md:hidden" aria-hidden="true"></i>
                             </div>
-                            <div class="node-carriers">
-                                {foreach $carriers as $code => $name}
-                                    {$probe = $server['probe_status'][$code]}
-                                    <span class="node-col probe-cell" data-probe-carrier="{$code}" data-probe-name="{$name}" data-status="{$probe['status']}" title="{$name}：{$probe['label']}">
-                                        <span class="node-col-label md:hidden">{$name}</span>
-                                        <span class="probe-dot" aria-hidden="true"></span>
-                                        <span class="probe-pill probe-tag" data-status="{$probe['status']}" data-probe-label>{if $probe['status'] === 'green'}正常{elseif $probe['status'] === 'yellow'}波动{else}中断{/if}</span>
-                                        <span class="sr-only" data-probe-sr>：{$probe['label']}</span>
-                                    </span>
-                                {/foreach}
-                            </div>
+                            {if $carriers}
+                                {if $server['probe_status'] === null}
+                                    <div class="node-carriers"><span class="node-unmonitored" style="--cols: {count($carriers)}">未开启检测</span></div>
+                                {else}
+                                    <div class="node-carriers">
+                                        {foreach $carriers as $code => $name}
+                                            {$probe = $server['probe_status'][$code]}
+                                            <span class="node-col probe-cell" data-probe-carrier="{$code}" data-probe-name="{$name}" data-status="{$probe['status']}" title="{$name}：{$probe['label']}">
+                                                <span class="node-col-label md:hidden">{$name}</span>
+                                                <span class="probe-dot" aria-hidden="true"></span>
+                                                <span class="probe-pill probe-tag" data-status="{$probe['status']}" data-probe-label>{if $probe['status'] === 'green'}正常{elseif $probe['status'] === 'yellow'}波动{else}中断{/if}</span>
+                                                <span class="sr-only" data-probe-sr>：{$probe['label']}</span>
+                                            </span>
+                                        {/foreach}
+                                    </div>
+                                {/if}
+                            {/if}
                             {if $server['locked']}
                                 <div class="node-meta node-meta-lock">
                                     <span class="probe-pill" data-status="gray">需 LV.{$server['class']}</span>

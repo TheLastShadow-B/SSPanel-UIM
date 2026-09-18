@@ -8,7 +8,6 @@ use App\Controllers\BaseController;
 use App\Services\Subscribe;
 use App\Services\TcpProbe;
 use App\Utils\NodeRegion;
-use App\Utils\TcpProbeStatus;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Http\Response;
@@ -46,7 +45,7 @@ final class ServerController extends BaseController
         return $response->write(
             $this->view()
                 ->assign('server_groups', NodeRegion::group($node_list))
-                ->assign('carriers', TcpProbeStatus::CARRIERS)
+                ->assign('carriers', TcpProbe::carriers())
                 ->fetch('user/server.tpl')
         );
     }

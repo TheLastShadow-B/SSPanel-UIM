@@ -119,6 +119,7 @@
 .node-link:focus-visible { outline: none; }
 .node-row:has(.node-link:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .node-carriers { display: flex; align-items: center; gap: .75rem; }
+.node-unmonitored { font-size: .75rem; color: var(--color-faint); white-space: nowrap; }
 .probe-cell { display: inline-flex; align-items: center; justify-content: center; gap: .3125rem; font-size: .75rem; color: var(--color-body); }
 .probe-cell > .probe-dot { width: .625rem; height: .625rem; --probe-color: inherit; }
 .probe-cell .probe-tag { display: none; }
@@ -133,6 +134,7 @@
     .node-name { flex: 1 1 0; }
     .node-carriers { gap: 0; }
     .node-col { display: flex; align-self: stretch; align-items: center; justify-content: center; width: 6.5rem; }
+    .node-unmonitored { width: calc(6.5rem * var(--cols, 3)); text-align: center; }
     .node-meta { margin-left: 0; gap: 0; font-size: .8125rem; color: var(--color-ink); }
     .node-meta-lock { width: 10rem; justify-content: flex-end; gap: .5rem; font-size: .75rem; }
     .node-rate { width: 4.5rem; text-align: right; }

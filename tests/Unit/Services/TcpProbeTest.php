@@ -58,8 +58,9 @@ it('migrates repeatedly and reverses without touching node schema', function () 
     expect($this->migration->up())->toBe(2026091701)
         ->and(DB::table('tcp_probe')->count())->toBe(1);
     expect($this->migration->down())->toBe(2026091700)->and(TcpProbe::installed())->toBeFalse();
-    // Without any probe data the user page shows 中断, never a separate "no data" state.
-    expect(TcpProbe::current([1], $this->now)[1]['telecom']['status'])->toBe('red');
+    // Nothing installed: no carrier columns and every node is simply unmonitored.
+    expect(TcpProbe::carriers())->toBe([])
+        ->and(TcpProbe::current([1], $this->now)[1])->toBeNull();
 });
 
 it('confirms green, yellow, red and recovery without flapping', function () {
@@ -104,16 +105,38 @@ it('ignores retry and out of order reports and resets streaks after missing roun
     expect(TcpProbe::current([1], $this->now + 180)[1]['telecom']['status'])->toBe('red');
 });
 
-it('expires status and clears current results after target edits or disabling', function () {
+it('expires status by time but keeps a fresh round across target edits', function () {
     TcpProbe::report(1, tcpReport($this->now - 60), $this->now - 60);
     TcpProbe::report(1, tcpReport($this->now), $this->now);
-    expect(TcpProbe::current([1], $this->now + 181)[1]['telecom']['status'])->toBe('red');
+    expect(TcpProbe::current([1], $this->now + 181)[1]['telecom']['status'])->toBe('red')
+        ->and(TcpProbe::detail(1, $this->now + 181)['carriers']['telecom']['targets'][0]['status'])->toBe('red')
+        ->and(TcpProbe::detail(1, $this->now + 181)['updated_at'])->toBe(date('m-d H:i:s', $this->now));
+    // A target edit changes the config hash; the last round is still a real measurement while it is fresh.
     DB::table('tcp_probe_target')->where('id', 1)->update(['port' => 80]);
-    expect(TcpProbe::current([1], $this->now)[1]['telecom']['status'])->toBe('red')
-        ->and(TcpProbe::detail(1, $this->now)['carriers']['telecom']['targets'][0]['status'])->toBe('red')
-        ->and(TcpProbe::detail(1, $this->now)['updated_at'])->toBe(date('m-d H:i:s', $this->now));
+    DB::table('tcp_probe_target')->insert(['id' => 3, 'carrier' => 'telecom', 'label' => '北京电信', 'ip' => '9.9.9.9', 'port' => 443]);
+    $detail = TcpProbe::detail(1, $this->now);
+    expect(TcpProbe::current([1], $this->now)[1]['telecom']['status'])->toBe('green')
+        ->and($detail['carriers']['telecom']['status'])->toBe('green')
+        ->and(array_column($detail['carriers']['telecom']['targets'], 'label'))->toBe(['广东电信', '上海电信'])
+        ->and($detail['carriers']['telecom']['targets'][0]['status'])->toBe('green');
     DB::table('tcp_probe')->update(['enabled' => false]);
     expect(fn () => TcpProbe::report(1, tcpReport($this->now + 60), $this->now + 60))->toThrow(InvalidArgumentException::class);
+});
+
+it('lists only carriers that have at least one target, in carrier order', function () {
+    expect(TcpProbe::carriers())->toBe(['telecom' => '电信']);
+    DB::table('tcp_probe_target')->insert(['id' => 3, 'carrier' => 'mobile', 'label' => '广东移动', 'ip' => '9.9.9.9', 'port' => 443]);
+    expect(TcpProbe::carriers())->toBe(['telecom' => '电信', 'mobile' => '移动']);
+});
+
+it('marks nodes without an enabled probe as unmonitored instead of broken', function () {
+    TcpProbe::report(1, tcpReport($this->now), $this->now);
+    $rows = TcpProbe::current([1, 2], $this->now);
+    expect($rows[1]['telecom']['status'])->toBe('green')
+        ->and($rows[2])->toBeNull();
+    DB::table('tcp_probe')->where('node_id', 1)->update(['enabled' => false]);
+    expect(TcpProbe::current([1], $this->now)[1])->toBeNull()
+        ->and(TcpProbe::detail(1, $this->now)['enabled'])->toBeFalse();
 });
 
 it('rejects malformed, incomplete, old and duplicate target reports', function (string $case) {

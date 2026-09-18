@@ -17,6 +17,8 @@ it('lists every node with three carrier columns, regions collapsible but open by
         ->not->toContain('node-seg')
         ->not->toContain('每分钟自动刷新')
         ->not->toContain('无数据')
+        ->toContain("{if \$server['probe_status'] === null}")
+        ->toContain('未开启检测')
         ->toContain('data-probe-node=')
         ->toContain('data-probe-carrier=')
         ->toContain("\$server['display_name']")
@@ -38,4 +40,11 @@ it('shows region availability as online/total only', function () {
     expect($tpl)->toContain("{\$group['online']}/{count(\$group['servers'])}")
         ->not->toContain('全部在线')
         ->not->toContain('个节点');
+});
+
+it('shows a notice instead of carrier sections on the detail page of an unmonitored node', function () {
+    $tpl = file_get_contents(__DIR__ . '/../../../resources/views/cafe/user/server_probe.tpl');
+
+    expect($tpl)->toContain("{if !\$probe['enabled']}")
+        ->toContain('未开启回国检测');
 });

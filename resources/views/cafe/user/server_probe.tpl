@@ -1,3 +1,9 @@
+{if !$probe['enabled']}
+<div class="c-card-pad text-faint flex flex-col items-center gap-2 py-14 text-sm">
+    <i class="ti ti-radar-off text-2xl"></i>
+    该节点未开启回国检测
+</div>
+{else}
 <div class="mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
     <div class="text-body flex flex-wrap gap-4">
         <span class="inline-flex items-center gap-1.5"><span class="probe-dot" data-status="green"></span>正常</span>
@@ -41,3 +47,4 @@
 {/foreach}
 </div>
 <p class="text-faint mt-5 text-xs leading-relaxed">检测周期：{$probe['interval_seconds']} 秒。黄色延迟阈值：{$probe['threshold_ms']} ms。可用率按有检测数据的轮次计算，至少一个目标连通即为可用；无记录的轮次不计入。历史格保留已确认的最严重状态，正常数据覆盖不足 80% 时显示灰色。TCP 建连耗时包含往返路径，不代表下载速度。</p>
+{/if}
