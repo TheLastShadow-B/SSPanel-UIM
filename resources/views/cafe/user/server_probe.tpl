@@ -46,5 +46,5 @@
     </section>
 {/foreach}
 </div>
-<p class="text-faint mt-5 text-xs leading-relaxed">检测周期：{$probe['interval_seconds']} 秒。黄色延迟阈值：{$probe['threshold_ms']} ms。可用率按有检测数据的轮次计算，至少一个目标连通即为可用；无记录的轮次不计入。历史格保留已确认的最严重状态，正常数据覆盖不足 80% 时显示灰色。TCP 建连耗时包含往返路径，不代表下载速度。</p>
+<p class="text-faint mt-5 text-xs leading-relaxed">检测周期：{$probe['interval_seconds']} 秒。黄色延迟阈值：{$probe['threshold_ms']} ms。可用率按有检测数据的轮次计算，至少一个目标连通即为可用；无记录的轮次不计入。历史格保留已确认的最严重状态，正常数据覆盖不足 80% 时显示灰色；最右一格为当前时段，按实时状态显示。TCP 建连耗时包含往返路径，不代表下载速度。</p>
 {/if}

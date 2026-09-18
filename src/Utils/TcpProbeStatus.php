@@ -92,8 +92,12 @@ final class TcpProbeStatus
         return $rows;
     }
 
-    /** 96 quarter-hour buckets, including the current partial bucket. */
-    public static function history(array $rounds, string $carrier, int $now): array
+    /**
+     * 96 quarter-hour buckets, including the current partial one. With $live (the carrier's current
+     * state) the partial bucket never turns coverage-gray: it shows the live state unless a confirmed
+     * yellow/red sample already landed in it.
+     */
+    public static function history(array $rounds, string $carrier, int $now, ?string $live = null): array
     {
         $start = intdiv($now, 900) * 900 - 95 * 900;
         $groups = [];
@@ -132,8 +136,13 @@ final class TcpProbeStatus
             $success = array_sum(array_column($samples, 'success'));
             $attempts = array_sum(array_column($samples, 'attempts'));
             $rate = $attempts ? round($success / $attempts * 100, 1) . '%' : '—';
-            $label = date('m-d H:i', $from) . ' – ' . date('H:i', $from + 900) . ' · ' . self::LABELS[$status]
-                . ' · 连接成功率 ' . $rate . ' · 数据覆盖率 ' . $coverage . '%';
+            if ($i === 95 && $live !== null) {
+                $status = in_array($status, ['red', 'yellow'], true) ? $status : $live;
+                $label = date('m-d H:i', $from) . ' – 现在 · ' . self::LABELS[$status] . ' · 正在检测 · 连接成功率 ' . $rate;
+            } else {
+                $label = date('m-d H:i', $from) . ' – ' . date('H:i', $from + 900) . ' · ' . self::LABELS[$status]
+                    . ' · 连接成功率 ' . $rate . ' · 数据覆盖率 ' . $coverage . '%';
+            }
             $buckets[] = ['status' => $status, 'label' => $label];
         }
         return [

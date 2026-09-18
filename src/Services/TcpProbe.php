@@ -283,7 +283,7 @@ final class TcpProbe
         $fresh = $latest && $config['enabled'] && $now - $latest['measured_at'] <= 3 * $config['interval_seconds'];
         $carriers = TcpProbeStatus::current($fresh ? $latest : null, $now, 3 * $config['interval_seconds']);
         foreach ($carriers as $key => &$carrier) {
-            $carrier['history'] = TcpProbeStatus::history($rounds, $key, $now);
+            $carrier['history'] = TcpProbeStatus::history($rounds, $key, $now, $carrier['status']);
             $carrier['targets'] = [];
             foreach (($config['targets'] ?? []) as $target) {
                 if ($target['carrier'] !== $key) {

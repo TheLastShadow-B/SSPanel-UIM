@@ -548,3 +548,16 @@ it('reports a refused manual sync instead of reloading the page', function () {
         ->and($response->hasHeader('HX-Refresh'))->toBeFalse()
         ->and(json_decode((string) $response->getBody(), true)['ret'])->toBe(0);
 });
+
+it('shows the live state in the current quarter while it is still being measured', function () {
+    $quarter = intdiv($this->now, 900) * 900 + 900;
+    TcpProbe::report(1, tcpReport($quarter - 120), $quarter - 120);
+    TcpProbe::report(1, tcpReport($quarter - 60), $quarter - 60);
+    $carrier = TcpProbe::detail(1, $quarter + 30)['carriers']['telecom'];
+
+    // No round has landed inside the new quarter yet: the bar shows the live state, not a coverage gray.
+    expect($carrier['status'])->toBe('green')
+        ->and($carrier['history']['buckets'][95]['status'])->toBe('green')
+        ->and($carrier['history']['buckets'][95]['label'])->toContain('现在')
+        ->and($carrier['history']['buckets'][94]['status'])->toBe('gray');
+});
