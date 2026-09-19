@@ -252,7 +252,8 @@ it('renders 96 history bars per carrier with escaped target labels', function ()
     $smarty->setCompileDir(BASE_PATH . '/storage/framework/smarty/compile');
     $smarty->assign('probe', TcpProbe::detail(1, $this->now));
     $html = $smarty->fetch('user/server_probe.tpl');
-    expect(substr_count($html, 'class="probe-bar"'))->toBe(288)
+    // 96 bars for each of the 3 carriers, plus 96 for each of telecom's 2 targets (the other carriers have none).
+    expect(substr_count($html, 'class="probe-bar"'))->toBe(480)
         ->and($html)->not->toContain('<script>alert(1)</script>')->toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
 });
 
@@ -560,4 +561,22 @@ it('shows the live state in the current quarter while it is still being measured
         ->and($carrier['history']['buckets'][95]['status'])->toBe('green')
         ->and($carrier['history']['buckets'][95]['label'])->toContain('现在')
         ->and($carrier['history']['buckets'][94]['status'])->toBe('gray');
+});
+
+it('gives every target its own 24 hour history alongside the carrier rollup', function () {
+    TcpProbe::report(1, tcpReport($this->now - 60), $this->now - 60);
+    TcpProbe::report(1, tcpReport($this->now, 'timeout', 150), $this->now);
+    $telecom = TcpProbe::detail(1, $this->now + 30)['carriers']['telecom'];
+
+    // Carrier rollup: one of two targets is down, so the carrier reads 波动 ...
+    expect($telecom['name'])->toBe('电信')
+        ->and($telecom['status'])->toBe('yellow')
+        ->and($telecom['history']['buckets'][95]['status'])->toBe('yellow')
+        // ... while each target's own bar tells which one: 广东电信 timed out, 上海电信 is fine.
+        ->and($telecom['targets'][0]['label'])->toBe('广东电信')
+        ->and(count($telecom['targets'][0]['history']['buckets']))->toBe(96)
+        ->and($telecom['targets'][0]['history']['buckets'][95]['status'])->toBe('red')
+        ->and($telecom['targets'][0]['history']['uptime'])->toBe('50%')
+        ->and($telecom['targets'][1]['history']['buckets'][95]['status'])->toBe('green')
+        ->and($telecom['targets'][1]['history']['uptime'])->toBe('100%');
 });

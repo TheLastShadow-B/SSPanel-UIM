@@ -95,15 +95,16 @@ final class TcpProbeStatus
     /**
      * 96 quarter-hour buckets, including the current partial one. With $live (the carrier's current
      * state) the partial bucket never turns coverage-gray: it shows the live state unless a confirmed
-     * yellow/red sample already landed in it.
+     * yellow/red sample already landed in it. $stateOf(round) swaps in another per-round state, such
+     * as a single target's, in place of the carrier's stabilized state.
      */
-    public static function history(array $rounds, string $carrier, int $now, ?string $live = null): array
+    public static function history(array $rounds, string $carrier, int $now, ?string $live = null, ?callable $stateOf = null): array
     {
         $start = intdiv($now, 900) * 900 - 95 * 900;
         $groups = [];
         $valid = $available = $coveredSeconds = 0;
         foreach ($rounds as $index => $round) {
-            $state = $round['states'][$carrier] ?? null;
+            $state = $stateOf !== null ? $stateOf($round) : ($round['states'][$carrier] ?? null);
             if ($round['measured_at'] < $start || $round['measured_at'] > $now || ! $state || $state['attempts'] === 0) {
                 continue;
             }

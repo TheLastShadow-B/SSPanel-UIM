@@ -4,16 +4,28 @@
     let pending = false;
     const detail = document.getElementById('node-probe-status');
     if (detail) {
+        const setOpen = (group, open) => {
+            group.dataset.open = String(open);
+            group.querySelector('[data-toggle-targets]')?.setAttribute('aria-expanded', String(open));
+            const panel = group.querySelector('.t-acc-panel');
+            if (panel) { panel.inert = !open; panel.setAttribute('aria-hidden', String(!open)); }
+        };
+        detail.addEventListener('click', event => {
+            const toggle = event.target.closest('[data-toggle-targets]');
+            if (!toggle) return;
+            const group = toggle.closest('.probe-group');
+            setOpen(group, group.dataset.open !== 'true');
+        });
         let opened = [];
         detail.addEventListener('htmx:beforeSwap', event => {
             if (event.detail.target !== detail) return;
-            opened = [...detail.querySelectorAll('details[open]')].map(el => el.dataset.carrier);
+            opened = [...detail.querySelectorAll('.probe-group[data-open="true"]')].map(el => el.dataset.carrier);
         });
         detail.addEventListener('htmx:afterSwap', event => {
             if (event.detail.target !== detail) return;
             lastSuccess = Date.now();
             document.getElementById('probe-refresh-error').hidden = true;
-            detail.querySelectorAll('details').forEach(el => { el.open = opened.includes(el.dataset.carrier); });
+            detail.querySelectorAll('.probe-group').forEach(el => setOpen(el, opened.includes(el.dataset.carrier)));
         });
         setInterval(() => {
             document.getElementById('probe-refresh-error').hidden = Date.now() - lastSuccess <= 180000;

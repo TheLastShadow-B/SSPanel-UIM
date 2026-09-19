@@ -48,3 +48,15 @@ it('shows a notice instead of carrier sections on the detail page of an unmonito
     expect($tpl)->toContain("{if !\$probe['enabled']}")
         ->toContain('未开启回国检测');
 });
+
+it('renders the detail page as one status card: a row plus bar per carrier, targets with their own bars behind a toggle', function () {
+    $tpl = file_get_contents(__DIR__ . '/../../../resources/views/cafe/user/server_probe.tpl');
+
+    expect(substr_count($tpl, 'class="c-card overflow-hidden"'))->toBe(1)
+        ->and($tpl)->toContain('class="probe-group t-acc"')
+        ->toContain('data-toggle-targets')
+        ->toContain("\$target['history']['buckets']")
+        ->toContain("\$target['history']['uptime']")
+        ->not->toContain('<details')
+        ->not->toContain('c-card-pad" aria-label');
+});

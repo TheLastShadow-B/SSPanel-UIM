@@ -283,6 +283,7 @@ final class TcpProbe
         $fresh = $latest && $config['enabled'] && $now - $latest['measured_at'] <= 3 * $config['interval_seconds'];
         $carriers = TcpProbeStatus::current($fresh ? $latest : null, $now, 3 * $config['interval_seconds']);
         foreach ($carriers as $key => &$carrier) {
+            $carrier['name'] = TcpProbeStatus::CARRIERS[$key]; // the user page spells carriers out, not CT/CU/CM
             $carrier['history'] = TcpProbeStatus::history($rounds, $key, $now, $carrier['status']);
             $carrier['targets'] = [];
             foreach (($config['targets'] ?? []) as $target) {
@@ -304,10 +305,23 @@ final class TcpProbe
                 if ($status === 'gray') {
                     $status = 'red'; // stale or no successful sample: the user page has no "no data" state
                 }
+                // The target's own bar: raw per-round results, so it shows which target dragged the carrier down.
+                $targetId = (int) $target['id'];
+                $stateOf = static function (array $round) use ($targetId, $key, $config) {
+                    foreach ($round['results'] as $candidate) {
+                        if ($candidate['target_id'] === $targetId) {
+                            $state = TcpProbeStatus::summarize([$candidate], $config['threshold_ms'])[$key];
+                            $state['interval_seconds'] = $round['states'][$key]['interval_seconds'] ?? 60;
+                            return $state;
+                        }
+                    }
+                    return null;
+                };
                 $carrier['targets'][] = [
                     'label' => $target['label'], 'status' => $status, 'status_label' => TcpProbeStatus::LABELS[$status],
                     'latency_ms' => $state['latency_ms'] ?? null,
                     'success' => $state ? $state['success'] . ' / ' . $state['attempts'] : '—',
+                    'history' => TcpProbeStatus::history($rounds, $key, $now, $status, $stateOf),
                 ];
             }
         }
