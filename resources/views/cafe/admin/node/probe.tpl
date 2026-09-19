@@ -3,7 +3,7 @@
 <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
     <div>
         <h2 class="text-2xl font-semibold tracking-tight">节点检测</h2>
-        <p class="text-body mt-1 text-sm">由节点上的 XrayR 执行，配置保存后自动下发 · 每轮每个目标 3 次，单次超时 3 秒</p>
+        <p class="text-body mt-1 text-sm">由节点上的 XrayR 执行，配置保存后自动下发 · 每轮每个目标 {$probe_attempts} 次，单次超时 {$probe_timeout_ms} ms</p>
     </div>
     {if $installed}
         <span class="probe-pill !text-sm" data-status="{$overview['status']}">
@@ -340,8 +340,8 @@
     <h3 class="text-base font-semibold">检测参数</h3>
     <div class="mt-2">
         <div class="kv-row"><span class="kv-key">检测周期</span><span class="kv-val tabular-nums">{$interval_seconds} 秒 <span class="text-faint font-normal">自动</span></span></div>
-        <div class="kv-row"><span class="kv-key">每轮次数</span><span class="kv-val tabular-nums">每目标 3 次</span></div>
-        <div class="kv-row"><span class="kv-key">单次超时</span><span class="kv-val tabular-nums">3 秒</span></div>
+        <div class="kv-row"><span class="kv-key">每轮次数</span><span class="kv-val tabular-nums">每目标 {$probe_attempts} 次</span></div>
+        <div class="kv-row"><span class="kv-key">单次超时</span><span class="kv-val tabular-nums">{$probe_timeout_ms} ms</span></div>
         <div class="kv-row"><span class="kv-key">历史粒度</span><span class="kv-val tabular-nums">15 分钟 / 格</span></div>
     </div>
     <p class="border-hairline text-faint mt-3 border-t pt-3 text-xs leading-relaxed">目标较多时周期自动延长，避免占满节点出口。TCP 建连耗时包含往返路径，不代表下载速度。</p>

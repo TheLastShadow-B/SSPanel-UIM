@@ -42,7 +42,7 @@ function tcpReport(int $time, mixed $first = 120, mixed $second = 150, int $node
     foreach ([1 => $first, 2 => $second] as $id => $value) {
         $results[] = ['target_id' => $id, 'samples' => array_map(
             static fn ($s) => ['latency_ms' => is_numeric($s) ? $s : null, 'error' => is_numeric($s) ? null : $s],
-            is_array($value) ? $value : array_fill(0, 3, $value))];
+            is_array($value) ? $value : array_fill(0, TcpProbe::config($node)['attempts'], $value))];
     }
     return ['config_hash' => TcpProbe::config($node)['config_hash'], 'measured_at' => $time, 'results' => $results];
 }
@@ -87,7 +87,7 @@ it('treats a partial target outage as yellow and no success as null latency', fu
     $report = tcpReport($this->now, 'refused', 100);
     $results = TcpProbe::validateReport($report, TcpProbe::config(1), $this->now);
     $state = TcpProbeStatus::summarize($results, 250);
-    expect($state['telecom']['raw'])->toBe('yellow')->and($state['telecom']['success'])->toBe(3)
+    expect($state['telecom']['raw'])->toBe('yellow')->and($state['telecom']['success'])->toBe(10)
         ->and($state['unicom']['raw'])->toBe('gray');
     $results = TcpProbe::validateReport(tcpReport($this->now, 'timeout', 'timeout'), TcpProbe::config(1), $this->now);
     expect(TcpProbeStatus::summarize($results, 250)['telecom']['latency_ms'])->toBeNull();
@@ -215,7 +215,7 @@ it('accepts complete large target reports through the WebAPI', function () {
     }
     $config = TcpProbe::config(1);
     $body = json_encode(['config_hash' => $config['config_hash'], 'measured_at' => time(), 'results' => array_map(
-        fn ($target) => ['target_id' => $target['id'], 'samples' => array_fill(0, 3, ['latency_ms' => 123.456, 'error' => null])], $config['targets'])]);
+        fn ($target) => ['target_id' => $target['id'], 'samples' => array_fill(0, $config['attempts'], ['latency_ms' => 123.456, 'error' => null])], $config['targets'])]);
     expect(strlen($body))->toBeGreaterThan(32768);
     $factory = new HttpFactory();
     $responses = new DecoratedResponseFactory($factory, $factory);
@@ -307,7 +307,7 @@ it('rolls every enabled node up into the admin overview and renders every row', 
     $html = $smarty->assign('installed', true)->assign('overview', $overview)->assign('updated', '0 秒前')
         ->assign('targets', $targets)->assign('managed', 0)->assign('nodes', $nodes)->assign('node_enabled', 2)
         ->assign('carriers', TcpProbeStatus::CARRIERS)->assign('carrier_codes', TcpProbeStatus::DISPLAY_NAMES)
-        ->assign('interval_seconds', TcpProbe::interval(count($targets)))
+        ->assign('interval_seconds', TcpProbe::interval(count($targets)))->assign('probe_attempts', TcpProbe::ATTEMPTS)->assign('probe_timeout_ms', TcpProbe::TIMEOUT_MS)
         ->assign('taier_installed', false)->assign('taier', \App\Services\TaierProbeSource::settings())
         ->assign('taier_status', 'gray')->assign('taier_cities', [])->assign('csrf_token', 'token')
         ->fetch('admin/node/probe.tpl');
@@ -382,14 +382,15 @@ it('uses an adaptive interval for complete reports and status freshness', functi
         DB::table('tcp_probe_target')->insert(['id' => $i, 'carrier' => 'telecom', 'label' => 'CT ' . $i, 'ip' => '8.8.4.' . $i, 'port' => 443]);
     }
     $config = TcpProbe::config(1);
-    expect($config['interval_seconds'])->toBe(120);
-    $results = array_map(fn ($target) => ['target_id' => $target['id'], 'samples' => array_fill(0, 3, ['latency_ms' => 100, 'error' => null])], $config['targets']);
-    foreach ([$this->now, $this->now + 120] as $time) {
+    // 32 targets = 6 batches; each target may take 10 × 2 s + 9 × 0.2 s ≈ 22 s, plus 15 s for API calls: 147 s → 3 minutes.
+    expect($config['interval_seconds'])->toBe(180);
+    $results = array_map(fn ($target) => ['target_id' => $target['id'], 'samples' => array_fill(0, $config['attempts'], ['latency_ms' => 100, 'error' => null])], $config['targets']);
+    foreach ([$this->now, $this->now + 180] as $time) {
         TcpProbe::report(1, ['config_hash' => $config['config_hash'], 'measured_at' => $time, 'results' => $results], $time + 90);
     }
-    expect(TcpProbe::current([1], $this->now + 360)[1]['telecom']['status'])->toBe('green')
-        ->and(TcpProbe::detail(1, $this->now + 360)['carriers']['telecom']['status'])->toBe('green')
-        ->and(TcpProbe::current([1], $this->now + 481)[1]['telecom']['status'])->toBe('red');
+    expect(TcpProbe::current([1], $this->now + 540)[1]['telecom']['status'])->toBe('green')
+        ->and(TcpProbe::detail(1, $this->now + 540)['carriers']['telecom']['status'])->toBe('green')
+        ->and(TcpProbe::current([1], $this->now + 721)[1]['telecom']['status'])->toBe('red');
 });
 
 it('counts scheduled slow rounds as full history coverage', function () {
@@ -515,7 +516,8 @@ it('rates each target per node by the rule the carrier status uses', function ()
     DB::table('tcp_probe')->insert(['node_id' => 2, 'enabled' => true, 'threshold_ms' => 250]);
     foreach ([$this->now - 60, $this->now] as $at) {
         TcpProbe::report(1, tcpReport($at, 'timeout', 400), $at);
-        TcpProbe::report(2, tcpReport($at, [200, 'timeout', 'timeout'], 400, 2), $at);
+        // One success out of ten on the first target: partial outage, latency from the surviving sample.
+        TcpProbe::report(2, tcpReport($at, [200, ...array_fill(0, 9, 'timeout')], 400, 2), $at);
     }
     $targets = TcpProbe::overview($this->now)['targets'];
     // One success out of three is degraded, not healthy; slow but reachable is degraded, never broken.
@@ -579,4 +581,23 @@ it('gives every target its own 24 hour history alongside the carrier rollup', fu
         ->and($telecom['targets'][0]['history']['uptime'])->toBe('50%')
         ->and($telecom['targets'][1]['history']['buckets'][95]['status'])->toBe('green')
         ->and($telecom['targets'][1]['history']['uptime'])->toBe('100%');
+});
+
+it('samples each target ten times with a two second timeout and keeps one-minute rounds up to twelve targets', function () {
+    $config = TcpProbe::config(1);
+    expect($config['attempts'])->toBe(10)
+        ->and($config['timeout_ms'])->toBe(2000)
+        ->and(TcpProbe::interval(6))->toBe(60)
+        ->and(TcpProbe::interval(12))->toBe(60)
+        ->and(TcpProbe::interval(13))->toBe(120)
+        ->and(TcpProbe::interval(32))->toBe(180)
+        // The agent's own formula, kept in sync: batches × ceil(attempts × timeout + gaps) + 15 s API budget, rounded up to minutes.
+        ->and(TcpProbe::interval(6, 3, 3000))->toBe(60)
+        ->and(TcpProbe::interval(25, 3, 3000))->toBe(120);
+});
+
+it('rejects a report that still carries three samples per target', function () {
+    $report = tcpReport($this->now);
+    $report['results'][0]['samples'] = array_slice($report['results'][0]['samples'], 0, 3);
+    expect(fn () => TcpProbe::report(1, $report, $this->now))->toThrow(InvalidArgumentException::class, '每个目标需要 10 次检测结果');
 });

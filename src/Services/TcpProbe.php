@@ -9,6 +9,10 @@ use InvalidArgumentException;
 
 final class TcpProbe
 {
+    /** Samples per target per round and the per-connect timeout, handed to XrayR (>= 1.0.8 honours them). */
+    public const ATTEMPTS = 10;
+    public const TIMEOUT_MS = 2000;
+
     public static function installed(): bool
     {
         return DB::getCapsule()->schema()->hasTable('tcp_probe_round');
@@ -19,10 +23,16 @@ final class TcpProbe
         return DB::table('tcp_probe_target')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
     }
 
-    /** Six workers, up to ten seconds per target, with time reserved for API calls. */
-    public static function interval(int $targetCount): int
+    /**
+     * Mirror of XrayR's tcpprobe.Interval(), which must agree with this: a target may take
+     * attempts × timeout plus the 200 ms gaps between attempts (rounded up to a second), six
+     * targets run in parallel, 15 s are reserved for API calls, and rounds align to whole minutes.
+     */
+    public static function interval(int $targetCount, int $attempts = self::ATTEMPTS, int $timeoutMs = self::TIMEOUT_MS): int
     {
-        return max(60, (int) ceil((ceil($targetCount / 6) * 10 + 15) / 60) * 60);
+        $perTarget = (int) ceil(($attempts * $timeoutMs + max(0, $attempts - 1) * 200) / 1000);
+        $batches = (int) ceil($targetCount / 6);
+        return max(1, (int) ceil(($batches * $perTarget + 15) / 60)) * 60;
     }
 
     public static function config(int $nodeId, ?array $targets = null, ?object $probe = null): array
@@ -34,7 +44,7 @@ final class TcpProbe
         $config = [
             'enabled' => (bool) ($probe->enabled ?? false),
             'threshold_ms' => (int) ($probe->threshold_ms ?? 250),
-            'interval_seconds' => self::interval(count($targets)), 'timeout_ms' => 3000, 'attempts' => 3,
+            'interval_seconds' => self::interval(count($targets)), 'timeout_ms' => self::TIMEOUT_MS, 'attempts' => self::ATTEMPTS,
             'targets' => $targets,
         ];
         $config['config_hash'] = hash('sha256', json_encode($config, JSON_THROW_ON_ERROR));
@@ -70,8 +80,8 @@ final class TcpProbe
                 throw new InvalidArgumentException('目标不存在或重复');
             }
             $samples = $report['samples'] ?? null;
-            if (! is_array($samples) || ! array_is_list($samples) || count($samples) !== 3) {
-                throw new InvalidArgumentException('每个目标需要 3 次检测结果');
+            if (! is_array($samples) || ! array_is_list($samples) || count($samples) !== $config['attempts']) {
+                throw new InvalidArgumentException('每个目标需要 ' . $config['attempts'] . ' 次检测结果');
             }
             foreach ($samples as $sample) {
                 if (! is_array($sample) || ! array_key_exists('error', $sample) || ! array_key_exists('latency_ms', $sample)) {
@@ -80,7 +90,7 @@ final class TcpProbe
                 $error = $sample['error'];
                 $latency = $sample['latency_ms'];
                 if ($error === null) {
-                    if ((! is_int($latency) && ! is_float($latency)) || ! is_finite((float) $latency) || $latency < 0 || $latency > 3500) {
+                    if ((! is_int($latency) && ! is_float($latency)) || ! is_finite((float) $latency) || $latency < 0 || $latency > $config['timeout_ms'] + 500) {
                         throw new InvalidArgumentException('连接耗时无效');
                     }
                 } elseif (! in_array($error, ['timeout', 'refused', 'unreachable', 'other'], true) || $latency !== null) {

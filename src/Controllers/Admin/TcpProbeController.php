@@ -50,6 +50,7 @@ final class TcpProbeController extends BaseController
         return $response->write($this->view()->assign('installed', $installed)->assign('targets', $targets)
             ->assign('carriers', TcpProbeStatus::CARRIERS)->assign('carrier_codes', TcpProbeStatus::DISPLAY_NAMES)
             ->assign('interval_seconds', TcpProbe::interval(count($targets)))
+            ->assign('probe_attempts', TcpProbe::ATTEMPTS)->assign('probe_timeout_ms', TcpProbe::TIMEOUT_MS)
             ->assign('overview', $overview)
             ->assign('updated', $overview['measured_at'] ? self::since($now - $overview['measured_at']) : null)
             ->assign('managed', count(array_filter($targets, static fn ($target) => $target['managed'])))
