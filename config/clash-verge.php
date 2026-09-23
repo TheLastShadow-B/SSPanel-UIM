@@ -271,6 +271,11 @@ $_ENV['Clash_Group_Config'] = [
         'GEOSITE,google,Default Proxy',
         // GitHub is included in microsoft; match it first to keep its exit independent.
         'GEOSITE,github,Default Proxy',
+        // apple/microsoft carry their mainland CDN and service domains
+        // (mzstatic.com, apple.com.cn, azchcdn*.com); send those direct before
+        // the group rules below route them through the selected region.
+        'GEOSITE,apple@cn,DIRECT',
+        'GEOSITE,microsoft@cn,DIRECT',
         'GEOSITE,apple,Microsoft & Apple',
         'GEOSITE,microsoft,Microsoft & Apple',
         // mihomo supports geosite attribute filtering (name@attr) even though
@@ -289,7 +294,10 @@ $_ENV['Clash_Group_Config'] = [
         'GEOSITE,itiger,Securities',
         'GEOSITE,ibkr,Securities',
         'GEOSITE,cn,DIRECT',
-        'GEOIP,CN,DIRECT',
+        // no-resolve: resolving here goes through the proxied nameservers,
+        // whose answers for CDN-backed mainland names are often overseas
+        // edges, so the lookup mostly sent them to Final Match anyway.
+        'GEOIP,CN,DIRECT,no-resolve',
         'MATCH,Final Match',
     ],
 ];

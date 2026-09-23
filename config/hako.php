@@ -202,6 +202,22 @@ return [
             'path' => './ruleset/site-google.mrs',
             'interval' => 86400,
         ],
+        'site-apple-cn' => [
+            'type' => 'http',
+            'behavior' => 'domain',
+            'format' => 'mrs',
+            'url' => 'https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/apple@cn.mrs',
+            'path' => './ruleset/site-apple-cn.mrs',
+            'interval' => 86400,
+        ],
+        'site-microsoft-cn' => [
+            'type' => 'http',
+            'behavior' => 'domain',
+            'format' => 'mrs',
+            'url' => 'https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/microsoft@cn.mrs',
+            'path' => './ruleset/site-microsoft-cn.mrs',
+            'interval' => 86400,
+        ],
         'site-apple' => [
             'type' => 'http',
             'behavior' => 'domain',
@@ -277,6 +293,11 @@ return [
             'path' => './ruleset/site-ibkr.mrs',
             'interval' => 86400,
         ],
+        // Full geosite/cn (~111k domains, <1 MB unpacked as MRS), unlike the
+        // trimmed Stash list: ip-cn below is no-resolve, so the long tail would
+        // otherwise fall through to the proxy. clash.md's own iOS template loads
+        // a 124k-entry ChinaMax YAML plus GEOSITE,CN; its warning is about large
+        // yaml/text sets and stacking overlapping lists, not MRS size.
         'site-cn' => [
             'type' => 'http',
             'behavior' => 'domain',
@@ -333,6 +354,11 @@ return [
         'DOMAIN-SUFFIX,x.ai,AI Services',
         'DOMAIN-SUFFIX,wifiman.com,Default Proxy',
         'RULE-SET,site-google,Default Proxy',
+        // apple/microsoft carry their mainland CDN and service domains
+        // (mzstatic.com, apple.com.cn, azchcdn*.com); send those direct before
+        // the group rules below route them through the selected region.
+        'RULE-SET,site-apple-cn,DIRECT',
+        'RULE-SET,site-microsoft-cn,DIRECT',
         'RULE-SET,site-apple,Microsoft & Apple',
         'RULE-SET,site-microsoft,Microsoft & Apple',
         'RULE-SET,site-steam-cn,Steam Download',
@@ -347,7 +373,11 @@ return [
         'RULE-SET,site-itiger,Securities',
         'RULE-SET,site-ibkr,Securities',
         'RULE-SET,site-cn,DIRECT',
-        'RULE-SET,ip-cn,DIRECT',
+        // no-resolve, as in clash.md's template: resolving here goes through
+        // the proxied nameservers, whose answers for CDN-backed mainland names
+        // are often overseas edges, so the lookup mostly sent them to Final
+        // Match anyway. IP-literal mainland destinations still match.
+        'RULE-SET,ip-cn,DIRECT,no-resolve',
         'MATCH,Final Match',
     ],
     'tun' => [

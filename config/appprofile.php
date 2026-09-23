@@ -176,13 +176,20 @@ $_ENV['Stash_Group_Config'] = [
         // 按需拉取——对国内用户是鸡生蛋：代理尚未建立时恰好拉不到，规则静默失效，
         // 流量直接落到 MATCH。改走 jsDelivr 上的 MRS 一并解决内存与可达性。
         'geosite-google' => $stash_mrs('domain', 'geosite/google.mrs'),
+        'geosite-apple-cn' => $stash_mrs('domain', 'geosite/apple@cn.mrs'),
+        'geosite-microsoft-cn' => $stash_mrs('domain', 'geosite/microsoft@cn.mrs'),
         'geosite-apple' => $stash_mrs('domain', 'geosite/apple.mrs'),
         'geosite-microsoft' => $stash_mrs('domain', 'geosite/microsoft.mrs'),
         'geosite-entertainment' => $stash_mrs('domain', 'geosite/category-entertainment.mrs'),
         'geosite-futu' => $stash_mrs('domain', 'geosite/futu.mrs'),
         'geosite-itiger' => $stash_mrs('domain', 'geosite/itiger.mrs'),
         'geosite-ibkr' => $stash_mrs('domain', 'geosite/ibkr.mrs'),
-        'geosite-cn' => $stash_mrs('domain', 'geosite/cn.mrs'),
+        // 不用 geosite/cn：111,030 条里有 104,976 条来自 felixonmars
+        // accelerated-domains.china，入选标准是权威 DNS 在国内，IP 也几乎都在国内，
+        // 下方 geoip-cn（未加 no-resolve）本就能兜住，只多一次国内 UDP 查询。
+        // geolocation-cn + tld-cn 合计约 5,400 条，覆盖主流国内服务。
+        'geosite-cn' => $stash_mrs('domain', 'geosite/geolocation-cn.mrs'),
+        'geosite-tld-cn' => $stash_mrs('domain', 'geosite/tld-cn.mrs'),
         'geoip-cn' => $stash_mrs('ipcidr', 'geoip/cn.mrs'),
     ],
     'rules' => [
@@ -224,6 +231,10 @@ $_ENV['Stash_Group_Config'] = [
         'DOMAIN-SUFFIX,x.ai,AI Services',
         'DOMAIN-SUFFIX,wifiman.com,Default Proxy',
         'RULE-SET,geosite-google,Default Proxy',
+        // apple/microsoft 里混有中国区 CDN 与服务域名(mzstatic.com、apple.com.cn、
+        // azchcdn*.com 等)，先直连，免得被下面的策略组送去所选地区节点。
+        'RULE-SET,geosite-apple-cn,DIRECT',
+        'RULE-SET,geosite-microsoft-cn,DIRECT',
         'RULE-SET,geosite-apple,Microsoft & Apple',
         'RULE-SET,geosite-microsoft,Microsoft & Apple',
         'RULE-SET,geosite-entertainment,Stream',
@@ -231,6 +242,7 @@ $_ENV['Stash_Group_Config'] = [
         'RULE-SET,geosite-itiger,Securities',
         'RULE-SET,geosite-ibkr,Securities',
         'RULE-SET,geosite-cn,DIRECT',
+        'RULE-SET,geosite-tld-cn,DIRECT',
         // 不加 no-resolve：Fake IP 下必须真实解析才能判定国别，加了会让这条
         // 永远不命中，未被 geosite-cn 兜住的国内 IP 会被误送去代理。
         'RULE-SET,geoip-cn,DIRECT',
