@@ -60,7 +60,7 @@
             <span class="text-faint text-xs">/ {count($nodes)} 个节点已开启</span>
         </div>
         <div class="meter mt-3.5"><span style="width: {$node_percent|string_format:"%.1f"}%"></span></div>
-        <p class="text-faint mt-2 text-xs">{count($targets)} 个测试目标 · {foreach $overview['carriers'] as $c}{$c['code']} {$c['targets']}{if !$c@last} · {/if}{/foreach}</p>
+        <p class="text-faint mt-2 text-xs">{if $groups_installed}{count($groups)} 个检测组 · {/if}{count($targets)} 个测试目标 · {foreach $overview['carriers'] as $c}{$c['code']} {$c['targets']}{if !$c@last} · {/if}{/foreach}</p>
     </div>
 </div>
 
@@ -86,6 +86,16 @@
                         :class="carrier === '{$key}' ? 'is-on' : ''" :aria-pressed="carrier === '{$key}'">{$carriers[$key]} <span class="tabular-nums opacity-60" x-text="count('{$key}')"></span></button>
             {/foreach}
         </div>
+        {if $groups_installed && count($groups) > 1}
+            <div class="bg-tile inline-flex gap-0.5 rounded-full p-1" role="group" aria-label="按检测组筛选">
+                <button type="button" class="probe-seg" @click="group = 'all'"
+                        :class="group === 'all' ? 'is-on' : ''" :aria-pressed="group === 'all'">全部组</button>
+                {foreach $groups as $g}
+                    <button type="button" class="probe-seg" @click="group = '{$g['id']}'"
+                            :class="group === '{$g['id']}' ? 'is-on' : ''" :aria-pressed="group === '{$g['id']}'">{$g['name']|escape}</button>
+                {/foreach}
+            </div>
+        {/if}
         <label class="relative flex flex-1 items-center sm:max-w-xs">
             <span class="sr-only">搜索测试目标</span>
             <i class="ti ti-search text-faint absolute left-3 text-base" aria-hidden="true"></i>
@@ -103,7 +113,7 @@
     <div class="max-h-[22rem] overflow-y-auto overscroll-contain">
         {foreach $targets as $target}
             <div class="border-hairline flex items-center gap-3 border-b py-2" x-show="match($el)"
-                 data-probe-target data-carrier="{$target['carrier']}"
+                 data-probe-target data-carrier="{$target['carrier']}" data-group="{$target['group_id']}"
                  data-search="{$target['label']|lower|escape} {$target['ip']|escape}:{$target['port']}">
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
@@ -111,7 +121,7 @@
                         <span class="text-ink truncate text-sm font-semibold">{$target['label']|escape}</span>
                     </div>
                     <p class="text-faint mt-0.5 truncate text-xs">
-                        {if $target['managed']}TaierSpeedtest 同步{else}手动添加{/if}<span class="md:hidden"> · {$target['ip']|escape}:{$target['port']}</span>
+                        {$target['origin']}{if $groups_installed && count($groups) > 1} · {$group_names[$target['group_id']]|default:'—'|escape}{/if}<span class="md:hidden"> · {$target['ip']|escape}:{$target['port']}</span>
                     </p>
                 </div>
                 <div class="text-body hidden w-44 shrink-0 truncate text-sm tabular-nums md:block">{$target['ip']|escape}:{$target['port']}</div>
@@ -122,13 +132,13 @@
                     <p class="text-faint mt-0.5 text-xs tabular-nums">{if $target['latency_ms'] !== null}{$target['latency_ms']|round} ms · {/if}{$target['reach']} 节点</p>
                 </div>
                 <div class="flex w-24 shrink-0 justify-end">
-                    {if $target['managed'] && $taier['enabled']}
+                    {if $target['locked']}
                         <button type="button" class="probe-icon-btn" disabled
-                                title="由 TaierSpeedtest 自动维护，关闭自动同步后可编辑或删除"
-                                aria-label="{$target['label']|escape} 由 TaierSpeedtest 自动维护，关闭自动同步后可编辑或删除"><i class="ti ti-lock" aria-hidden="true"></i></button>
+                                title="由 {$target['origin']} 自动维护，{if $target['managed']}关闭自动同步{else}清空该组的抓取地址{/if}后可编辑或删除"
+                                aria-label="{$target['label']|escape} 由 {$target['origin']} 自动维护，{if $target['managed']}关闭自动同步{else}清空该组的抓取地址{/if}后可编辑或删除"><i class="ti ti-lock" aria-hidden="true"></i></button>
                     {else}
                         <button type="button" class="probe-icon-btn" @click="edit($el)" aria-label="编辑 {$target['label']|escape}"
-                                data-id="{$target['id']}" data-carrier="{$target['carrier']}" data-label="{$target['label']|escape}"
+                                data-id="{$target['id']}" data-group="{$target['group_id']}" data-carrier="{$target['carrier']}" data-label="{$target['label']|escape}"
                                 data-ip="{$target['ip']|escape}" data-port="{$target['port']}"><i class="ti ti-pencil" aria-hidden="true"></i></button>
                         <button type="button" class="probe-icon-btn" aria-label="删除 {$target['label']|escape}"
                                 hx-delete="/admin/node/probe/targets/{$target['id']}" hx-swap="none" hx-params="none"
@@ -207,6 +217,7 @@
             <span class="min-w-0 flex-1">节点</span>
             <span class="hidden w-32 shrink-0 sm:block">最近三网</span>
             <span class="hidden w-20 shrink-0 lg:block">最近上报</span>
+            {if $groups_installed}<span class="hidden w-28 shrink-0 sm:block">检测组</span>{/if}
             <span class="w-28 shrink-0">黄色阈值</span>
             <span class="w-14 shrink-0 text-right">检测</span>
         </div>
@@ -228,6 +239,14 @@
                         {/foreach}
                     </div>
                     <div class="text-faint hidden w-20 shrink-0 text-xs tabular-nums lg:block">{$node['reported']}</div>
+                    {if $groups_installed}
+                        <div class="hidden w-28 shrink-0 sm:block">
+                            <select class="field-input !px-2.5 !py-1.5 text-xs" name="group_id[{$node['id']}]"
+                                    data-initial="{$node['group_id']}" aria-label="{$node['name']|escape} 检测组">
+                                {foreach $groups as $g}<option value="{$g['id']}" {if $g['id'] == $node['group_id']}selected{/if}>{$g['name']|escape}</option>{/foreach}
+                            </select>
+                        </div>
+                    {/if}
                     <div class="flex w-28 shrink-0 items-center gap-1.5">
                         <input class="field-input !w-20 !px-2.5 !py-1.5 tabular-nums" type="number" min="1" max="3000" required
                                name="threshold_ms[{$node['id']}]" value="{$node['threshold_ms']}" data-initial="{$node['threshold_ms']}"
@@ -268,6 +287,116 @@
 
 </div>
 <div class="flex flex-col gap-6">
+
+{* ============ 检测组 ============ *}
+{if $groups_installed}
+<section class="c-card-pad" x-data="probeGroups()">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <h3 class="text-base font-semibold">检测组</h3>
+            <p class="text-faint mt-1 text-xs leading-relaxed">节点分到哪个组，就只检测那个组的目标。填了抓取地址的组由面板按间隔抓取其中的 IP 和端口。</p>
+        </div>
+        <button type="button" class="btn-primary btn-sm" @click="create()"><i class="ti ti-plus" aria-hidden="true"></i> 新建组</button>
+    </div>
+
+    <div class="mt-4 flex flex-col gap-3">
+        {foreach $groups as $g}
+            <div class="bg-tile rounded-xl p-3" data-probe-group="{$g['id']}">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                        <p class="text-ink flex items-center gap-2 text-sm font-semibold">
+                            <span class="truncate">{$g['name']|escape}</span>
+                            {if $g['id'] == 1}<span class="probe-code">默认</span>{/if}
+                        </p>
+                        <p class="text-faint mt-0.5 text-xs tabular-nums">{$g['targets']} 个目标 · {$g['nodes']} 个节点 · 周期 {$g['interval_seconds']} 秒</p>
+                    </div>
+                    <div class="flex shrink-0">
+                        <button type="button" class="probe-icon-btn" aria-label="编辑 {$g['name']|escape}" @click="edit($el)"
+                                data-id="{$g['id']}" data-name="{$g['name']|escape}" data-url="{$g['url']|escape}" data-minutes="{$g['interval_minutes']}"><i class="ti ti-pencil" aria-hidden="true"></i></button>
+                        {if $g['id'] != 1}
+                            <button type="button" class="probe-icon-btn" aria-label="删除 {$g['name']|escape}"
+                                    hx-delete="/admin/node/probe/groups/{$g['id']}" hx-swap="none" hx-params="none"
+                                    hx-confirm="确定删除「{$g['name']|escape}」？" hx-headers='{ldelim}"X-CSRF-Token":"{$csrf_token}"{rdelim}'
+                                    {if $g['targets'] || $g['nodes']}disabled title="请先删除组内目标并把节点移到其他组"{/if}><i class="ti ti-trash" aria-hidden="true"></i></button>
+                        {/if}
+                    </div>
+                </div>
+                {if $g['url']}
+                    <p class="text-body mt-2 truncate text-xs tabular-nums" title="{$g['url']|escape}">{$g['url']|escape}</p>
+                    <p class="text-ink mt-2 flex items-start gap-2 text-xs" role="status">
+                        <span class="probe-dot mt-1" data-status="{$g['status']}"></span>{$g['last_message']|escape}
+                    </p>
+                    <p class="text-faint mt-1 pl-4 text-xs leading-relaxed">
+                        每 {$g['interval_minutes']} 分钟 · 上次成功 {if $g['last_success']}{$g['last_success']|date_format:'%m-%d %H:%M'}{else}尚未抓取{/if}
+                        · {if !$g['next_sync_at']}等待下一次定时任务{else}下次 {$g['next_sync_at']|date_format:'%m-%d %H:%M'}{/if}
+                    </p>
+                    <form class="mt-2" hx-post="/admin/node/probe/groups/{$g['id']}/sync" hx-swap="none" hx-disabled-elt="find button"
+                          hx-headers='{ldelim}"X-CSRF-Token":"{$csrf_token}"{rdelim}'>
+                        <button type="submit" class="btn-secondary btn-sm w-full"><i class="ti ti-refresh" aria-hidden="true"></i> 立即抓取</button>
+                        <span class="htmx-indicator text-faint mt-1 block text-center text-xs" role="status">正在抓取…</span>
+                    </form>
+                {else}
+                    <p class="text-faint mt-2 text-xs">目标手动维护{if $g['id'] == 1}，TaierSpeedtest 自动目标也写入此组{/if}</p>
+                {/if}
+            </div>
+        {/foreach}
+    </div>
+
+    {* ---- 新建 / 编辑组抽屉 ---- *}
+    <template x-teleport="body">
+        <div x-show="open" x-cloak class="fixed inset-0 z-50 flex justify-end" role="dialog" aria-labelledby="probe-group-title">
+            <div class="absolute inset-0 bg-black/40" x-show="open" x-transition.opacity.duration.250ms @click="close()"></div>
+            <div class="bg-card border-hairline relative flex h-full w-full max-w-md flex-col border-l shadow-xl"
+                 x-show="open" @keydown.escape.window="close()"
+                 x-transition:enter="transition duration-300 ease-drawer" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+                 x-transition:leave="transition duration-200 ease-drawer" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
+                <form class="flex h-full flex-col" hx-post="/admin/node/probe/groups" hx-swap="none"
+                      hx-disabled-elt="find button[type=submit]" hx-headers='{ldelim}"X-CSRF-Token":"{$csrf_token}"{rdelim}'>
+                    <div class="border-hairline flex items-start justify-between gap-3 border-b p-5">
+                        <div>
+                            <h3 id="probe-group-title" class="text-base font-semibold" x-text="form.id ? '编辑检测组' : '新建检测组'">新建检测组</h3>
+                            <p class="text-faint mt-1 text-xs">改了抓取地址会在五分钟内重新抓取</p>
+                        </div>
+                        <button type="button" class="probe-icon-btn -mt-1 -mr-2" aria-label="关闭" @click="close()"><i class="ti ti-x" aria-hidden="true"></i></button>
+                    </div>
+                    <div class="flex-1 space-y-4 overflow-y-auto p-5">
+                        <input type="hidden" name="id" x-model="form.id">
+                        <div>
+                            <label class="field-label" for="probe-group-name">组名称</label>
+                            <input id="probe-group-name" class="field-input" name="name" x-model="form.name" maxlength="40" placeholder="例如：中转入口" required>
+                        </div>
+                        <div>
+                            <label class="field-label" for="probe-group-url">抓取地址</label>
+                            <input id="probe-group-url" class="field-input tabular-nums" name="url" x-model="form.url" type="url" maxlength="255"
+                                   placeholder="https://…/targets.txt，留空则手动维护目标" autocomplete="off">
+                        </div>
+                        <div>
+                            <label class="field-label" for="probe-group-minutes">抓取间隔（分钟）</label>
+                            <input id="probe-group-minutes" class="field-input tabular-nums" name="interval_minutes" x-model="form.interval_minutes" type="number" min="5" max="1440" required>
+                        </div>
+                        <div class="bg-tile rounded-xl p-3 text-xs leading-relaxed">
+                            <p class="text-ink font-semibold">抓取内容格式</p>
+                            <p class="text-faint mt-1">纯文本，每行一个目标，逗号分隔：<code class="text-ink">IP,端口,运营商,名字</code>。运营商填 电信 / 联通 / 移动（或 CT / CU / CM），名字可留空。井号开头的行是注释。</p>
+                            <pre class="text-body mt-2 overflow-x-auto tabular-nums">1.2.3.4,443,移动,广州移动入口
+5.6.7.8,8443,电信,上海电信入口</pre>
+                            <p class="text-faint mt-2">最多取前 100 个目标；抓取失败或没有合法行时保留上次的目标。抓取由面板每五分钟的 Cron 触发。</p>
+                        </div>
+                    </div>
+                    <div class="border-hairline flex gap-2 border-t p-5">
+                        <button type="button" class="btn-secondary flex-1" @click="close()">取消</button>
+                        <button type="submit" class="btn-primary flex-[2]" x-text="form.id ? '保存修改' : '创建组'">创建组</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </template>
+</section>
+{else}
+<section class="c-card-pad">
+    <h3 class="text-base font-semibold">检测组</h3>
+    <p class="text-warning mt-2 text-sm">启用前请先运行 <code>php xcat Migration latest</code>。</p>
+</section>
+{/if}
 
 {* ============ TaierSpeedtest 自动同步 ============ *}
 {if $taier_installed}
@@ -339,7 +468,7 @@
 <section class="c-card-pad">
     <h3 class="text-base font-semibold">检测参数</h3>
     <div class="mt-2">
-        <div class="kv-row"><span class="kv-key">检测周期</span><span class="kv-val tabular-nums">{$interval_seconds} 秒 <span class="text-faint font-normal">自动</span></span></div>
+        <div class="kv-row"><span class="kv-key">检测周期</span><span class="kv-val tabular-nums">{$interval_seconds} 秒 <span class="text-faint font-normal">{if $groups_installed}默认组 · 各组按目标数自动{else}自动{/if}</span></span></div>
         <div class="kv-row"><span class="kv-key">每轮次数</span><span class="kv-val tabular-nums">每目标 {$probe_attempts} 次</span></div>
         <div class="kv-row"><span class="kv-key">单次超时</span><span class="kv-val tabular-nums">{$probe_timeout_ms} ms</span></div>
         <div class="kv-row"><span class="kv-key">历史粒度</span><span class="kv-val tabular-nums">15 分钟 / 格</span></div>
@@ -364,30 +493,35 @@
     function probeTargets() {
         return {
             carrier: 'all',
+            group: 'all',
             q: '',
             open: false,
-            form: { id: '', carrier: 'telecom', label: '', ip: '', port: 443 },
+            form: { id: '', carrier: 'telecom', label: '', ip: '', port: 443, group_id: '1' },
             rows: [],
             init() {
                 this.rows = Array.from(this.$root.querySelectorAll('[data-probe-target]'));
             },
+            inGroup(el) {
+                return this.group === 'all' || this.group === el.dataset.group;
+            },
             match(el) {
-                return (this.carrier === 'all' || this.carrier === el.dataset.carrier)
+                return (this.carrier === 'all' || this.carrier === el.dataset.carrier) && this.inGroup(el)
                     && el.dataset.search.includes(this.q.trim().toLowerCase());
             },
             count(key) {
-                return key === 'all' ? this.rows.length : this.rows.filter(el => el.dataset.carrier === key).length;
+                return this.rows.filter(el => this.inGroup(el) && (key === 'all' || el.dataset.carrier === key)).length;
             },
             get visible() {
                 return this.rows.filter(el => this.match(el)).length;
             },
             create() {
-                this.form = { id: '', carrier: 'telecom', label: '', ip: '', port: 443 };
+                // A new target lands in the group being looked at, or the default group.
+                this.form = { id: '', carrier: 'telecom', label: '', ip: '', port: 443, group_id: this.group === 'all' ? '1' : this.group };
                 this.show();
             },
             edit(el) {
                 this.form = {
-                    id: el.dataset.id, carrier: el.dataset.carrier,
+                    id: el.dataset.id, carrier: el.dataset.carrier, group_id: el.dataset.group || '1',
                     label: el.dataset.label, ip: el.dataset.ip, port: el.dataset.port,
                 };
                 this.show();
@@ -396,6 +530,31 @@
                 this.opener = document.activeElement;
                 this.open = true;
                 this.$nextTick(() => document.getElementById('probe-target-label')?.focus());
+            },
+            close() {
+                this.open = false;
+                if (this.opener && typeof this.opener.focus === 'function') this.opener.focus();
+            },
+        };
+    }
+
+    // 检测组:新建/编辑共用一个抽屉,和目标抽屉同一套开关
+    function probeGroups() {
+        return {
+            open: false,
+            form: { id: '', name: '', url: '', interval_minutes: 60 },
+            create() {
+                this.form = { id: '', name: '', url: '', interval_minutes: 60 };
+                this.show();
+            },
+            edit(el) {
+                this.form = { id: el.dataset.id, name: el.dataset.name, url: el.dataset.url, interval_minutes: el.dataset.minutes };
+                this.show();
+            },
+            show() {
+                this.opener = document.activeElement;
+                this.open = true;
+                this.$nextTick(() => document.getElementById('probe-group-name')?.focus());
             },
             close() {
                 this.open = false;

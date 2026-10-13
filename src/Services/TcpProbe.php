@@ -18,9 +18,30 @@ final class TcpProbe
         return DB::getCapsule()->schema()->hasTable('tcp_probe_round');
     }
 
-    public static function targets(): array
+    /** All targets, or one group's; before the group migration the single list is returned either way. */
+    public static function targets(?int $groupId = null): array
     {
-        return DB::table('tcp_probe_target')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+        $query = DB::table('tcp_probe_target')->orderBy('id');
+        if ($groupId !== null && TcpProbeGroup::installed()) {
+            $query->where('group_id', $groupId);
+        }
+        return $query->get()->map(fn ($row) => (array) $row)->all();
+    }
+
+    /** The group a node probes; everything is the default group until groups exist. */
+    public static function groupOf(?object $probe): int
+    {
+        return (int) ($probe->group_id ?? TcpProbeGroup::DEFAULT_ID);
+    }
+
+    /** Targets keyed by group, for per-node hashes and periods. */
+    private static function byGroup(array $targets): array
+    {
+        $groups = [];
+        foreach ($targets as $target) {
+            $groups[(int) ($target['group_id'] ?? TcpProbeGroup::DEFAULT_ID)][] = $target;
+        }
+        return $groups;
     }
 
     /**
@@ -37,10 +58,10 @@ final class TcpProbe
 
     public static function config(int $nodeId, ?array $targets = null, ?object $probe = null): array
     {
-        $targets ??= self::targets();
+        $probe ??= DB::table('tcp_probe')->where('node_id', $nodeId)->first();
+        $targets ??= self::targets(self::groupOf($probe));
         // Source metadata must not invalidate probes when endpoints are unchanged.
         $targets = array_map(fn ($target) => array_intersect_key($target, array_flip(['id', 'carrier', 'label', 'ip', 'port'])), $targets);
-        $probe ??= DB::table('tcp_probe')->where('node_id', $nodeId)->first();
         $config = [
             'enabled' => (bool) ($probe->enabled ?? false),
             'threshold_ms' => (int) ($probe->threshold_ms ?? 250),
@@ -154,18 +175,20 @@ final class TcpProbe
         if ($nodeIds === [] || ! self::installed()) {
             return $rows;
         }
-        $stale = 3 * self::interval(count(self::targets()));
+        $groups = self::byGroup(self::targets());
         $probes = DB::table('tcp_probe')->whereIn('node_id', $nodeIds)->get()->keyBy('node_id');
+        // Freshness follows the period of the node's own group: a bigger list means slower rounds.
+        $stale = static fn ($probe) => 3 * self::interval(count($groups[self::groupOf($probe)] ?? []));
         foreach ($nodeIds as $nodeId) {
             if ($probes->get($nodeId)?->enabled) {
-                $rows[$nodeId] = TcpProbeStatus::current(null, $now, $stale);
+                $rows[$nodeId] = TcpProbeStatus::current(null, $now, $stale($probes->get($nodeId)));
             }
         }
         $latest = DB::table('tcp_probe_round')->selectRaw('MAX(id)')->whereIn('node_id', $nodeIds)->groupBy('node_id');
         foreach (DB::table('tcp_probe_round')->whereIn('id', $latest)->get() as $round) {
             // A round recorded before a target edit is still a real measurement while it is fresh by time.
             if ($rows[$round->node_id] !== null) {
-                $rows[$round->node_id] = TcpProbeStatus::current(self::decode($round), $now, $stale);
+                $rows[$round->node_id] = TcpProbeStatus::current(self::decode($round), $now, $stale($probes->get($round->node_id)));
             }
         }
         return $rows;
@@ -189,6 +212,7 @@ final class TcpProbe
             return $overview;
         }
         $targets = self::targets();
+        $groups = self::byGroup($targets);
         foreach ($targets as $target) {
             $overview['targets'][(int) $target['id']] = [
                 'ok' => 0, 'reached' => 0, 'total' => 0, 'latency_ms' => null,
@@ -203,18 +227,18 @@ final class TcpProbe
         $latencies = array_fill_keys(array_keys($overview['carriers']), []);
         $reach = [];
         if ($probes->isNotEmpty()) {
-            $stale = 3 * self::interval(count($targets));
             $latest = DB::table('tcp_probe_round')->selectRaw('MAX(id)')->whereIn('node_id', $probes->keys()->all())->groupBy('node_id');
             foreach (DB::table('tcp_probe_round')->whereIn('id', $latest)->get() as $row) {
-                if ($now - $row->measured_at > $stale) {
+                $probe = $probes->get($row->node_id);
+                $mine = $groups[self::groupOf($probe)] ?? [];
+                if ($now - $row->measured_at > 3 * self::interval(count($mine))) {
                     continue;
                 }
-                $probe = $probes->get($row->node_id);
                 $round = self::decode($row);
                 $overview['reporting']++;
                 $overview['measured_at'] = max($overview['measured_at'] ?? 0, $round['measured_at']);
                 // A node still probing an outdated config is alive, but nothing it reports is valid yet.
-                $valid = self::config((int) $row->node_id, $targets, $probe)['config_hash'] === $row->config_hash;
+                $valid = self::config((int) $row->node_id, $mine, $probe)['config_hash'] === $row->config_hash;
                 $overview['nodes'][(int) $row->node_id] = [
                     'measured_at' => $round['measured_at'],
                     'states' => $valid ? array_map(static fn ($state) => $state['status'], $round['states'])

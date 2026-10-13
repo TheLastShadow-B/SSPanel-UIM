@@ -52,6 +52,7 @@ EOL;
         $jobs->updateNodeIp();
         \App\Services\TcpProbe::cleanup();
         (new \App\Services\TaierProbeSource())->sync();
+        (new \App\Services\UrlProbeSource())->sync();
 
         if ($_ENV['enable_detect_offline']) {
             $jobs->detectNodeOffline();

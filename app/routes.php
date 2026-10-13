@@ -165,6 +165,10 @@ return static function (Slim\App $app): void {
         $group->post('/node/probe/targets', App\Controllers\Admin\TcpProbeController::class . ':saveTarget')->add(new App\Middleware\CSRF());
         $group->post('/node/probe/targets/{id:[0-9]+}', App\Controllers\Admin\TcpProbeController::class . ':saveTarget')->add(new App\Middleware\CSRF());
         $group->delete('/node/probe/targets/{id:[0-9]+}', App\Controllers\Admin\TcpProbeController::class . ':deleteTarget')->add(new App\Middleware\CSRF());
+        $group->post('/node/probe/groups', App\Controllers\Admin\TcpProbeController::class . ':saveGroup')->add(new App\Middleware\CSRF());
+        $group->post('/node/probe/groups/{id:[0-9]+}', App\Controllers\Admin\TcpProbeController::class . ':saveGroup')->add(new App\Middleware\CSRF());
+        $group->delete('/node/probe/groups/{id:[0-9]+}', App\Controllers\Admin\TcpProbeController::class . ':deleteGroup')->add(new App\Middleware\CSRF());
+        $group->post('/node/probe/groups/{id:[0-9]+}/sync', App\Controllers\Admin\TcpProbeController::class . ':syncGroup')->add(new App\Middleware\CSRF());
         $group->get('/node', App\Controllers\Admin\NodeController::class . ':index');
         $group->get('/node/create', App\Controllers\Admin\NodeController::class . ':create');
         $group->post('/node', App\Controllers\Admin\NodeController::class . ':add');

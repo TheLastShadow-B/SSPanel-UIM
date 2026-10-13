@@ -214,8 +214,14 @@ final class TaierProbeSource
                     }
                     $endpoints[$endpoint] = true;
                 }
+                // Taier only ever fills the default group; other groups are the admin's own lists.
+                $grouped = TcpProbeGroup::installed();
                 $existing = DB::table('tcp_probe_target')->where('source', 'taier')->get()->keyBy('source_key');
-                $manual = DB::table('tcp_probe_target')->where('source', 'manual')->get()->keyBy(fn ($target) => $target->ip . ':' . $target->port);
+                $manual = DB::table('tcp_probe_target')->where('source', '!=', 'taier');
+                if ($grouped) {
+                    $manual->where('group_id', TcpProbeGroup::DEFAULT_ID);
+                }
+                $manual = $manual->get()->keyBy(fn ($target) => $target->ip . ':' . $target->port);
                 $kept = []; $skipped = 0;
                 // Reconcile atomically, preserving IDs, including when two endpoints swap IPs.
                 DB::table('tcp_probe_target')->where('source', 'taier')->delete();
@@ -231,7 +237,7 @@ final class TaierProbeSource
                     if ($old = $existing->get($target['source_key'])) {
                         $target['id'] = $old->id;
                     }
-                    $kept[] = DB::table('tcp_probe_target')->insertGetId($target);
+                    $kept[] = DB::table('tcp_probe_target')->insertGetId($target + ($grouped ? ['group_id' => TcpProbeGroup::DEFAULT_ID] : []));
                 }
                 $message = '同步成功：' . count($kept) . ' 个自动目标' . ($skipped ? '，跳过 ' . $skipped . ' 个重复的手动目标' : '');
                 DB::table('tcp_probe_source')->where('id', 1)->update([

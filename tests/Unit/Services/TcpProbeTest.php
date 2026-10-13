@@ -294,7 +294,8 @@ it('rolls every enabled node up into the admin overview and renders every row', 
     $targets = array_map(static fn ($target) => $target + [
         'status' => $overview['targets'][$target['id']]['status'], 'status_label' => $overview['targets'][$target['id']]['label'],
         'latency_ms' => $overview['targets'][$target['id']]['latency_ms'],
-        'reach' => $overview['targets'][$target['id']]['ok'] . ' / ' . $overview['targets'][$target['id']]['total'], 'managed' => false,
+        'reach' => $overview['targets'][$target['id']]['ok'] . ' / ' . $overview['targets'][$target['id']]['total'],
+        'managed' => false, 'locked' => false, 'origin' => '手动添加', 'group_id' => 1,
     ], TcpProbe::targets());
     // Medians carry two decimals; the console must round them, not truncate (250.5 is over a 250 threshold).
     $overview['carriers']['telecom']['latency_ms'] = 250.5;
@@ -306,6 +307,7 @@ it('rolls every enabled node up into the admin overview and renders every row', 
     ];
     $html = $smarty->assign('installed', true)->assign('overview', $overview)->assign('updated', '0 秒前')
         ->assign('targets', $targets)->assign('managed', 0)->assign('nodes', $nodes)->assign('node_enabled', 2)
+        ->assign('groups', [])->assign('groups_installed', false)->assign('group_names', [])
         ->assign('carriers', TcpProbeStatus::CARRIERS)->assign('carrier_codes', TcpProbeStatus::DISPLAY_NAMES)
         ->assign('interval_seconds', TcpProbe::interval(count($targets)))->assign('probe_attempts', TcpProbe::ATTEMPTS)->assign('probe_timeout_ms', TcpProbe::TIMEOUT_MS)
         ->assign('taier_installed', false)->assign('taier', \App\Services\TaierProbeSource::settings())

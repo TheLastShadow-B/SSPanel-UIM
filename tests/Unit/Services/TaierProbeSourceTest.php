@@ -7,6 +7,7 @@ use App\Models\Node;
 use App\Services\DB;
 use App\Services\TaierProbeSource;
 use App\Services\TcpProbe;
+use App\Services\TcpProbeGroup;
 use App\Utils\TcpProbeStatus;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
@@ -29,6 +30,7 @@ beforeEach(function () {
     }
     $this->statusMigration = require BASE_PATH . '/db/migrations/2026091704-add_taier_sync_status.php';
     $this->statusMigration->up();
+    (require BASE_PATH . '/db/migrations/2026092201-add_tcp_probe_groups.php')->up();
     DB::table('tcp_probe')->insert(['node_id' => 1, 'enabled' => true, 'threshold_ms' => 250]);
     DB::table('tcp_probe_target')->insert(['carrier' => 'telecom', 'label' => '手动', 'ip' => '1.1.1.1', 'port' => 443]);
     TaierProbeSource::saveSettings(true, ['北京', '上海', '广州'], 6);
@@ -236,4 +238,15 @@ it('adds the status column once and derives it from the timestamps of existing r
     DB::table('tcp_probe_source')->update(['last_status' => 'ok']);
     $this->statusMigration->up();
     expect(TaierProbeSource::settings()['last_status'])->toBe('ok');
+});
+
+it('writes only into the default group and leaves other groups alone', function () {
+    $id = TcpProbeGroup::save(null, ['name' => '中转', 'url' => '', 'interval_minutes' => 60]);
+    // The first Taier endpoint also exists as a manual target of another group: neither a conflict nor a skip.
+    DB::table('tcp_probe_target')->insert(['carrier' => 'mobile', 'label' => '入口', 'ip' => '8.8.4.1', 'port' => 65499, 'group_id' => $id]);
+    $result = taierSource(taierResponses())->sync(true, $this->now);
+    expect($result['ret'])->toBe(1)->and($result['msg'])->not->toContain('跳过')
+        ->and(TcpProbe::targets(1))->toHaveCount(10)
+        ->and(array_unique(array_column(TcpProbe::targets(1), 'group_id')))->toBe([1])
+        ->and(TcpProbe::targets($id))->toHaveCount(1);
 });

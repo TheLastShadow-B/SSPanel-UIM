@@ -1,5 +1,15 @@
 {* 目标抽屉表单域:值绑定在外层 probeTargets() 的 form 上,新建与编辑共用 *}
 <div class="space-y-4">
+    {if $groups_installed}
+        <div>
+            <label class="field-label" for="probe-target-group">检测组</label>
+            <select id="probe-target-group" class="field-input" name="group_id" x-model="form.group_id">
+                {foreach $groups as $g}<option value="{$g['id']}">{$g['name']|escape}</option>{/foreach}
+            </select>
+            <p class="text-faint mt-2 text-xs leading-relaxed">只有分到该组的节点会检测这个目标。</p>
+        </div>
+    {/if}
+
     <div>
         <span class="field-label">运营商</span>
         <div class="bg-tile flex gap-0.5 rounded-full p-1" role="group" aria-label="运营商">
@@ -32,6 +42,6 @@
 
     <p class="text-faint flex items-start gap-2 text-xs leading-relaxed">
         <i class="ti ti-info-circle mt-0.5 shrink-0 text-sm" aria-hidden="true"></i>
-        <span>目标需开放对应 TCP 端口。手动目标不会被 TaierSpeedtest 同步覆盖；与自动目标地址重复时，自动同步会跳过该地址。</span>
+        <span>目标需开放对应 TCP 端口。手动目标不会被 TaierSpeedtest 同步或组抓取覆盖；同组内与自动目标地址重复时，自动来源会跳过该地址。</span>
     </p>
 </div>
