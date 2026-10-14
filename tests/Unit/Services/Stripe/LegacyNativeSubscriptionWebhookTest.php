@@ -101,6 +101,35 @@ it('keeps renewing existing native Stripe subscriptions on invoice.paid', functi
     expect((int) $freshUser->transfer_enable)->toBe(Tools::gbToB(10));
 });
 
+it('keeps the local period on the reset_day anchor when a native Stripe cycle renews', function () {
+    // Stripe bills a Jan 31 anchor on Feb 28, then Mar 31; the local period must follow
+    // reset_day back to the month end instead of drifting to the 28th.
+    $user = makeLegacyStripeUser('cus_legacy_anchor');
+    $subscription = makeLegacyStripeSubscription($user->id, 'sub_legacy_anchor');
+    $subscription->start_date = '2026-01-31';
+    $subscription->end_date = '2026-02-27';
+    $subscription->reset_day = 31;
+    $subscription->save();
+
+    (new WebhookHandler())->handle(\Stripe\Event::constructFrom([
+        'id' => 'evt_legacy_anchor',
+        'type' => 'invoice.paid',
+        'data' => ['object' => [
+            'id' => 'in_legacy_anchor',
+            'customer' => 'cus_legacy_anchor',
+            'subscription' => 'sub_legacy_anchor',
+            'billing_reason' => 'subscription_cycle',
+        ]],
+    ]));
+
+    $freshSub = (new Subscription())->find($subscription->id);
+    expect($freshSub->start_date)->toBe('2026-02-28');
+    expect($freshSub->end_date)->toBe('2026-03-30');
+
+    $freshUser = (new User())->find($user->id);
+    expect($freshUser->class_expire)->toBe('2026-03-30 23:59:59');
+});
+
 it('keeps revoking access for existing native Stripe subscriptions on invoice.payment_failed', function () {
     $user = makeLegacyStripeUser('cus_legacy_fail');
     $subscription = makeLegacyStripeSubscription($user->id, 'sub_legacy_fail');

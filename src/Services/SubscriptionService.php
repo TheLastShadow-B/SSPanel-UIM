@@ -86,15 +86,29 @@ final class SubscriptionService
     }
 
     /**
-     * 计算订阅结束日期
+     * 计算订阅结束日期（含当天）
+     *
+     * $anchorDay 为开通日（subscription.reset_day），缺省取 $startDate 当天。短月把下一期
+     * 起点截到月末后（31 号 → 2 月 28 日），再下一期回到锚点日，避免 31 号开通的订阅过了
+     * 2 月就永久变成 28 号续费、12 次月付凑不满一年。只向后补最多 3 天（月末截断最多吃掉
+     * 的天数）；不在锚点附近的起点（如管理员改过到期日）仍按自然月推算，绝不缩短周期。
      */
-    public static function calculateEndDate(Carbon $startDate, string $billingCycle): Carbon
+    public static function calculateEndDate(Carbon $startDate, string $billingCycle, ?int $anchorDay = null): Carbon
     {
-        return match ($billingCycle) {
-            'month' => $startDate->copy()->addMonthsNoOverflow(1)->subDay(),
-            'quarter' => $startDate->copy()->addMonthsNoOverflow(3)->subDay(),
-            'year' => $startDate->copy()->addMonthsNoOverflow(12)->subDay(),
+        $months = match ($billingCycle) {
+            'month' => 1,
+            'quarter' => 3,
+            'year' => 12,
         };
+
+        $nextStart = $startDate->copy()->addMonthsNoOverflow($months);
+        $anchored = $nextStart->copy()->day(min($anchorDay ?? $startDate->day, $nextStart->daysInMonth));
+
+        if ($anchored->gt($nextStart) && $nextStart->diffInDays($anchored) <= 3) {
+            $nextStart = $anchored;
+        }
+
+        return $nextStart->subDay();
     }
 
     /**
@@ -156,7 +170,8 @@ final class SubscriptionService
     /**
      * 推进一个订阅到下一计费周期（自动续费成功 / 手动续费激活共用）。
      *
-     * newStart = end_date + 1 天；newEnd = calculateEndDate(newStart, cycle)。
+     * newStart = end_date + 1 天；newEnd = calculateEndDate(newStart, cycle, reset_day)，
+     * 以开通日为锚点，月末开通的订阅不会因短月漂移。
      * 更新订阅起止日、置 status='active'、清空 grace_until；用户 class_expire 对齐到
      * newEnd 23:59:59。
      *
@@ -169,7 +184,7 @@ final class SubscriptionService
     public static function advanceRenewedPeriod(Subscription $sub, User $user): void
     {
         $newStart = Carbon::parse($sub->end_date)->addDay();
-        $newEnd = self::calculateEndDate($newStart, $sub->billing_cycle);
+        $newEnd = self::calculateEndDate($newStart, $sub->billing_cycle, (int) $sub->reset_day);
 
         $sub->start_date = $newStart->format('Y-m-d');
         $sub->end_date = $newEnd->format('Y-m-d');

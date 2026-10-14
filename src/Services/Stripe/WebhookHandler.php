@@ -169,7 +169,11 @@ final class WebhookHandler
         }
 
         $newStart = Carbon::parse($subscription->end_date)->addDay();
-        $newEnd = SubscriptionService::calculateEndDate($newStart, $subscription->billing_cycle);
+        $newEnd = SubscriptionService::calculateEndDate(
+            $newStart,
+            $subscription->billing_cycle,
+            (int) $subscription->reset_day
+        );
 
         $subscription->start_date = $newStart->format('Y-m-d');
         $subscription->end_date = $newEnd->format('Y-m-d');

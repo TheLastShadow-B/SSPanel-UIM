@@ -105,3 +105,22 @@ it('rolls a month-end anchor forward without overflow', function () {
     expect($freshSub->start_date)->toBe('2026-02-01');
     expect($freshSub->end_date)->toBe('2026-02-28');
 });
+
+it('renews back onto the reset_day anchor after February clamped it', function () {
+    // Opened on Jan 31 (reset_day 31): the first period ended Feb 27. The renewal must
+    // run to Mar 30, not drift to Mar 27 and stay on the 28th from then on.
+    $user = makeUserWithMoney(0.0, class: 2);
+    $sub = makeSub($user, endDate: '2026-02-27', status: 'pending_renewal');
+    $sub->reset_day = 31;
+    $sub->save();
+
+    SubscriptionService::advanceRenewedPeriod($sub, $user);
+
+    $freshSub = (new Subscription())->find($sub->id);
+    expect($freshSub->start_date)->toBe('2026-02-28');
+    expect($freshSub->end_date)->toBe('2026-03-30');
+    expect((int) $freshSub->reset_day)->toBe(31);
+
+    $freshUser = (new User())->find($user->id);
+    expect($freshUser->class_expire)->toBe('2026-03-30 23:59:59');
+});
