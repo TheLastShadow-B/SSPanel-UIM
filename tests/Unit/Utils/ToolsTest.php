@@ -358,3 +358,40 @@ describe('Tools::genRealityPublicKey', function () {
         expect(Tools::genRealityPublicKey(''))->toBe('');
     });
 });
+describe('Tools::ipLimitKey', function () {
+    it('groups IPv4 by /24, so a mobile CGNAT handing out a new address per flow counts once', function () {
+        expect(Tools::ipLimitKey('223.104.79.66'))->toBe('223.104.79.0/24')
+            ->and(Tools::ipLimitKey('223.104.79.87'))->toBe('223.104.79.0/24')
+            ->and(Tools::ipLimitKey('58.209.187.141'))->toBe('58.209.187.0/24');
+    });
+
+    it('unwraps the IPv4-mapped form online_log stores', function () {
+        expect(Tools::ipLimitKey('::ffff:223.104.79.66'))->toBe('223.104.79.0/24');
+    });
+
+    it('groups IPv6 by /64, so rotating privacy addresses count once', function () {
+        expect(Tools::ipLimitKey('240e:3a8:4caf:6de0:1c2d:5e6f:7a8b:9c0d'))->toBe('240e:3a8:4caf:6de0::/64')
+            ->and(Tools::ipLimitKey('240e:3a8:4caf:6de0::1'))->toBe('240e:3a8:4caf:6de0::/64')
+            ->and(Tools::ipLimitKey('2409:8924:5034:82c:aaaa:bbbb:cccc:dddd'))->toBe('2409:8924:5034:82c::/64');
+    });
+
+    it('drops addresses that are not globally routable, such as a local reverse proxy', function () {
+        foreach (['127.0.0.1', '::ffff:127.0.0.1', '10.1.0.5', '172.26.6.228', '192.168.1.1', '100.64.1.1', '::1', 'fe80::1', 'fd00::1'] as $ip) {
+            expect(Tools::ipLimitKey($ip))->toBeNull();
+        }
+    });
+
+    it('drops the exact addresses it is told to ignore, but not their neighbours', function () {
+        $ignored = ['103.169.217.55', '2a0b:9900::1'];
+
+        expect(Tools::ipLimitKey('103.169.217.55', $ignored))->toBeNull()
+            ->and(Tools::ipLimitKey('::ffff:103.169.217.55', $ignored))->toBeNull()
+            ->and(Tools::ipLimitKey('2a0b:9900:0:0::1', $ignored))->toBeNull()
+            ->and(Tools::ipLimitKey('103.169.217.56', $ignored))->toBe('103.169.217.0/24');
+    });
+
+    it('drops input that is not an IP address', function () {
+        expect(Tools::ipLimitKey(''))->toBeNull()
+            ->and(Tools::ipLimitKey('UwU'))->toBeNull();
+    });
+});

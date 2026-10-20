@@ -23,6 +23,8 @@ use function filter_var;
 use function floor;
 use function hash;
 use function in_array;
+use function inet_ntop;
+use function inet_pton;
 use function is_numeric;
 use function json_decode;
 use function log;
@@ -37,11 +39,14 @@ use function round;
 use function rtrim;
 use function shuffle;
 use function sodium_crypto_scalarmult_base;
+use function str_repeat;
+use function str_starts_with;
 use function strlen;
 use function strpos;
 use function strtr;
 use function substr;
 use function trim;
+use const FILTER_FLAG_GLOBAL_RANGE;
 use const FILTER_FLAG_IPV4;
 use const FILTER_FLAG_IPV6;
 use const FILTER_VALIDATE_EMAIL;
@@ -379,6 +384,43 @@ final class Tools
         }
 
         return true;
+    }
+
+    /**
+     * Collapse an online_log IP into what the device limit counts
+     *
+     * One subscriber line shows up as many addresses: mobile CGNAT hands out a different IPv4
+     * per flow inside a /24, and IPv6 privacy addresses rotate inside a /64. Addresses that are
+     * not globally routable (a node behind a local reverse proxy reports 127.0.0.1) and the exit
+     * IPs of our own relays (UDP and Hysteria 2 carry no PROXY header) are not devices at all.
+     *
+     * @param array<string> $ignored exact addresses never counted
+     *
+     * @return string|null Example: `223.104.79.0/24`, `240e:3a8:4caf:6de0::/64`, or null to skip it
+     */
+    public static function ipLimitKey(string $ip, array $ignored = []): ?string
+    {
+        if (str_starts_with($ip, '::ffff:') && self::isIPv4(substr($ip, 7))) {
+            $ip = substr($ip, 7);
+        }
+
+        if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_GLOBAL_RANGE)) {
+            return null;
+        }
+
+        $packed = inet_pton($ip);
+
+        foreach ($ignored as $ignored_ip) {
+            if (@inet_pton($ignored_ip) === $packed) {
+                return null;
+            }
+        }
+
+        if (strlen($packed) === 4) {
+            return inet_ntop(substr($packed, 0, 3) . "\0") . '/24';
+        }
+
+        return inet_ntop(substr($packed, 0, 8) . str_repeat("\0", 8)) . '/64';
     }
 
     public static function isInt($input): bool

@@ -101,6 +101,9 @@ $_ENV['theme'] = 'cafe';                //默认主题
 $_ENV['locale'] = 'zh-CN';                //默认语言
 $_ENV['jump_delay'] = 1000;               //跳转延时，单位ms
 $_ENV['keep_connect'] = false;            // 流量耗尽用户限速至 1Mbps
+// 统计同时在线 IP 数时忽略的地址：自家中转的出口 IP（UDP / Hysteria 2 经中转不带 PROXY 头，节点只看得到中转机）
+// 非公网地址（如本机反代的 127.0.0.1）总是忽略；IPv4 按 /24、IPv6 按 /64 合并计数
+$_ENV['iplimit_ignore_ips'] = [];
 
 //Other-----------------------------------------------------------------------------------------------------------------
 // cdn.jsdelivr.net / fastly.jsdelivr.net / testingcf.jsdelivr.net

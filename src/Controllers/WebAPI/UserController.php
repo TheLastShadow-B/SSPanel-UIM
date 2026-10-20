@@ -89,6 +89,15 @@ final class UserController extends BaseController
         };
 
         $users = [];
+        $online_ips = [];
+
+        foreach ((new OnlineLog())->where('last_time', '>', time() - 90)->get(['user_id', 'ip']) as $log) {
+            $key = Tools::ipLimitKey($log->ip, $_ENV['iplimit_ignore_ips'] ?? []);
+
+            if ($key !== null) {
+                $online_ips[$log->user_id][$key] = true;
+            }
+        }
 
         foreach ($users_raw as $user_raw) {
             if ($user_raw->transfer_enable <= $user_raw->u + $user_raw->d) {
@@ -101,12 +110,7 @@ final class UserController extends BaseController
             }
 
             if ($user_raw->node_iplimit !== 0 &&
-                $user_raw->node_iplimit <
-                (new OnlineLog())
-                    ->where('user_id', $user_raw->id)
-                    ->where('last_time', '>', time() - 90)
-                    ->distinct()
-                    ->count('ip')
+                $user_raw->node_iplimit < count($online_ips[$user_raw->id] ?? [])
             ) {
                 continue;
             }

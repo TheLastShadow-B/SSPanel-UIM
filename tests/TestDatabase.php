@@ -116,6 +116,23 @@ class TestDatabase
             });
         }
 
+        // Raw SQL: the ip column is MariaDB inet6 like production, which hands IPv4 back as ::ffff:a.b.c.d
+        if (!$schema->hasTable('online_log')) {
+            $capsule->getConnection()->statement('
+                CREATE TABLE online_log (
+                    id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                    user_id bigint(20) unsigned NOT NULL,
+                    ip inet6 NOT NULL,
+                    node_id int(11) unsigned NOT NULL,
+                    first_time int(11) unsigned NOT NULL,
+                    last_time int(11) unsigned NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY user_ip_node (user_id, ip, node_id),
+                    KEY last_time (last_time)
+                )
+            ');
+        }
+
         if (!$schema->hasTable('tcp_probe_target')) {
             $schema->create('tcp_probe_target', function (Blueprint $table) {
                 $table->increments('id');
@@ -310,7 +327,7 @@ class TestDatabase
         $capsule = DB::getCapsule();
         $schema = $capsule->schema();
         
-        $tables = ['tcp_probe_source', 'tcp_probe_round', 'tcp_probe', 'tcp_probe_target', 'user_coupon', 'stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'product', 'subscription', 'config', 'user_traffic_log', 'node_online_log', 'node', 'user'];
+        $tables = ['tcp_probe_source', 'tcp_probe_round', 'tcp_probe', 'tcp_probe_target', 'user_coupon', 'stripe_event', 'paylist', 'email_queue', 'invoice', 'order', 'product', 'subscription', 'config', 'user_traffic_log', 'online_log', 'node_online_log', 'node', 'user'];
         
         foreach ($tables as $table) {
             if ($schema->hasTable($table)) {
