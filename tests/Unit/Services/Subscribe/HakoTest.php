@@ -37,13 +37,13 @@ it('preserves node credentials and options without nesting subscriptions', funct
         ->and($config)->not->toHaveKey('proxy-providers');
 });
 
-it('keeps empty regions blocked and unclassified nodes selectable', function () use ($hakoTestNodes) {
+it('keeps empty regions blocked and Global limited to region groups', function () use ($hakoTestNodes) {
     $config = (new Hako())->buildConfig($hakoTestNodes());
     $groups = array_column($config['proxy-groups'], null, 'name');
 
     expect($groups['JP']['proxies'])->toBe(['JP-Vision'])
         ->and($groups['HK']['proxies'])->toBe(['REJECT'])
-        ->and($groups['Global']['proxies'])->toContain('SG-Other');
+        ->and($groups['Global']['proxies'])->toBe(['HK', 'US', 'JP', 'TW']);
 
     foreach ((new Hako())->buildConfig([])['proxy-groups'] as $group) {
         expect($group['proxies'])->not->toBeEmpty();

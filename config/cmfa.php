@@ -112,7 +112,6 @@ return [
         [
             'name' => 'Global',
             'type' => 'select',
-            'include-all-proxies' => true,
             'proxies' => [
                 'HK',
                 'US',

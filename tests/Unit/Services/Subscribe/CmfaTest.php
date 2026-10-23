@@ -46,6 +46,16 @@ it('preserves supplied user nodes without sharing desktop template state', funct
     }
 });
 
+it('limits Global to region groups', function () {
+    $groups = array_column((new Cmfa())->buildConfig([])['proxy-groups'], null, 'name');
+
+    expect($groups['Global'])->toBe([
+        'name' => 'Global',
+        'type' => 'select',
+        'proxies' => ['HK', 'US', 'JP', 'TW'],
+    ]);
+});
+
 it('resolves CMFA routing and DNS targets to declared groups and rule providers', function () {
     $config = (new Cmfa())->buildConfig([]);
     $groups = array_column($config['proxy-groups'], null, 'name');

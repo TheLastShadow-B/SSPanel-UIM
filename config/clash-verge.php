@@ -115,7 +115,6 @@ $_ENV['Clash_Group_Config'] = [
         [
             'name' => 'Global',
             'type' => 'select',
-            'include-all-proxies' => true,
             'proxies' => [
                 'HK',
                 'US',

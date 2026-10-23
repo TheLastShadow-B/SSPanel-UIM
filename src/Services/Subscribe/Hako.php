@@ -6,7 +6,6 @@ namespace App\Services\Subscribe;
 
 use function array_column;
 use function array_filter;
-use function array_merge;
 use function array_values;
 use function str_contains;
 use function yaml_emit;
@@ -40,9 +39,6 @@ final class Hako extends Base
                 // Never silently turn an unavailable region into a direct exit.
                 $group['proxies'] = $matches !== [] ? $matches : ['REJECT'];
                 unset($group['filter']);
-            } elseif ($group['name'] === 'Global') {
-                // Nodes without a recognized region remain manually selectable.
-                $group['proxies'] = array_merge($group['proxies'], $names);
             }
         }
         unset($group);
