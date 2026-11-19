@@ -58,6 +58,23 @@ final class Subscribe
             ->get();
     }
 
+    /**
+     * 订阅用的节点列表:在 getUserNodes 的基础上展开多入口节点。
+     * 用户中心的节点页 / 倍率页仍用 getUserNodes,一个节点只显示一次。
+     */
+    public static function getUserSubscribeNodes($user): Collection
+    {
+        return self::expandEntries(self::getUserNodes($user));
+    }
+
+    /**
+     * 多入口节点展开,见 NodeEntries。
+     */
+    public static function expandEntries(Collection $nodes): Collection
+    {
+        return NodeEntries::expand($nodes);
+    }
+
     public static function getContent($user, string $type): string
     {
         return self::getClient($type)->getContent($user);

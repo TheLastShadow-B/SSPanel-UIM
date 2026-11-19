@@ -20,7 +20,7 @@ final class Stash extends Base
         $stash_config = $_ENV['Stash_Config'];
         $stash_group_indexes = $_ENV['Stash_Group_Indexes'];
         $stash_group_config = $_ENV['Stash_Group_Config'];
-        $nodes_raw = Subscribe::getUserNodes($user);
+        $nodes_raw = Subscribe::getUserSubscribeNodes($user);
 
         foreach ($nodes_raw as $node_raw) {
             $node_custom_config = json_decode($node_raw->custom_config, true);
