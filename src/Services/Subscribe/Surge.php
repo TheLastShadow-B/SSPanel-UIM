@@ -49,7 +49,7 @@ final class Surge extends Base
 
     public function getContent($user): string
     {
-        $nodes_raw = Subscribe::getUserSubscribeNodes($user);
+        $nodes_raw = Subscribe::getUserNodes($user);
 
         [$proxy_lines, $node_names] = $this->buildProxies($user, $nodes_raw);
         $regions = $this->classifyNodesByRegion($node_names);
