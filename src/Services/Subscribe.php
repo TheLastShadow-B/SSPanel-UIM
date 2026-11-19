@@ -10,6 +10,7 @@ use App\Services\Subscribe\Clash;
 use App\Services\Subscribe\Cmfa;
 use App\Services\Subscribe\Hako;
 use App\Services\Subscribe\Json;
+use App\Services\Subscribe\NodeEntries;
 use App\Services\Subscribe\SIP002;
 use App\Services\Subscribe\SIP008;
 use App\Services\Subscribe\SS;
@@ -56,6 +57,16 @@ final class Subscribe
         })->orderBy('node_class')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * The nodes a subscription lists: getUserNodes(), with every node that has
+     * several entries listed once per entry (see NodeEntries). The node and
+     * rate pages keep using getUserNodes() and show each node once.
+     */
+    public static function getUserSubscribeNodes($user): Collection
+    {
+        return NodeEntries::expand(self::getUserNodes($user));
     }
 
     public static function getContent($user, string $type): string
